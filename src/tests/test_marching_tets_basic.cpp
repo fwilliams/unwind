@@ -1,13 +1,12 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/per_face_normals.h>
+#include <igl/marching_tets.h>
 
 #include <iostream>
 #include <utility>
 
 //#include "tetrahedralize.h"
-#include "marching_tets.h"
-
 typedef igl::opengl::glfw::Viewer Viewer;
 
 void make_single_tet(Eigen::MatrixXd& TV, Eigen::MatrixXd& TN, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT) {
@@ -45,6 +44,7 @@ void make_single_tet(Eigen::MatrixXd& TV, Eigen::MatrixXd& TN, Eigen::MatrixXi& 
 
 void mt_test_case(Viewer& viewer, int i, const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
                   Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
+    using namespace std;
     const int I =  1;
     const int O = -1;
     Eigen::MatrixXd isovals(16, 4);
@@ -65,7 +65,10 @@ void mt_test_case(Viewer& viewer, int i, const Eigen::MatrixXd& TV, const Eigen:
                I, I, I, O, // 3d
                I, I, I, I; // 4a
 
-    marching_tets(TV, isovals.row(i), TT, V, F);
+    cout << "CASE " << i << endl;
+    Eigen::VectorXd isoval_row = isovals.row(i);
+    igl::marching_tets(TV, TT, isoval_row, 0.0, V, F);
+    cout << "END" << endl;
 
     Eigen::MatrixXd e1(6, 3), e2(6, 3);
     e1.row(0) = TV.row(0); e2.row(0) = TV.row(1);
@@ -76,7 +79,9 @@ void mt_test_case(Viewer& viewer, int i, const Eigen::MatrixXd& TV, const Eigen:
     e1.row(5) = TV.row(2); e2.row(5) = TV.row(3);
 
     viewer.data().clear();
-    viewer.data().set_mesh(V, F);
+    if(V.rows() > 0) {
+        viewer.data().set_mesh(V, F);
+    }
     viewer.data().add_edges(e1, e2, Eigen::RowVector3d(0.1, 0.1, 0.1));
     viewer.data().line_width = 2.0;
     viewer.data().point_size = 5.0;
