@@ -45,4 +45,7 @@ add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/tetra
 target_include_directories(test_marching_tets_bin PRIVATE src)
 target_link_libraries(test_marching_tets_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
 
+add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/MshLoader.cpp)
+target_include_directories(test_meshing_harish_data_bin PRIVATE src)
+target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
 
