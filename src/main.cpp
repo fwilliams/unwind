@@ -5,6 +5,11 @@
 #include <igl/harmonic.h>
 #include <igl/readOFF.h>
 #include <igl/marching_tets.h>
+#include <igl/directed_edge_parents.h>
+#include <igl/boundary_conditions.h>
+#include <igl/bbw.h>
+#include <igl/normalize_row_sums.h>
+#include <igl/project_isometrically_to_plane.h>
 
 #include <iostream>
 #include <utility>
@@ -72,23 +77,6 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
   TF.conservativeResize(fcount, 3);
 }
 
-void plotMeshDistance(Viewer& viewer, const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, const Eigen::VectorXd& d, const double strip_size ) {
-  // Rescale the function depending on the strip size
-  Eigen::VectorXd f = (d/strip_size);
-
-  // The function should be 1 on each integer coordinate
-  f = (f*M_PI).array().sin().abs();
-
-  // Compute per-vertex colors
-  Eigen::MatrixXd C;
-  igl::colormap(igl::COLOR_MAP_TYPE_JET, f, false, C);
-
-  // Plot the mesh
-  viewer.data().clear();
-  viewer.data().set_mesh(V, F);
-  viewer.data().set_colors(C);
-}
-
 
 // Visualize the tet mesh as a wireframe
 void visualize_tet_wireframe(igl::opengl::glfw::Viewer& viewer,
@@ -136,44 +124,67 @@ void visualize_tet_wireframe(igl::opengl::glfw::Viewer& viewer,
   viewer.data().add_edges(v1, v2, Eigen::RowVector3d(0.1, 0.1, 0.1));
 }
 
+
+void extract_skeleton(int num_samples, const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, const Eigen::VectorXd isovals, Eigen::MatrixXd& SV) {
+  SV.resize(num_samples, 3);
+  Eigen::MatrixXd LV;
+  Eigen::MatrixXi LF;
+  int vcount = 0;
+  for(int i = 1; i < num_samples; i++) {
+    double isovalue = i * (1.0/num_samples);
+    igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
+    if (LV.rows() == 0) {
+      continue;
+    }
+    Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
+    SV.row(vcount++) = C;
+  }
+
+  SV.conservativeResize(vcount, 3);
+}
+
+void draw_skeleton(Viewer& viewer, const Eigen::MatrixXd& SV) {
+  Eigen::MatrixXd v1(SV.rows()-1, 3), v2(SV.rows()-1, 3);
+  for (int i = 0; i < SV.rows()-1; i++) {
+    v1.row(i) = SV.row(i);
+    v2.row(i) = SV.row(i+1);
+  }
+  viewer.data().add_edges(v1, v2, Eigen::RowVector3d(0.8, 0.1, 0.4));
+  viewer.data().add_points(SV, Eigen::RowVector3d(1.0, 0.0, 0.0));
+}
+
+bool bbw(const Eigen::MatrixXd& SV, const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, Eigen::MatrixXd& W) {
+ // Need to construct
+  Eigen::MatrixXi BE(SV.rows() - 1, 2);
+
+  for (int i = 0; i < SV.rows()-1; i++) {
+    BE.row(i) = Eigen::RowVector2i(i, i+1);
+  }
+
+  Eigen::VectorXi b;
+  Eigen::MatrixXd bc;
+  igl::boundary_conditions(TV, TT, SV, Eigen::VectorXi(), BE, Eigen::MatrixXi(), b, bc);
+  igl::BBWData bbw_data;
+  //  bbw_data.active_set_params.max_iter = 3;
+  bbw_data.verbosity = 2;
+  return igl::bbw(TV, TT, b, bc, bbw_data, W);
+}
+
 int main(int argc, char *argv[]) {
   using namespace Eigen;
   using namespace std;
 
-  Eigen::MatrixXd TV, V, isoV;
-  Eigen::MatrixXi TF, TT, F, isoF;
-  Eigen::VectorXd W;
+  Eigen::MatrixXd TV, isoV, SV, W;
+  Eigen::MatrixXi TF, TT, isoF;
+  Eigen::VectorXd isovals;
 
   igl::opengl::glfw::Viewer viewer;
   igl::opengl::glfw::imgui::ImGuiMenu menu;
   viewer.plugins.push_back(&menu);
 
   // Load a mesh in OFF format
-  // igl::readOFF("../p-tapinosoma-100k.off", V, F);
-//   igl::readOBJ("./meshes/armadillo.obj", V, F);
-  // igl::readOFF("./meshes/p-tapinosoma-100k-watertight.off", V, F);
-   igl::readOFF("./meshes/fertility.off", V, F);
-//  igl::readOFF("./meshes/ball.off", V, F);
-  igl::readOFF("./out2.off", V, F);
-  cout << "Input surface mesh has " << V.rows() << " vertices and " << F.rows() << " faces" << endl;
-  cout << "Loaded mesh bounding box: " <<
-          V.colwise().maxCoeff() - V.colwise().minCoeff() << endl;
-  tetrahedralize_mesh(V, F,
-                      10, // Facet angle
-                      8, // Facet size
-                      0.5, // Facet distance
-                      3, // Cell Radius Edge Ratio
-                      -4, // Cell size
-                      TV, TF, TT);
-//  tetrahedralize_mesh(V, F,
-//                      5, // Facet angle
-//                      2, // Facet size
-//                      0.1, // Facet distance
-//                      3, // Cell Radius Edge Ratio
-//                      3, // Cell size
-//                      TV, TF, TT);
-//  igl::readMEDIT("./out2.mesh", TV, TF, TT);
 
+  load_yixin_tetmesh("outReoriented_.msh", TV, TF, TT);
   viewer.data().clear();
   viewer.data().set_mesh(TV, TF);
 
@@ -182,11 +193,11 @@ int main(int argc, char *argv[]) {
   bool done_harmonic = false;
   double level_set = 0.0;
   double increment = 0.05;
+  int current_weight = 0;
+
   viewer.callback_key_down = [&](igl::opengl::glfw::Viewer& viewer,
-                                 unsigned char key, int modifiers) -> bool
-  {
-    switch (key)
-    {
+                                 unsigned char key, int modifiers) -> bool {
+    switch (key) {
     case 'R':
       done_harmonic = false;
       current_idx = 0;
@@ -194,41 +205,67 @@ int main(int argc, char *argv[]) {
       viewer.data().set_mesh(TV, TF);
       break;
     case 'N':
-      if (W.rows() != TV.rows())
-      {
+      if (isovals.rows() != TV.rows()) {
         cerr << "No isofunction defined yet!" << endl;
-      }
-      else
-      {
+      } else {
         level_set += increment;
         if (level_set > 1.0) {
           level_set = 0.0;
         }
         cout << "Showing level set for isovalue " << level_set << endl;
-        igl::marching_tets(TV, TT, W, level_set, isoV, isoF);
+        igl::marching_tets(TV, TT, isovals, level_set, isoV, isoF);
         viewer.data().clear();
-        visualize_tet_wireframe(viewer, TV, TT, W);
+        visualize_tet_wireframe(viewer, TV, TT, isovals);
         viewer.data().set_mesh(isoV, isoF);
       }
       break;
     case 'P':
-      if (W.rows() != TV.rows())
-      {
+      if (isovals.rows() != TV.rows()) {
         cerr << "No isofunction defined yet!" << endl;
-      }
-      else
-      {
+      } else {
         level_set -= increment;
         if (level_set < 0.0) {
           level_set = 0.0;
         }
         cout << "Showing level set for isovalue " << level_set << endl;
-        igl::marching_tets(TV, TT, W, level_set, isoV, isoF);
+        igl::marching_tets(TV, TT, isovals, level_set, isoV, isoF);
         viewer.data().clear();
-        visualize_tet_wireframe(viewer, TV, TT, W);
+        visualize_tet_wireframe(viewer, TV, TT, isovals);
         viewer.data().set_mesh(isoV, isoF);
       }
       break;
+    case 'S':
+      if (isovals.rows() != TV.rows()) {
+        cerr << "No isofunction defined yet!" << endl;
+      } else {
+        extract_skeleton(25, TV, TT, isovals, SV);
+        viewer.data().clear();
+        viewer.data().set_mesh(TV, TF);
+        viewer.data().show_faces = false;
+        draw_skeleton(viewer, SV);
+      }
+      break;
+    case 'B':
+      bbw(SV, TV, TT, W);
+      for (int i = 0; i < W.rows(); i++) {
+        double sum = W.row(i).sum();
+        if (fabs(sum) < 1e-15) {
+          cout << "Row " << i << " sums to zero..." << endl;
+        } else {
+          W.row(i) /= sum;
+        }
+      }
+      cout << W.rows() << " x " << W.cols() << endl;
+      break;
+    case '.':
+      if (W.cols() != 0) {
+        current_weight = (current_weight + 1 % W.cols());
+        viewer.data().clear();
+        viewer.data().set_mesh(TV, TF);
+        viewer.data().show_faces = false;
+        visualize_tet_wireframe(viewer, TV, TT, W.col(current_weight));
+        draw_skeleton(viewer, SV);
+      }
     }
   };
 
@@ -270,12 +307,12 @@ int main(int argc, char *argv[]) {
         constraint_values(0, 0) = 1.0;
         constraint_values(1, 0) = 0.0;
 
-        igl::harmonic(TV, TT, constraint_indices, constraint_values, 1, W);
+        igl::harmonic(TV, TT, constraint_indices, constraint_values, 1, isovals);
         done_harmonic = true;
 
         viewer.data().clear();
         viewer.data().set_mesh(TV, TF);
-        visualize_tet_wireframe(viewer, TV, TT, W);
+        visualize_tet_wireframe(viewer, TV, TT, isovals);
       }
     }
     return false;
