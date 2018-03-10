@@ -28,7 +28,8 @@ option(LIBIGL_WITH_XML               "Use XML"            OFF)
 find_package(LIBIGL REQUIRED QUIET)
 
 add_executable(${PROJECT_NAME}_bin src/main.cpp src/MshLoader.cpp)
-target_link_libraries(${PROJECT_NAME}_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(${PROJECT_NAME}_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui cholmod)
+target_include_directories(${PROJECT_NAME}_bin PRIVATE /usr/include/suitesparse/)
 
 # Test the basic cases for marching tets
 add_executable(test_marching_tets_cases_bin src/tests/test_marching_tets_basic.cpp)
