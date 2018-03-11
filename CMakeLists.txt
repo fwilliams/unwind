@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(fish_deformation)
 
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -g)
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -O3 -g -DNDEBUG) # O3 with asserts and debug symbols
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # libigl
@@ -34,6 +34,10 @@ target_include_directories(${PROJECT_NAME}_bin PRIVATE /usr/include/suitesparse/
 add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/yixin_loader.cpp)
 target_include_directories(preprocess_fish_bin PRIVATE src)
 target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+
+add_executable(mesh_datfile_bin src/mesh_datfile.cpp)
+target_include_directories(mesh_datfile_bin PRIVATE src)
+target_link_libraries(mesh_datfile_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
 # Test loading Harish's dat files
 add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/yixin_loader.cpp)
