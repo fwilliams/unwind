@@ -1,13 +1,120 @@
-/* This file is part of PyMesh. Copyright (c) 2015 by Qingnan Zhou */
-#include "MshLoader.h"
-
-#include <iostream>
-#include <sstream>
+#include <fstream>
+#include <map>
+#include <string>
 #include <vector>
+#include <iostream>
 
-#include "Exception.h"
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
-using namespace PyMesh;
+typedef double Float;
+typedef Eigen::VectorXd VectorF;
+typedef Eigen::VectorXi VectorI;
+
+class MshLoaderException : public std::exception {
+public:
+    MshLoaderException(const std::string& description) :
+            exception(), m_description(description) {}
+    virtual ~MshLoaderException() throw() {}
+
+public:
+    virtual const char* what() const throw() {
+        return m_description.c_str();
+    }
+
+private:
+    std::string m_description;
+};
+
+class IOError : public MshLoaderException {
+public:
+    IOError(const std::string& description) :
+            MshLoaderException(description) {}
+    virtual ~IOError() throw() {}
+};
+
+class RuntimeError : public MshLoaderException {
+public:
+    RuntimeError(const std::string& description) :
+            MshLoaderException(description) {}
+    virtual ~RuntimeError() throw() {}
+};
+
+class NotImplementedError : public MshLoaderException {
+public:
+    NotImplementedError(const std::string& description) :
+            MshLoaderException(description) {}
+    virtual ~NotImplementedError() throw() {}
+};
+
+
+class MshLoader {
+    public:
+        typedef std::map<std::string, VectorF> FieldMap;
+        typedef std::vector<std::string> FieldNames;
+
+    public:
+        MshLoader(const std::string& filename);
+
+    public:
+        const VectorF& get_nodes() const { return m_nodes; }
+        const VectorI& get_elements() const { return m_elements; }
+
+        VectorF& get_node_field(const std::string& fieldname) {
+            return m_node_fields[fieldname];
+        }
+
+        VectorF& get_element_field(const std::string& fieldname) {
+            return m_element_fields[fieldname];
+        }
+
+        bool is_node_field(const std::string& fieldname) {
+            return (m_node_fields.find(fieldname) != m_node_fields.end());
+        }
+
+        bool is_element_field(const std::string& fieldname) {
+            return (m_element_fields.find(fieldname) != m_element_fields.end());
+        }
+
+        FieldNames get_node_field_names() const;
+        FieldNames get_element_field_names() const;
+
+        size_t get_nodes_per_element() const {
+            return m_nodes_per_element;
+        }
+
+        size_t get_element_type() const {
+            return m_element_type;
+        }
+
+
+    public:
+        enum ErrorCode {
+            INVALID_FORMAT,
+            NOT_IMPLEMENTED
+        };
+
+    private:
+        void parse_nodes(std::ifstream& fin);
+        void parse_elements(std::ifstream& fin);
+        void parse_node_field(std::ifstream& fin);
+        void parse_element_field(std::ifstream& fin);
+        void parse_unknown_field(std::ifstream& fin,
+                const std::string& fieldname);
+
+        void eat_white_space(std::ifstream& fin);
+        int num_nodes_per_elem_type(int elem_type);
+
+    public:
+        bool m_binary;
+        size_t m_data_size;
+        size_t m_nodes_per_element;
+        size_t m_element_type;
+        VectorF m_nodes;
+        VectorI m_elements;
+        FieldMap m_node_fields;
+        FieldMap m_element_fields;
+};
 
 MshLoader::MshLoader(const std::string& filename) {
     std::ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
@@ -451,4 +558,63 @@ int MshLoader::num_nodes_per_elem_type(int elem_type) {
             throw NOT_IMPLEMENTED;
     }
     return nodes_per_element;
+}
+
+
+void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT) {
+  using namespace std;
+  MshLoader vol_loader(filename);
+  assert(vol_loader.m_nodes_per_element == 4);
+  assert(vol_loader.m_data_size == 8);
+
+  int tv_rows = vol_loader.m_nodes.rows() / 3;
+  int tt_rows = vol_loader.m_elements.rows() / vol_loader.m_nodes_per_element;
+
+  TT.resize(tt_rows, vol_loader.m_nodes_per_element);
+  TV.resize(tv_rows, 3);
+
+  std::vector<array<int, 3>> tris;
+
+  int vcount = 0;
+  for (int i = 0; i < vol_loader.m_nodes.rows(); i += 3) {
+    TV.row(vcount++) = Eigen::RowVector3d(vol_loader.m_nodes[i], vol_loader.m_nodes[i+2], vol_loader.m_nodes[i+1]);
+  }
+  int tcount = 0;
+  for (int i = 0; i < vol_loader.m_elements.rows(); i += vol_loader.m_nodes_per_element) {
+    const int e1 = vol_loader.m_elements[i];
+    const int e2 = vol_loader.m_elements[i+1];
+    const int e3 = vol_loader.m_elements[i+2];
+    const int e4 = vol_loader.m_elements[i+3];
+    TT.row(tcount++) = Eigen::RowVector4i(e1, e2, e3, e4);
+    array<int, 3> t1, t2, t3, t4;
+    t1 = array<int, 3>{{ e1, e2, e3 }};
+    t2 = array<int, 3>{{ e1, e2, e3 }};
+    t3 = array<int, 3>{{ e2, e3, e4 }};
+    t4 = array<int, 3>{{ e1, e3, e4 }};
+    sort(t1.begin(), t1.end());
+    sort(t2.begin(), t2.end());
+    sort(t3.begin(), t3.end());
+    sort(t4.begin(), t4.end());
+    tris.push_back(t1);
+    tris.push_back(t2);
+    tris.push_back(t3);
+    tris.push_back(t4);
+  }
+
+  int fcount;
+  TF.resize(tris.size(), 3);
+  sort(tris.begin(), tris.end());
+  for (int i = 0; i < TF.rows();) {
+    int v1 = tris[i][0], v2 = tris[i][1], v3 = tris[i][2];
+    int count = 0;
+    while (v1 == tris[i][0] && v2 == tris[i][1] && v3 == tris[i][2]) {
+      i += 1;
+      count += 1;
+    }
+    if (count == 1) {
+      TF.row(fcount++) = Eigen::RowVector3i(v1, v2, v3);
+    }
+  }
+
+  TF.conservativeResize(fcount, 3);
 }

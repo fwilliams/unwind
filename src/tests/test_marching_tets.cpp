@@ -9,7 +9,7 @@
 #include <iostream>
 #include <utility>
 
-#include "tetrahedralize.h"
+#include "cgal_tetrahedralize.h"
 
 
 typedef igl::opengl::glfw::Viewer Viewer;

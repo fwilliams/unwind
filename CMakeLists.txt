@@ -27,9 +27,18 @@ option(LIBIGL_WITH_XML               "Use XML"            OFF)
 
 find_package(LIBIGL REQUIRED QUIET)
 
-add_executable(${PROJECT_NAME}_bin src/main.cpp src/MshLoader.cpp)
+add_executable(${PROJECT_NAME}_bin src/main.cpp src/yixin_loader.cpp)
 target_link_libraries(${PROJECT_NAME}_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui cholmod)
 target_include_directories(${PROJECT_NAME}_bin PRIVATE /usr/include/suitesparse/)
+
+add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/yixin_loader.cpp)
+target_include_directories(preprocess_fish_bin PRIVATE src)
+target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+
+# Test loading Harish's dat files
+add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/yixin_loader.cpp)
+target_include_directories(test_meshing_harish_data_bin PRIVATE src)
+target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
 # Test the basic cases for marching tets
 add_executable(test_marching_tets_cases_bin src/tests/test_marching_tets_basic.cpp)
@@ -42,14 +51,8 @@ target_include_directories(test_cgal_tet_meshing_bin PRIVATE src)
 target_link_libraries(test_cgal_tet_meshing_bin igl::cgal)
 
 # Example for calling the CGAL tet-mesher
-add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/tetrahedralize.cpp)
-target_include_directories(test_marching_tets_bin PRIVATE src)
-target_link_libraries(test_marching_tets_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
+#add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/cgal_tetrahedralize.cpp)
+#target_include_directories(test_marching_tets_bin PRIVATE src)
+#target_link_libraries(test_marching_tets_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
 
-add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/MshLoader.cpp)
-target_include_directories(test_meshing_harish_data_bin PRIVATE src)
-target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
-add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/MshLoader.cpp)
-target_include_directories(preprocess_fish_bin PRIVATE src)
-target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)

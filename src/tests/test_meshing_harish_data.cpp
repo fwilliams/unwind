@@ -14,7 +14,7 @@
 #include <array>
 #include <algorithm>
 
-#include "MshLoader.h"
+#include "yixin_loader.h"
 
 typedef igl::opengl::glfw::Viewer Viewer;
 
@@ -177,65 +177,6 @@ void visualize_tet_wireframe(igl::opengl::glfw::Viewer& viewer,
   viewer.data().point_size = 5.0;
   viewer.data().add_points(TV, C);
   viewer.data().add_edges(v1, v2, Eigen::RowVector3d(0.1, 0.1, 0.1));
-}
-
-
-void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT) {
-  using namespace std;
-  MshLoader vol_loader(filename);
-  assert(vol_loader.m_nodes_per_element == 4);
-  assert(vol_loader.m_data_size == 8);
-
-  int tv_rows = vol_loader.m_nodes.rows() / 3;
-  int tt_rows = vol_loader.m_elements.rows() / vol_loader.m_nodes_per_element;
-
-  TT.resize(tt_rows, vol_loader.m_nodes_per_element);
-  TV.resize(tv_rows, 3);
-
-  std::vector<array<int, 3>> tris;
-
-  int vcount = 0;
-  for (int i = 0; i < vol_loader.m_nodes.rows(); i += 3) {
-    TV.row(vcount++) = Eigen::RowVector3d(vol_loader.m_nodes[i], vol_loader.m_nodes[i+2], vol_loader.m_nodes[i+1]);
-  }
-  int tcount = 0;
-  for (int i = 0; i < vol_loader.m_elements.rows(); i += vol_loader.m_nodes_per_element) {
-    const int e1 = vol_loader.m_elements[i];
-    const int e2 = vol_loader.m_elements[i+1];
-    const int e3 = vol_loader.m_elements[i+2];
-    const int e4 = vol_loader.m_elements[i+3];
-    TT.row(tcount++) = Eigen::RowVector4i(e1, e2, e3, e4);
-    array<int, 3> t1, t2, t3, t4;
-    t1 = array<int, 3>{{ e1, e2, e3 }};
-    t2 = array<int, 3>{{ e1, e2, e3 }};
-    t3 = array<int, 3>{{ e2, e3, e4 }};
-    t4 = array<int, 3>{{ e1, e3, e4 }};
-    sort(t1.begin(), t1.end());
-    sort(t2.begin(), t2.end());
-    sort(t3.begin(), t3.end());
-    sort(t4.begin(), t4.end());
-    tris.push_back(t1);
-    tris.push_back(t2);
-    tris.push_back(t3);
-    tris.push_back(t4);
-  }
-
-  int fcount;
-  TF.resize(tris.size(), 3);
-  sort(tris.begin(), tris.end());
-  for (int i = 0; i < TF.rows();) {
-    int v1 = tris[i][0], v2 = tris[i][1], v3 = tris[i][2];
-    int count = 0;
-    while (v1 == tris[i][0] && v2 == tris[i][1] && v3 == tris[i][2]) {
-      i += 1;
-      count += 1;
-    }
-    if (count == 1) {
-      TF.row(fcount++) = Eigen::RowVector3i(v1, v2, v3);
-    }
-  }
-
-  TF.conservativeResize(fcount, 3);
 }
 
 int main(int argc, char *argv[]) {
