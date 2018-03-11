@@ -1,5 +1,6 @@
 ../libigl/include
 ../libigl/external/eigen/
+../libigl/external/imgui/
 .
 build/glfw/src
 build/CMakeFiles/3.9.1/CompilerIdC

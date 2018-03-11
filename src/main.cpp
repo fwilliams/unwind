@@ -4,14 +4,14 @@
 #include <igl/unproject_onto_mesh.h>
 #include <igl/harmonic.h>
 #include <igl/readOFF.h>
+#include <igl/writeOFF.h>
 #include <igl/marching_tets.h>
+#include <igl/components.h>
 #include <igl/directed_edge_parents.h>
 #include <igl/boundary_conditions.h>
 #include <igl/bbw.h>
-#include <igl/normalize_row_sums.h>
-#include <igl/project_isometrically_to_plane.h>
-#include <igl/AABB.h>
 #include <igl/slim.h>
+#include <igl/copyleft/marching_cubes.h>
 
 #include <iostream>
 #include <utility>
@@ -79,7 +79,6 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
   TF.conservativeResize(fcount, 3);
 }
 
-
 // Visualize the tet mesh as a wireframe
 void visualize_tet_wireframe(igl::opengl::glfw::Viewer& viewer,
                              const Eigen::MatrixXd& TV,
@@ -101,12 +100,22 @@ void visualize_tet_wireframe(igl::opengl::glfw::Viewer& viewer,
     edges.push_back(std::make_pair(tf2, tf4));
     edges.push_back(std::make_pair(tf3, tf4));
   }
+  std::vector<std::pair<int, int>> deduped_edges;
+  std::sort(edges.begin(), edges.end());
+  for (int i = 0; i < edges.size();) {
+    int v1 = edges[i].first;
+    int v2 = edges[i].second;
+    deduped_edges.push_back(edges[i]);
+    while (v1 == edges[i].first && v2 == edges[i].second) {
+      i += 1;
+    }
+  }
 
-  Eigen::MatrixXd v1(edges.size(), 3), v2(edges.size(), 3);
-  for (int i = 0; i < edges.size(); i++)
+  Eigen::MatrixXd v1(deduped_edges.size(), 3), v2(deduped_edges.size(), 3);
+  for (int i = 0; i < deduped_edges.size(); i++)
   {
-    v1.row(i) = TV.row(edges[i].first);
-    v2.row(i) = TV.row(edges[i].second);
+    v1.row(i) = TV.row(deduped_edges[i].first);
+    v2.row(i) = TV.row(deduped_edges[i].second);
   }
 
   // Normalize the isovalues between 0 and 1 for the colormap
@@ -192,6 +201,107 @@ bool bbw(const Eigen::MatrixXd& SV, const Eigen::MatrixXd& TV, const Eigen::Matr
   return igl::bbw(TV, TT, b, bc, bbw_data, W);
 }
 
+bool mesh_datfile(const std::string& dat_filename, Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
+  using namespace std;
+
+  ifstream datfile(dat_filename);
+
+  string raw_filename;
+  datfile >> raw_filename;
+  datfile >> raw_filename;
+  raw_filename = string("./meshes/") + raw_filename;
+  cout << "rawfile is " << raw_filename << endl;
+  int w, h, d;
+  string resolution_str;
+  datfile >> resolution_str;
+  datfile >> w;
+  datfile >> h;
+  datfile >> d;
+
+  cout << "Grid has dimensions " << w << " x " << h << " x " << d << endl;
+
+  char* data = new char[w*h*d];
+  ifstream rawfile(raw_filename, std::ifstream::binary);
+  rawfile.read(data, w*h*d);
+  if (rawfile) {
+    cout << "Read rawfile successfully" << endl;
+  } else {
+    cout << "Only read " << rawfile.gcount() << " bytes" << endl;
+    return EXIT_FAILURE;
+  }
+  rawfile.close();
+
+  Eigen::MatrixXd GP((w+2)*(h+2)*(d+2), 3);
+  Eigen::VectorXd SV(GP.rows());
+
+  int readcount = 0;
+  int appendcount = 0;
+  for (int zi = 0; zi < d+2; zi++) {
+    for (int yi = 0; yi < h+2; yi++) {
+      for (int xi = 0; xi < w+2; xi++) {
+        if (xi == 0 || yi == 0 || zi == 0 || xi == (w+1) || yi == (h+1) || zi == (d+1)) {
+          SV[readcount] = 0.0;
+        } else {
+          SV[readcount] = double(data[appendcount]);
+          appendcount += 1;
+        }
+        GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
+        readcount += 1;
+      }
+    }
+  }
+  delete data;
+
+  igl::copyleft::marching_cubes(SV, GP, w+2, h+2, d+2, V, F);
+
+  igl::writeOFF("out.off", V, F);
+}
+
+void remove_garbage_components(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, Eigen::MatrixXi& newF) {
+  using namespace std;
+
+  cout << "Input model has " << V.rows() << " vertices and " << F.rows() << " faces" << endl;
+
+  cout << "Computing connected components..." << endl;
+  Eigen::VectorXi components;
+  igl::components(F, components);
+  vector<int> component_count;
+  component_count.resize(components.maxCoeff());
+  for (int i = 0; i < V.rows(); i++) {
+    component_count[components[i]] += 1;
+  }
+  int max_component = -1;
+  int max_component_count = 0;
+  for (int i = 0; i < component_count.size(); i++) {
+    if (max_component_count < component_count[i]) {
+      max_component = i;
+      max_component_count = component_count[i];
+    }
+  }
+
+  cout << "The model has " << component_count.size() << " connected components." << endl;
+  cout << "Component " << max_component << " has the most vertices with a count of " << max_component_count << endl;
+
+  newF.resize(F.rows(), 3);
+
+  int fcount = 0;
+  for(int i = 0; i < F.rows(); i++) {
+    bool keep = true;
+    for (int j = 0; j < 3; j++) {
+      if (components[F(i, j)] != max_component) {
+        keep = false;
+        break;
+      }
+    }
+    if (keep) {
+      newF.row(fcount++) = F.row(i);
+    }
+  }
+
+  cout << "Output model has " << fcount << " faces and " << newF.maxCoeff() << " vertices." << endl;
+  newF.conservativeResize(fcount, 3);
+}
+
 bool slim(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, Eigen::VectorXi& b, igl::SLIMData& sData, bool first) {
   if (first) {
     Eigen::MatrixXd bc(b.rows(), 3);
@@ -216,9 +326,28 @@ int main(int argc, char *argv[]) {
   using namespace Eigen;
   using namespace std;
 
-  if (argc > 1 && strning(argv[1]) == "--mesh") {
+  if (argc > 1 && string(argv[1]) == "--mesh") {
     if (argc != 2) { cerr << "--mesh expected .dat file argument" << endl; }
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    string in_filename = string(argv[2]);
+    mesh_datfile(in_filename, V, F);
+
+    // For some stupid reason marching cubes flips the triangle order
+    Eigen::VectorXd Vswap = V.col(1);
+    V.col(1) = V.col(2);
+    V.col(2) = Vswap;
+
+    Eigen::MatrixXi Fmain;
+    remove_garbage_components(V, F, Fmain);
+    string out_filename = in_filename + string(".off");
+    igl::writeOFF(out_filename, V, Fmain);
+  } else if (argc > 1 && string(argv[1]) == "--straighten") {
+
+  } else if (argc > 1 && string(argv[1]) == "--pick-endpoints") {
+
   }
+
   Eigen::MatrixXd TV, isoV, SV, W;
   Eigen::MatrixXi TF, TT, isoF;
   Eigen::VectorXd isovals;
@@ -329,7 +458,7 @@ int main(int argc, char *argv[]) {
     }
   };
 
-  viewer.callback_mouse_down = [&](igl::opengl::glfw::Viewer& viewer, int, int)->bool {
+  viewer.callback_mouse_down = [&](Viewer& viewer, int, int)->bool {
     int fid;
     Eigen::Vector3f bc; // Barycentric coordinates of the click point on the face
 
@@ -344,14 +473,11 @@ int main(int argc, char *argv[]) {
         int max;
         bc.maxCoeff(&max);
         int vid = TF(fid, max);
-        viewer.data().point_size = 5.0;
-        viewer.data().add_points(TV.row(vid), Eigen::RowVector3d(1.0, 0.0, 0.0));
-
         selected_end_coords[current_idx] = vid;
 
         viewer.data().point_size = 7.0;
         Eigen::RowVector3d color;
-        if (current_idx == 0) { color = Eigen::RowVector3d(0.0, 1.0, 0.0); } else { cout << "GREEN" << endl; color = Eigen::RowVector3d(1.0, 0.0, 0.0); }
+        if (current_idx == 0) { color = Eigen::RowVector3d(0.0, 1.0, 0.0); } else { color = Eigen::RowVector3d(1.0, 0.0, 0.0); }
         viewer.data().add_points(TV.row(vid), color);
 
         current_idx += 1;

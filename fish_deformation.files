@@ -4,6 +4,7 @@ build/CMakeFiles/3.9.1/CompilerIdCXX/CMakeCXXCompilerId.cpp
 build/CMakeFiles/feature_tests.c
 build/CMakeFiles/feature_tests.cxx
 build/glfw/src/glfw_config.h
+preprocess_fish.cpp
 src/MshLoader.cpp
 src/MshLoader.h
 src/cgal_tetmesh.h

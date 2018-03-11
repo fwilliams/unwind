@@ -50,3 +50,6 @@ add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.c
 target_include_directories(test_meshing_harish_data_bin PRIVATE src)
 target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
+add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/MshLoader.cpp)
+target_include_directories(preprocess_fish_bin PRIVATE src)
+target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
