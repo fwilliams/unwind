@@ -51,8 +51,8 @@ target_include_directories(test_cgal_tet_meshing_bin PRIVATE src)
 target_link_libraries(test_cgal_tet_meshing_bin igl::cgal)
 
 # Example for calling the CGAL tet-mesher
-#add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/cgal_tetrahedralize.cpp)
-#target_include_directories(test_marching_tets_bin PRIVATE src)
-#target_link_libraries(test_marching_tets_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
+add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/cgal_tetrahedralize.cpp)
+target_include_directories(test_marching_tets_bin PRIVATE src)
+target_link_libraries(test_marching_tets_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
 
 

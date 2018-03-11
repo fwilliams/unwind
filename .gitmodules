@@ -1,0 +1,4 @@
+[submodule "external/libigl"]
+	path = external/libigl
+	url = git@github.com:fwilliams/libigl.git
+	branch = fish_deformation
