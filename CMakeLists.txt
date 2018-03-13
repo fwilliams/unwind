@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.1)
 project(fish_deformation)
 
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -O3 -g -DNDEBUG) # O3 with asserts and debug symbols
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DNDEBUG -O3 -g") # O3 with asserts and debug symbols
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 
 # libigl
 option(LIBIGL_USE_STATIC_LIBRARY "Use libigl as static library" ON)
@@ -27,36 +28,38 @@ option(LIBIGL_WITH_XML               "Use XML"            OFF)
 
 find_package(LIBIGL REQUIRED QUIET)
 
-add_executable(${PROJECT_NAME}_bin src/main.cpp src/yixin_loader.cpp)
+set(INCLUDE_DIRS src src/utils src/tests)
+
+add_executable(${PROJECT_NAME}_bin src/main.cpp src/utils/yixin_loader.cpp)
 target_link_libraries(${PROJECT_NAME}_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui cholmod)
-target_include_directories(${PROJECT_NAME}_bin PRIVATE /usr/include/suitesparse/)
+target_include_directories(${PROJECT_NAME}_bin PRIVATE ${INCLUDE_DIRS})
 
-add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/yixin_loader.cpp)
-target_include_directories(preprocess_fish_bin PRIVATE src)
-target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/utils/yixin_loader.cpp)
+target_include_directories(preprocess_fish_bin PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui cholmod)
 
-add_executable(mesh_datfile_bin src/mesh_datfile.cpp)
-target_include_directories(mesh_datfile_bin PRIVATE src)
-target_link_libraries(mesh_datfile_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+add_executable(extract_surface_bin src/extract_surface.cpp)
+target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(extract_surface_bin igl::core)
 
 # Test loading Harish's dat files
-add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/yixin_loader.cpp)
-target_include_directories(test_meshing_harish_data_bin PRIVATE src)
+add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/utils/yixin_loader.cpp)
+target_include_directories(test_meshing_harish_data_bin PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
 # Test the basic cases for marching tets
 add_executable(test_marching_tets_cases_bin src/tests/test_marching_tets_basic.cpp)
-target_include_directories(test_marching_tets_cases_bin PRIVATE src)
+target_include_directories(test_marching_tets_cases_bin PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(test_marching_tets_cases_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 
 # Test marching tets on a mesh
 add_executable(test_cgal_tet_meshing_bin src/tests/test_cgal_tet_meshing.cpp)
-target_include_directories(test_cgal_tet_meshing_bin PRIVATE src)
+target_include_directories(test_cgal_tet_meshing_bin PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(test_cgal_tet_meshing_bin igl::cgal)
 
 # Example for calling the CGAL tet-mesher
-add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/cgal_tetrahedralize.cpp)
-target_include_directories(test_marching_tets_bin PRIVATE src)
+add_executable(test_marching_tets_bin src/tests/test_marching_tets.cpp src/utils/cgal_tetrahedralize.cpp)
+target_include_directories(test_marching_tets_bin PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(test_marching_tets_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal)
 
 

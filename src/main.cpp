@@ -143,107 +143,6 @@ bool bbw(const Eigen::MatrixXd& SV, const Eigen::MatrixXd& TV, const Eigen::Matr
   return igl::bbw(TV, TT, b, bc, bbw_data, W);
 }
 
-bool mesh_datfile(const std::string& dat_filename, Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
-  using namespace std;
-
-  ifstream datfile(dat_filename);
-
-  string raw_filename;
-  datfile >> raw_filename;
-  datfile >> raw_filename;
-  raw_filename = string("./meshes/") + raw_filename;
-  cout << "rawfile is " << raw_filename << endl;
-  int w, h, d;
-  string resolution_str;
-  datfile >> resolution_str;
-  datfile >> w;
-  datfile >> h;
-  datfile >> d;
-
-  cout << "Grid has dimensions " << w << " x " << h << " x " << d << endl;
-
-  char* data = new char[w*h*d];
-  ifstream rawfile(raw_filename, std::ifstream::binary);
-  rawfile.read(data, w*h*d);
-  if (rawfile) {
-    cout << "Read rawfile successfully" << endl;
-  } else {
-    cout << "Only read " << rawfile.gcount() << " bytes" << endl;
-    return EXIT_FAILURE;
-  }
-  rawfile.close();
-
-  Eigen::MatrixXd GP((w+2)*(h+2)*(d+2), 3);
-  Eigen::VectorXd SV(GP.rows());
-
-  int readcount = 0;
-  int appendcount = 0;
-  for (int zi = 0; zi < d+2; zi++) {
-    for (int yi = 0; yi < h+2; yi++) {
-      for (int xi = 0; xi < w+2; xi++) {
-        if (xi == 0 || yi == 0 || zi == 0 || xi == (w+1) || yi == (h+1) || zi == (d+1)) {
-          SV[readcount] = 0.0;
-        } else {
-          SV[readcount] = double(data[appendcount]);
-          appendcount += 1;
-        }
-        GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
-        readcount += 1;
-      }
-    }
-  }
-  delete data;
-
-  igl::copyleft::marching_cubes(SV, GP, w+2, h+2, d+2, V, F);
-
-  igl::writeOFF("out.off", V, F);
-}
-
-void remove_garbage_components(const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, Eigen::MatrixXi& newF) {
-  using namespace std;
-
-  cout << "Input model has " << V.rows() << " vertices and " << F.rows() << " faces" << endl;
-
-  cout << "Computing connected components..." << endl;
-  Eigen::VectorXi components;
-  igl::components(F, components);
-  vector<int> component_count;
-  component_count.resize(components.maxCoeff());
-  for (int i = 0; i < V.rows(); i++) {
-    component_count[components[i]] += 1;
-  }
-  int max_component = -1;
-  int max_component_count = 0;
-  for (int i = 0; i < component_count.size(); i++) {
-    if (max_component_count < component_count[i]) {
-      max_component = i;
-      max_component_count = component_count[i];
-    }
-  }
-
-  cout << "The model has " << component_count.size() << " connected components." << endl;
-  cout << "Component " << max_component << " has the most vertices with a count of " << max_component_count << endl;
-
-  newF.resize(F.rows(), 3);
-
-  int fcount = 0;
-  for(int i = 0; i < F.rows(); i++) {
-    bool keep = true;
-    for (int j = 0; j < 3; j++) {
-      if (components[F(i, j)] != max_component) {
-        keep = false;
-        break;
-      }
-    }
-    if (keep) {
-      newF.row(fcount++) = F.row(i);
-    }
-  }
-
-  cout << "Output model has " << fcount << " faces and " << newF.maxCoeff() << " vertices." << endl;
-  newF.conservativeResize(fcount, 3);
-}
-
 bool slim(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, Eigen::VectorXi& b, igl::SLIMData& sData, bool first) {
   if (first) {
     Eigen::MatrixXd bc(b.rows(), 3);
@@ -267,28 +166,6 @@ bool slim(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, Eigen::VectorXi&
 int main(int argc, char *argv[]) {
   using namespace Eigen;
   using namespace std;
-
-  if (argc > 1 && string(argv[1]) == "--mesh") {
-    if (argc != 2) { cerr << "--mesh expected .dat file argument" << endl; }
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
-    string in_filename = string(argv[2]);
-    mesh_datfile(in_filename, V, F);
-
-    // For some stupid reason marching cubes flips the triangle order
-    Eigen::VectorXd Vswap = V.col(1);
-    V.col(1) = V.col(2);
-    V.col(2) = Vswap;
-
-    Eigen::MatrixXi Fmain;
-    remove_garbage_components(V, F, Fmain);
-    string out_filename = in_filename + string(".off");
-    igl::writeOFF(out_filename, V, Fmain);
-  } else if (argc > 1 && string(argv[1]) == "--straighten") {
-
-  } else if (argc > 1 && string(argv[1]) == "--pick-endpoints") {
-
-  }
 
   Eigen::MatrixXd TV, isoV, SV, W;
   Eigen::MatrixXi TF, TT, isoF;

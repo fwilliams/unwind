@@ -19,7 +19,7 @@
 typedef igl::opengl::glfw::Viewer Viewer;
 
 
-bool mesh_datfile(const std::string& dat_filename, Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
+bool compute_surface_mesh(const std::string& dat_filename, Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
   using namespace std;
 
   ifstream datfile(dat_filename);

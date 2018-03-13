@@ -5,6 +5,7 @@
 #include <igl/marching_tets.h>
 #include <igl/colormap.h>
 #include <igl/harmonic.h>
+#include <igl/slim.h>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -31,7 +32,12 @@ class FishPreprocessingMenu :
   int m_current_point_idx = 0;
   std::array<int, 2> m_selected_end_coords{{-1, -1}};
   std::array<int, 2> m_tmp_selected_end_coords{{-1, -1}};
-  int m_num_bones = 20;
+  float m_bone_sep = 0.1;
+  igl::SLIMData m_sData;
+  bool m_first_slim; // True if we need to initialize slim
+  int m_num_slim_iterations = 10;
+  int m_num_skel_verts = 1;
+
 
   // Will be set to true if we need to redraw
   bool m_draw_state_changed = false;
@@ -41,18 +47,21 @@ class FishPreprocessingMenu :
   bool m_draw_surface = true;
   bool m_draw_tet_wireframe = false;
   bool m_draw_skeleton = false;
+  bool m_draw_slim_res = false;
 
   // Used so we can restore draw state
   bool m_old_draw_isovalues = false;
   bool m_old_draw_surface = true;
   bool m_old_draw_tet_wireframe = false;
   bool m_old_draw_skeleton = false;
+  bool m_old_draw_slim_res = false;
 
   void push_draw_state() {
     m_old_draw_isovalues = m_draw_isovalues;
     m_old_draw_skeleton = m_draw_skeleton;
     m_old_draw_surface = m_draw_surface;
     m_old_draw_tet_wireframe = m_draw_tet_wireframe;
+    m_old_draw_slim_res = m_draw_slim_res;
   }
 
   void pop_draw_state() {
@@ -60,6 +69,7 @@ class FishPreprocessingMenu :
     m_draw_skeleton = m_old_draw_skeleton;
     m_draw_surface = m_old_draw_surface;
     m_draw_tet_wireframe = m_old_draw_tet_wireframe;
+    m_draw_slim_res = m_old_draw_slim_res;
   }
 
   // Calculate the endpoints of edges for the tetmesh. Used for drawing.
@@ -167,36 +177,111 @@ class FishPreprocessingMenu :
       m_viewer.data().add_points(v1, RowVector3d(0.0, 0.0, 1.0));
       m_viewer.data().add_points(v2.row(skeletonV.rows()-2),
                                   RowVector3d(0.0, 0.0, 1.0));
+
+      if (m_sData.bc.rows() > 0) {
+        for (int i = 0; i < skeletonV.rows()-1; i++) {
+          v1.row(i) = m_sData.bc.row(i);
+          v2.row(i) = m_sData.bc.row(i+1);
+        }
+        m_viewer.data().add_edges(v1, v2, RowVector3d(0.1, 1.0, 1.0));
+        m_viewer.data().add_points(v1, RowVector3d(1.0, 0.0, 1.0));
+        m_viewer.data().add_points(v2.row(skeletonV.rows()-2),
+                                    RowVector3d(1.0, 0.0, 1.0));
+      }
+    }
+
+    // Draw the straightened skeleton
+    if (m_draw_slim_res) {
+      m_viewer.data().add_points(m_sData.V_o, m_isovalColors);
+      m_viewer.data().add_edges(m_TEV1_straight, m_TEV2_straight, RowVector3d(0.1, 0.1, 0.1));
     }
   }
 
-  void extract_skeleton(int num_samples) {
+  void extract_skeleton(double sep) {
     using namespace std;
+    using namespace  Eigen;
 
-    Eigen::MatrixXd LV;
-    Eigen::MatrixXi LF;
-    skeletonV.resize(num_samples);
-    int vcount = 0;
-    for(int i = 1; i < num_samples; i++) {
-      double isovalue = i * (1.0/num_samples);
-      igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
-      if (LV.rows() == 0) {
-        continue;
-      }
-      Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
+    MatrixXd LV;
+    MatrixXi LF;
+
+    vector<int> svi;
+
+    auto nearest_vertex = [&](const RowVector3d& p) -> int {
       int idx = -1;
-      double min_norm = std::numeric_limits<double>::infinity();
+      double min_norm = numeric_limits<double>::infinity();
       for (int k = 0; k < TV.rows(); k++) {
-        double norm = (TV.row(k) - C).norm();
+        double norm = (TV.row(k) - p).norm();
         if (norm < min_norm) {
           idx = k;
           min_norm = norm;
         }
       }
-      skeletonV[vcount] = idx;
-      vcount += 1;
+      return idx;
+    };
+
+    double dist = 0.0;
+    double step = 0.01;
+
+    RowVector3d lastC;
+
+    const double isoval_min = isovals.minCoeff();
+    const double isoval_max = isovals.maxCoeff();
+    const double isoval_spread = isoval_max - isoval_min;
+    const std::size_t n_isovals = isovals.size();
+    VectorXd isovals_normalized =
+        (isovals - isoval_min * VectorXd::Ones(n_isovals)) / isoval_spread;
+
+    cout << "Finding first nonzero level set..." << endl;
+    while(true) { // Find the first nonempty level set
+      double isovalue = dist + step;
+      igl::marching_tets(TV, TT, isovals_normalized, isovalue, LV, LF);
+      dist += step;
+      if (LV.rows() != 0) {
+        lastC = LV.colwise().sum() / LV.rows();
+        svi.push_back(nearest_vertex(lastC));
+        break;
+      }
+    }
+    cout << "Found at isovalue = " << dist << endl;
+
+    cout << "Extracting Skeleton Vertices" << endl;
+    while(dist < 1.0) { // Add vertices so everything is at most sep apart
+      double isovalue = dist + step;
+      igl::marching_tets(TV, TT, isovals_normalized, isovalue, LV, LF);
+      if (LV.rows() == 0) {
+        cerr << "Empty level sets are bad" << endl;
+        break;
+      }
+
+      RowVector3d C = LV.colwise().sum() / LV.rows();
+      if ((C - lastC).norm() > sep) {
+        if (fabs(step) < 1e-6) {
+          dist += step;
+          step = 0.1;
+          lastC = C;
+          svi.push_back(nearest_vertex(C));
+        } else {
+          step /= 1.2;
+//          cout << "We took a big step. Try again..." << endl;
+        }
+      } else {
+        cout << "Success! dist = " << dist << ", step = " << step << endl;
+        dist += step;
+        step = 0.1;
+        lastC = C;
+        svi.push_back(nearest_vertex(C));
+      }
     }
 
+    skeletonV.resize(svi.size());
+    int vcount = 0;
+    for (int i = 0; i < svi.size();) {
+      skeletonV[vcount] = svi[i];
+      while(skeletonV[vcount] == svi[i]) {
+        i++;
+      }
+      vcount += 1;
+    }
     skeletonV.conservativeResize(vcount);
   }
 
@@ -214,6 +299,32 @@ class FishPreprocessingMenu :
                   constraint_values, 1, isovals);
   }
 
+  void init_slim(int n, const Eigen::MatrixXd& V_0) {
+    assert(n >= 1);
+    using namespace std;
+    Eigen::MatrixXd bc(n, 3);
+    Eigen::RowVector3d v = TV.row(skeletonV[1]) - TV.row(skeletonV[0]);
+    v /= v.norm();
+    //    v = Eigen::RowVector3d(0, 0, 1);
+
+    bc.row(0) = TV.row(skeletonV[0]);
+    for (int i = 0; i < n-1; i++) {
+      Eigen::RowVector3d s = TV.row(skeletonV[i]);
+      Eigen::RowVector3d n = TV.row(skeletonV[i+1]);
+      double d = (n - s).norm();
+      bc.row(i+1) = bc.row(i) + v*d;
+    }
+
+    Eigen::MatrixXd TV_0 = V_0;
+    Eigen::VectorXi b = skeletonV.segment(0, n); // skeletonV.segment(0, n+1);
+    double soft_const_p = 1e5;
+    m_sData.exp_factor = 5.0;
+    slim_precompute(TV, TT, TV_0, m_sData, igl::SLIMData::EXP_CONFORMAL,
+                    b, bc, soft_const_p);
+  }
+
+  Eigen::MatrixXd m_TEV1_straight;
+  Eigen::MatrixXd m_TEV2_straight;
   Eigen::MatrixXd m_TEV1;
   Eigen::MatrixXd m_TEV2;
   Eigen::MatrixXd m_isovalColors;
@@ -247,7 +358,6 @@ public:
 
   virtual bool pre_draw() override {
     if (m_draw_state_changed) {
-      std::cout << "Draw State Changed!" << std::endl;
       draw_mesh();
       m_draw_state_changed = false;
     }
@@ -283,9 +393,11 @@ public:
           m_selected_end_coords[1] = m_tmp_selected_end_coords[1];
 
           // You selected new endpoints so we need to recompute the harmonic
-          // function and the skeleton
+          // function, the skeleton and SLIM
           isovals.resize(0);
           skeletonV.resize(0);
+          m_first_slim = true;
+          m_sData.V_o.resize(0, 3);
         }
         m_draw_state_changed = true;
       }
@@ -328,6 +440,7 @@ public:
         m_draw_tet_wireframe = false;
         m_draw_skeleton = false;
         m_draw_isovalues = false;
+        m_draw_slim_res = false;
         m_draw_state_changed = true;
       }
       if (disabled) {
@@ -348,7 +461,7 @@ public:
     if (m_selected_end_coords[0] >= 0 && m_selected_end_coords[1] >= 0) {
       if (ImGui::CollapsingHeader("Skeleton Extraction",
                                   ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::DragInt("Number of bones", &m_num_bones, 1.0f, 1, 100);
+        ImGui::DragFloat("Distance between bone verts", &m_bone_sep, 0.1f, 0.5f, 4.5f);
         if (ImGui::Button("Extract Skeleton", ImVec2(-1,0))) {
           if (isovals.rows() == 0) {
             cout << "Solving diffusion on tet mesh..." << endl;
@@ -356,15 +469,68 @@ public:
             isoval_colors();
             cout << "Done!" << endl;
           }
-          cout << "Extracting Skeleton with " <<
-                  m_num_bones << " bones..." << endl;
-          extract_skeleton(m_num_bones);
+          cout << "Extracting Skeleton..." << endl;
+          extract_skeleton(m_bone_sep);
+
+          // Need to recompute slim for a new skeleton
+          m_first_slim = true;
+          m_sData.V_o.resize(0, 3);
+
           m_draw_surface = false;
           m_draw_skeleton = true;
           m_draw_tet_wireframe = true;
           m_draw_isovalues = true;
+          m_draw_slim_res = false;
           m_draw_state_changed = true;
           cout << "Done!" << endl;
+        }
+
+        if (skeletonV.rows() > 0) {
+          if (ImGui::Button("Save Skeleton", ImVec2(-1,0))) {
+          }
+        }
+      }
+    }
+
+    //
+    // Skeleton Straightening Options
+    //
+    if (skeletonV.rows() > 0) {
+      if (ImGui::CollapsingHeader("Straightening Options",
+                                  ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::DragInt("SLIM Iterations", &m_num_slim_iterations, 1.0f, 1, 100);
+//        if(ImGui::DragInt("Num Skeleton Vertices", &m_num_skel_verts, 1.0f, 1, m_num_bones)) {
+//          m_first_slim = true;
+//        }
+        if (ImGui::Button("Straighten Skeleton", ImVec2(-1,0))) {
+          if (m_first_slim) {
+            cout << "Initializing SLIM..." << endl;
+            init_slim(skeletonV.rows(), TV);
+//            if (m_sData.V_o.rows() != 0) {
+//              cout << "Using last output" << endl;
+//              init_slim(m_num_skel_verts, m_sData.V_o);
+//            } else {
+//              init_slim(m_num_skel_verts, TV);
+//            }
+            cout << "Done" << endl;
+            m_first_slim = false;
+          }
+
+          cout << "Running " << m_num_slim_iterations << " iterations of SLIM..." << endl;
+          cout << "Initial SLIM energy is " << m_sData.energy << endl;
+          for(int i = 0; i < m_num_slim_iterations; i++) {
+            igl::slim_solve(m_sData, 1);
+            cout << "Iteration " << i + 1 << endl;
+          }
+          cout << "Final SLIM energy is " << m_sData.energy << endl;
+          cout << "Done!" << endl;
+          tet_mesh_edges(m_sData.V_o, m_sData.F, m_TEV1_straight, m_TEV2_straight);
+          m_draw_surface = false;
+          m_draw_tet_wireframe = false;
+          m_draw_skeleton = false;
+          m_draw_isovalues = false;
+          m_draw_slim_res = true;
+          m_draw_state_changed = true;
         }
       }
     }
@@ -391,10 +557,11 @@ public:
           m_draw_state_changed = true;
         }
       }
-    }
-
-    if (ImGui::Button("Save Skeleton", ImVec2(-1,0))) {
-
+      if (m_sData.V_o.rows() > 0) {
+        if (ImGui::Checkbox("Draw Straightened Tet Mesh", &m_draw_slim_res)) {
+          m_draw_state_changed = true;
+        }
+      }
     }
   }
 
@@ -402,7 +569,7 @@ public:
 
 int main(int argc, char *argv[]) {
   Viewer viewer;
-  FishPreprocessingMenu menu("outReoriented_.msh", viewer);
+  FishPreprocessingMenu menu("data/Sternopygus_arenatus-small.dat.out_.msh", viewer);
   viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
   return viewer.launch();
 }

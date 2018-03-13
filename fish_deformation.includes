@@ -1,10 +1,10 @@
-../libigl/include
-../libigl/external/eigen/
-../libigl/external/imgui/
-.
+external/libigl/include
+external/libigl/external/eigen/
+external/libigl/external/imgui/
+src/utils
+src/tests
+src
 build/glfw/src
 build/CMakeFiles/3.9.1/CompilerIdC
 build/CMakeFiles/3.9.1/CompilerIdCXX
-src/tests
-src
 build/CMakeFiles
