@@ -18,7 +18,7 @@
 #include <imgui/imgui_internal.h>
 
 #include <array>
-#include <fstream>
+#include <unordered_map>
 
 #include "yixin_loader.h"
 
@@ -47,6 +47,17 @@ class FishPreprocessingMenu :
   int m_current_vertex = 0; // used to select up to where we are straightening
   float m_current_vertex_angle = 0; // used to control the up vector
 
+  Eigen::MatrixXd m_Vfield; // Visualize the normalized gradient field of the heat diffusion
+  float m_vfield_scale = 10.0f;
+  float m_linewidth = 1.0;
+
+  Eigen::MatrixXd m_oldTV;
+
+  std::vector<int> m_containing_tet;
+  std::vector<int> m_nearest_vertex;
+
+  // Maps skeleton vertex to up vector angle and tet index
+  std::unordered_map<int, std::pair<double, int>> m_up_vectors;
 
   // Will be set to true if we need to redraw
   bool m_draw_state_changed = false;
@@ -94,7 +105,6 @@ class FishPreprocessingMenu :
     return idx;
   }
 
-
   bool point_in_tet(int tet, const Eigen::RowVector3d pt) {
     // TODO: check if tet contains vertex
     using namespace  Eigen;
@@ -103,7 +113,7 @@ class FishPreprocessingMenu :
       return (double(0) < val) - (val < double(0));
     };
 
-    Matrix4Xd D0, D1, D2, D3, D4;
+    Matrix4d D0, D1, D2, D3, D4;
     RowVector3d v1 = TV.row(TT(tet, 0)), v2 = TV.row(TT(tet, 1));
     RowVector3d v3 = TV.row(TT(tet, 2)), v4 = TV.row(TT(tet, 3));
 
@@ -201,8 +211,13 @@ class FishPreprocessingMenu :
   void draw_mesh() {
     using namespace Eigen;
 
+    m_viewer.data().line_width = m_linewidth;
     m_viewer.data().clear();
-    m_viewer.data().set_mesh(TV, TF);
+    if (m_draw_slim_res) {
+      m_viewer.data().set_mesh(m_sData.V_o, TF);
+    } else {
+      m_viewer.data().set_mesh(TV, TF);
+    }
     m_viewer.data().show_lines = false;
     m_viewer.data().show_faces = false;
 
@@ -210,6 +225,10 @@ class FishPreprocessingMenu :
       m_viewer.data().show_lines = true;
       m_viewer.data().show_faces = true;
     }
+
+    m_viewer.data().add_edges(RowVector3d(0, 0, 0), RowVector3d(1000, 0, 0), RowVector3d(1, 0, 0));
+    m_viewer.data().add_edges(RowVector3d(0, 0, 0), RowVector3d(0, 1000, 0), RowVector3d(0, 1, 0));
+    m_viewer.data().add_edges(RowVector3d(0, 0, 0), RowVector3d(0, 0, 1000), RowVector3d(0, 0, 1));
 
     // Draw selected endpoints
     m_viewer.data().point_size = 7.0;
@@ -230,13 +249,13 @@ class FishPreprocessingMenu :
     if (m_draw_tet_wireframe && m_draw_isovalues) {
       m_viewer.data().add_points(TV, m_isovalColors);
       m_viewer.data().add_edges(m_TEV1, m_TEV2, RowVector3d(0.1, 0.1, 0.1));
-      m_viewer.data().add_edges(TV, TV+Vfield*10, RowVector3d(0.1, 0.1, 1.0));
+//      m_viewer.data().add_edges(TV, TV+m_Vfield*10, RowVector3d(0.1, 0.1, 1.0));
     } else if (m_draw_tet_wireframe && !m_draw_isovalues) {
       m_viewer.data().add_points(TV, RowVector3d(0.5, 0.5, 0.5));
       m_viewer.data().add_edges(m_TEV1, m_TEV2, RowVector3d(0.1, 0.1, 0.1));
     } else if (!m_draw_tet_wireframe && m_draw_isovalues) {
       m_viewer.data().add_points(TV, m_isovalColors);
-      m_viewer.data().add_edges(TV, TV+Vfield*10, RowVector3d(0.1, 0.1, 1.0));
+//      m_viewer.data().add_edges(TV, TV+m_Vfield*10, RowVector3d(0.1, 0.1, 1.0));
     }
 
     // Draw the skeleton
@@ -253,15 +272,21 @@ class FishPreprocessingMenu :
                                   RowVector3d(0.0, 0.0, 1.0));
 
       if (m_sData.bc.rows() > 0) {
-        for (int i = 0; i < skeletonV.rows()-1; i++) {
-          v1.row(i) = m_sData.bc.row(i);
-          v2.row(i) = m_sData.bc.row(i+1);
+        for (int i = 0; i < m_sData.bc.rows(); i++) {
+          m_viewer.data().add_points(m_sData.bc.row(i), RowVector3d(1, 0, 0));
         }
-        m_viewer.data().add_edges(v1, v2, RowVector3d(0.1, 1.0, 1.0));
-        m_viewer.data().add_points(v1, RowVector3d(1.0, 0.0, 1.0));
-        m_viewer.data().add_points(v2.row(skeletonV.rows()-2),
-                                    RowVector3d(1.0, 0.0, 1.0));
       }
+
+      Matrix3d frame = get_frame(m_current_vertex, m_current_vertex_angle);
+      std::cout << frame << std::endl;
+      RowVector3d right = frame.row(0);
+      RowVector3d up = frame.row(1);
+      RowVector3d dir = frame.row(2);
+
+      RowVector3d sv = skeletonJoints.row(m_current_vertex);
+      m_viewer.data().add_edges(sv, sv + dir*m_vfield_scale, RowVector3d(1, 0.3, 0.3));
+      m_viewer.data().add_edges(sv, sv + up*m_vfield_scale, RowVector3d(0.3, 1.0, 0.3));
+      m_viewer.data().add_edges(sv, sv + right*m_vfield_scale, RowVector3d(0.3, 0.3, 1.0));
     }
 
     // Draw the straightened skeleton
@@ -271,16 +296,41 @@ class FishPreprocessingMenu :
     }
   }
 
+  Eigen::Matrix3d get_frame(int idx, double angle) {
+    using namespace Eigen;
+    RowVector3d dir = (skeletonJoints.row(idx+1) - skeletonJoints.row(idx)).normalized();
+    RowVector3d up(0, 1, 0);
+    up -= dir*up.dot(dir);
+    up = up.normalized();
+    RowVector3d right = dir.cross(up);
+
+    RowVector3d rotatedUp = right*sin(angle) + up*cos(angle);
+    RowVector3d rotatedRight = rotatedUp.cross(dir);
+
+    Matrix3d ret;
+    ret.row(0) = rotatedRight;
+    ret.row(1) = rotatedUp;
+    ret.row(2) = dir;
+
+    return ret;
+  }
+
   void extract_skeleton(int num_verts) {
     using namespace std;
     using namespace  Eigen;
 
     MatrixXd LV;
     MatrixXi LF;
+    m_up_vectors.clear();
+    m_nearest_vertex.clear();
+    m_containing_tet.clear();
 
     skeletonV.resize(num_verts);
     skeletonJoints.resize(num_verts, 3);
     int vcount = 0;
+
+    unordered_map<int, int> tet_to_vertex;
+    unordered_map<int, int> snap_to_vertex;
 
     for(int i = 1; i < num_verts; i++) {
       double isovalue = i * (1.0/num_verts);
@@ -289,15 +339,28 @@ class FishPreprocessingMenu :
         continue;
       }
       Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
-      skeletonJoints.row(vcount) = C;
-      skeletonV[vcount] = nearest_vertex(C);
-      vcount += 1;
+
+      int tet = containing_tet(C);
+      if (tet < 0) {
+        continue;
+      }
+      if (tet_to_vertex.find(tet) == tet_to_vertex.end()) {
+        int nv = nearest_vertex(C);
+        if (snap_to_vertex.find(nv) == snap_to_vertex.end()) {
+          skeletonJoints.row(vcount) = C;
+          skeletonV[vcount] = nearest_vertex(C);
+          m_nearest_vertex.push_back(nv);
+          m_containing_tet.push_back(tet);
+          tet_to_vertex[tet] = 1;
+          snap_to_vertex[nv] = 1;
+          vcount += 1;
+          cout << "Added skeleton joint in tet " << tet << endl;
+        }
+      }
     }
     skeletonJoints.conservativeResize(vcount, 3);
     skeletonV.conservativeResize(vcount);
   }
-
-  Eigen::MatrixXd Vfield;
 
   void compute_diffusion() {
     using namespace std;
@@ -338,7 +401,7 @@ class FishPreprocessingMenu :
       }
     }
     X_per_V = X_per_V.rowwise().normalized();
-    Vfield = X_per_V;
+    m_Vfield = X_per_V;
 
     Eigen::MatrixXd JX = G * X_per_V;
     Eigen::VectorXd div = JX.col(0).segment(0, TT.rows()) + JX.col(1).segment(TT.rows(), TT.rows()) + JX.col(2).segment(2*TT.rows(), TT.rows());
@@ -367,6 +430,67 @@ class FishPreprocessingMenu :
     const double isoval_spread = isoval_max - isoval_min;
     const std::size_t n_isovals = isovals.size();
     isovals = (isovals - isoval_min * Eigen::VectorXd::Ones(n_isovals)) / isoval_spread;
+  }
+
+  void init_slim3(int up_to) {
+    using namespace Eigen;
+    VectorXi b(4*m_up_vectors.size() + skeletonJoints.rows() + 2);
+    MatrixXd bc(4*m_up_vectors.size() + skeletonJoints.rows() + 2, 3);
+
+    b[0] = m_selected_end_coords[1];
+    bc.row(0) = RowVector3d(0, 0, 0);
+    double dist = (skeletonJoints.row(0) - TV.row(m_selected_end_coords[1])).norm();
+    int vcount = 1;
+
+    for(int i = 0; i < up_to+1; i++) {
+      auto it = m_up_vectors.find(i);
+      if (it != m_up_vectors.end()) {
+        int tet = it->second.second; // Index of containing tet
+        const Matrix3d frame = get_frame(i, it->second.first);
+        Vector3d ctr = Vector3d(0, 0, dist);
+        RowVector3d v1 = frame * (TV.row(TT(tet, 0)) - skeletonJoints.row(i)).transpose() + ctr;
+        RowVector3d v2 = frame * (TV.row(TT(tet, 1)) - skeletonJoints.row(i)).transpose() + ctr;
+        RowVector3d v3 = frame * (TV.row(TT(tet, 2)) - skeletonJoints.row(i)).transpose() + ctr;
+        RowVector3d v4 = frame * (TV.row(TT(tet, 3)) - skeletonJoints.row(i)).transpose() + ctr;
+
+        b[vcount] = TT(tet, 0);
+        bc.row(vcount) = v1;
+        vcount += 1;
+
+        b[vcount] = TT(tet, 1);
+        bc.row(vcount) = v2;
+        vcount += 1;
+
+        b[vcount] = TT(tet, 2);
+        bc.row(vcount) = v3;
+        vcount += 1;
+
+        b[vcount] = TT(tet, 3);
+        bc.row(vcount) = v4;
+        vcount += 1;
+      } else {
+        b[vcount] = m_nearest_vertex[i];
+        bc.row(vcount) = RowVector3d(0, 0, dist);
+        vcount += 1;
+      }
+      dist += (skeletonJoints.row(i+1) - skeletonJoints.row(i)).norm();
+    }
+
+    if (up_to == skeletonJoints.rows()-1) {
+      b[vcount] = m_nearest_vertex[skeletonJoints.rows()-1];
+      bc.row(vcount) = RowVector3d(0, 0, dist);
+      dist += (TV.row(m_selected_end_coords[0]) - skeletonJoints.row(skeletonJoints.rows()-1)).norm();
+      vcount += 1;
+      b[vcount] = m_selected_end_coords[0];
+      bc.row(vcount) = RowVector3d(0, 0, dist);
+    }
+    b.conservativeResize(vcount);
+    bc.conservativeResize(vcount, 3);
+    Eigen::MatrixXd TV_0 = TV;
+    double soft_const_p = 1e5;
+    m_sData.exp_factor = 5.0;
+    slim_precompute(TV, TT, TV_0, m_sData, igl::SLIMData::EXP_CONFORMAL,
+                    b, bc, soft_const_p);
   }
 
   void init_slim(int n, const Eigen::MatrixXd& V_0) {
@@ -416,6 +540,7 @@ public:
 
     m_current_model_filename = filename;
     load_yixin_tetmesh(filename, TV, TF, TT);
+    m_oldTV = TV;
     cout << "Loaded " << filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
             " tets." << endl;
@@ -533,7 +658,7 @@ public:
     if (m_selected_end_coords[0] >= 0 && m_selected_end_coords[1] >= 0) {
       if (ImGui::CollapsingHeader("Skeleton Extraction",
                                   ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::DragInt("Distance between bone verts", &m_num_skel_verts, 1.0f, 5, 100);
+        ImGui::DragInt("Number of Joints", &m_num_skel_verts, 1.0f, 5, 100);
         if (ImGui::Button("Extract Skeleton", ImVec2(-1,0))) {
           if (isovals.rows() == 0) {
             cout << "Solving diffusion on tet mesh..." << endl;
@@ -571,17 +696,27 @@ public:
       if (ImGui::CollapsingHeader("Straightening Options",
                                   ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::DragInt("SLIM Iterations", &m_num_slim_iterations, 1.0f, 1, 100);
-        ImGui::DragInt("Up-To Vertex", &m_current_vertex, 1.0f, 0, m_num_skel_verts);
-        ImGui::DragFloat("Up Angle", &m_current_vertex_angle, 0.5f, 0.0f, 360.0f);
+        if (ImGui::SliderInt("Up-To Vertex", &m_current_vertex, 0, skeletonJoints.rows()-1)) {
+          m_draw_state_changed = true;
+        }
+        if (ImGui::SliderAngle("Up Angle", &m_current_vertex_angle, 0.0f, 360.0f)) {
+          m_draw_state_changed = true;
+        }
 
+        if (ImGui::Button("Fix Up", ImVec2(-1, 0))) {
+          double angle = m_current_vertex_angle;
+          int tet = m_containing_tet[m_current_vertex];
+          m_up_vectors[m_current_vertex] = make_pair(angle, tet);
+        }
         if (ImGui::Button("Straighten Skeleton", ImVec2(-1,0))) {
-          if (m_first_slim) {
-            cout << "Initializing SLIM..." << endl;
-            init_slim(skeletonV.rows(), TV);
-            cout << "Done" << endl;
-            m_first_slim = false;
-          }
-
+//          if (m_first_slim) {
+//            cout << "Initializing SLIM..." << endl;
+//            init_slim(skeletonV.rows(), TV);
+//            cout << "Done" << endl;
+//            m_first_slim = false;
+//          }
+//          init_slim2(m_current_vertex+1);
+          init_slim3(m_current_vertex);
           cout << "Running " << m_num_slim_iterations << " iterations of SLIM..." << endl;
           cout << "Initial SLIM energy is " << m_sData.energy << endl;
           for(int i = 0; i < m_num_slim_iterations; i++) {
@@ -590,12 +725,34 @@ public:
           }
           cout << "Final SLIM energy is " << m_sData.energy << endl;
           cout << "Done!" << endl;
-          tet_mesh_edges(m_sData.V_o, m_sData.F, m_TEV1_straight, m_TEV2_straight);
+          TV = m_sData.V_o;
+          isoval_colors();
+          tet_mesh_edges(TV, TT, m_TEV1, m_TEV2);
+          //          tet_mesh_edges(m_sData.V_o, m_sData.F, m_TEV1_straight, m_TEV2_straight);
           m_draw_surface = false;
-          m_draw_tet_wireframe = false;
-          m_draw_skeleton = false;
-          m_draw_isovalues = false;
-          m_draw_slim_res = true;
+          m_draw_tet_wireframe = true;
+          m_draw_skeleton = true;
+          m_draw_isovalues = true;
+          m_draw_slim_res = false;
+          m_draw_state_changed = true;
+        }
+        if (ImGui::Button("Moar SLIM", ImVec2(-1,0))) {
+          cout << "Running " << m_num_slim_iterations << " iterations of SLIM..." << endl;
+          cout << "Initial SLIM energy is " << m_sData.energy << endl;
+          for(int i = 0; i < m_num_slim_iterations; i++) {
+            igl::slim_solve(m_sData, 1);
+            cout << "Iteration " << i + 1 << endl;
+          }
+          cout << "Final SLIM energy is " << m_sData.energy << endl;
+          cout << "Done!" << endl;
+          TV = m_sData.V_o;
+          tet_mesh_edges(TV, TT, m_TEV1, m_TEV2);
+//          tet_mesh_edges(m_sData.V_o, m_sData.F, m_TEV1_straight, m_TEV2_straight);
+          m_draw_surface = false;
+          m_draw_tet_wireframe = true;
+          m_draw_skeleton = true;
+          m_draw_isovalues = true;
+          m_draw_slim_res = false;
           m_draw_state_changed = true;
         }
       }
@@ -606,6 +763,10 @@ public:
     //
     if (ImGui::CollapsingHeader("Drawing Options",
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
+
+      if (ImGui::DragFloat("LineWidth", &m_linewidth, 0.1f, 1.0f, 10.0f)) {
+        m_draw_state_changed = true;
+      }
       if (ImGui::Checkbox("Draw Mesh Surface", &m_draw_surface)) {
         m_draw_state_changed = true;
       }
@@ -625,6 +786,12 @@ public:
       }
       if (m_sData.V_o.rows() > 0) {
         if (ImGui::Checkbox("Draw Straightened Tet Mesh", &m_draw_slim_res)) {
+          m_draw_state_changed = true;
+        }
+      }
+
+      if (m_Vfield.rows() > 0) {
+        if (ImGui::DragFloat("Vector Field Scale", &m_vfield_scale, 0.5f, 1.0f, 100.0f)) {
           m_draw_state_changed = true;
         }
       }

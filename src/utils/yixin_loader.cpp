@@ -611,7 +611,7 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
       i += 1;
       count += 1;
     }
-    if (count == 1) {
+    if (count > 0) {
       TF.row(fcount++) = Eigen::RowVector3i(v1, v2, v3);
     }
   }
