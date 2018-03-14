@@ -3,6 +3,8 @@
 #include <igl/readOFF.h>
 #include <igl/writeOFF.h>
 
+#include <iostream>
+
 #include "datfile.h"
 
 

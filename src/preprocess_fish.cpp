@@ -6,6 +6,13 @@
 #include <igl/colormap.h>
 #include <igl/harmonic.h>
 #include <igl/slim.h>
+#include <igl/grad.h>
+#include <igl/adjacency_list.h>
+#include <igl/massmatrix.h>
+#include <igl/cotmatrix.h>
+
+#include <Eigen/SparseQR>
+#include <Eigen/OrderingMethods>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -32,11 +39,13 @@ class FishPreprocessingMenu :
   int m_current_point_idx = 0;
   std::array<int, 2> m_selected_end_coords{{-1, -1}};
   std::array<int, 2> m_tmp_selected_end_coords{{-1, -1}};
-  float m_bone_sep = 0.1;
   igl::SLIMData m_sData;
   bool m_first_slim; // True if we need to initialize slim
   int m_num_slim_iterations = 10;
-  int m_num_skel_verts = 1;
+  int m_num_skel_verts = 20;
+
+  int m_current_vertex = 0; // used to select up to where we are straightening
+  float m_current_vertex_angle = 0; // used to control the up vector
 
 
   // Will be set to true if we need to redraw
@@ -70,6 +79,67 @@ class FishPreprocessingMenu :
     m_draw_surface = m_old_draw_surface;
     m_draw_tet_wireframe = m_old_draw_tet_wireframe;
     m_draw_slim_res = m_old_draw_slim_res;
+  }
+
+  int nearest_vertex(const Eigen::RowVector3d& p) {
+    int idx = -1;
+    double min_norm = std::numeric_limits<double>::infinity();
+    for (int k = 0; k < TV.rows(); k++) {
+      double norm = (TV.row(k) - p).norm();
+      if (norm < min_norm) {
+        idx = k;
+        min_norm = norm;
+      }
+    }
+    return idx;
+  }
+
+  template <typename T> int sgn(T val) {
+      return (T(0) < val) - (val < T(0));
+  }
+
+  bool point_in_tet(int tet, const Eigen::RowVector3d pt) {
+    // TODO: check if tet contains vertex
+    using namespace  Eigen;
+    Matrix4Xd D0, D1, D2, D3, D4;
+    RowVector3d v1 = TV.row(TT(tet, 0)), v2 = TV.row(TT(tet, 1));
+    RowVector3d v3 = TV.row(TT(tet, 2)), v4 = TV.row(TT(tet, 3));
+
+    D0 << v1[0], v1[1], v1[2], 1,
+          v2[0], v2[1], v2[2], 1,
+          v3[0], v3[1], v3[2], 1,
+          v4[0], v4[1], v4[2], 1;
+
+    RowVector4d pt_row(pt[0], pt[1], pt[2], 1);
+    D1 = D0;
+    D1.row(0) = pt_row;
+
+    D2 = D0;
+    D2.row(1) = pt_row;
+
+    D3 = D0;
+    D3.row(2) = pt_row;
+
+    D4 = D0;
+    D4.row(3) = pt_row;
+
+    const double det0 = D0.determinant();
+    assert(det0 != 0);
+    const double det1 = D1.determinant();
+    const double det2 = D2.determinant();
+    const double det3 = D3.determinant();
+    const double det4 = D4.determinant();
+
+    return sgn(det1) == sgn(det2) && sgn(det1) == sgn(det3) && sgn(det1) == sgn(det4);
+   }
+
+  int containing_tet(const Eigen::RowVector3d& p) {
+    for (int i = 0; i < TT.rows(); i++) {
+      if (point_in_tet(i, p)) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   // Calculate the endpoints of edges for the tetmesh. Used for drawing.
@@ -158,11 +228,13 @@ class FishPreprocessingMenu :
     if (m_draw_tet_wireframe && m_draw_isovalues) {
       m_viewer.data().add_points(TV, m_isovalColors);
       m_viewer.data().add_edges(m_TEV1, m_TEV2, RowVector3d(0.1, 0.1, 0.1));
+      m_viewer.data().add_edges(TV, TV+Vfield*10, RowVector3d(0.1, 0.1, 1.0));
     } else if (m_draw_tet_wireframe && !m_draw_isovalues) {
       m_viewer.data().add_points(TV, RowVector3d(0.5, 0.5, 0.5));
       m_viewer.data().add_edges(m_TEV1, m_TEV2, RowVector3d(0.1, 0.1, 0.1));
     } else if (!m_draw_tet_wireframe && m_draw_isovalues) {
       m_viewer.data().add_points(TV, m_isovalColors);
+      m_viewer.data().add_edges(TV, TV+Vfield*10, RowVector3d(0.1, 0.1, 1.0));
     }
 
     // Draw the skeleton
@@ -170,8 +242,8 @@ class FishPreprocessingMenu :
       MatrixXd v1(skeletonV.rows()-1, 3), v2(skeletonV.rows()-1, 3);
 
       for (int i = 0; i < skeletonV.rows()-1; i++) {
-        v1.row(i) = TV.row(skeletonV[i]);
-        v2.row(i) = TV.row(skeletonV[i+1]);
+        v1.row(i) = skeletonJoints.row(i);//TV.row(skeletonV[i]);
+        v2.row(i) = skeletonJoints.row(i+1);//TV.row(skeletonV[i+1]);
       }
       m_viewer.data().add_edges(v1, v2, RowVector3d(0.1, 0.1, 1.0));
       m_viewer.data().add_points(v1, RowVector3d(0.0, 0.0, 1.0));
@@ -197,95 +269,37 @@ class FishPreprocessingMenu :
     }
   }
 
-  void extract_skeleton(double sep) {
+  void extract_skeleton(int num_verts) {
     using namespace std;
     using namespace  Eigen;
 
     MatrixXd LV;
     MatrixXi LF;
 
-    vector<int> svi;
-
-    auto nearest_vertex = [&](const RowVector3d& p) -> int {
-      int idx = -1;
-      double min_norm = numeric_limits<double>::infinity();
-      for (int k = 0; k < TV.rows(); k++) {
-        double norm = (TV.row(k) - p).norm();
-        if (norm < min_norm) {
-          idx = k;
-          min_norm = norm;
-        }
-      }
-      return idx;
-    };
-
-    double dist = 0.0;
-    double step = 0.01;
-
-    RowVector3d lastC;
-
-    const double isoval_min = isovals.minCoeff();
-    const double isoval_max = isovals.maxCoeff();
-    const double isoval_spread = isoval_max - isoval_min;
-    const std::size_t n_isovals = isovals.size();
-    VectorXd isovals_normalized =
-        (isovals - isoval_min * VectorXd::Ones(n_isovals)) / isoval_spread;
-
-    cout << "Finding first nonzero level set..." << endl;
-    while(true) { // Find the first nonempty level set
-      double isovalue = dist + step;
-      igl::marching_tets(TV, TT, isovals_normalized, isovalue, LV, LF);
-      dist += step;
-      if (LV.rows() != 0) {
-        lastC = LV.colwise().sum() / LV.rows();
-        svi.push_back(nearest_vertex(lastC));
-        break;
-      }
-    }
-    cout << "Found at isovalue = " << dist << endl;
-
-    cout << "Extracting Skeleton Vertices" << endl;
-    while(dist < 1.0) { // Add vertices so everything is at most sep apart
-      double isovalue = dist + step;
-      igl::marching_tets(TV, TT, isovals_normalized, isovalue, LV, LF);
-      if (LV.rows() == 0) {
-        cerr << "Empty level sets are bad" << endl;
-        break;
-      }
-
-      RowVector3d C = LV.colwise().sum() / LV.rows();
-      if ((C - lastC).norm() > sep) {
-        if (fabs(step) < 1e-6) {
-          dist += step;
-          step = 0.1;
-          lastC = C;
-          svi.push_back(nearest_vertex(C));
-        } else {
-          step /= 1.2;
-//          cout << "We took a big step. Try again..." << endl;
-        }
-      } else {
-        cout << "Success! dist = " << dist << ", step = " << step << endl;
-        dist += step;
-        step = 0.1;
-        lastC = C;
-        svi.push_back(nearest_vertex(C));
-      }
-    }
-
-    skeletonV.resize(svi.size());
+    skeletonV.resize(num_verts);
+    skeletonJoints.resize(num_verts, 3);
     int vcount = 0;
-    for (int i = 0; i < svi.size();) {
-      skeletonV[vcount] = svi[i];
-      while(skeletonV[vcount] == svi[i]) {
-        i++;
+
+    for(int i = 1; i < num_verts; i++) {
+      double isovalue = i * (1.0/num_verts);
+      igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
+      if (LV.rows() == 0) {
+        continue;
       }
+      Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
+      skeletonJoints.row(vcount) = C;
+      skeletonV[vcount] = nearest_vertex(C);
       vcount += 1;
     }
+    skeletonJoints.conservativeResize(vcount, 3);
     skeletonV.conservativeResize(vcount);
   }
 
+  Eigen::MatrixXd Vfield;
+
   void compute_diffusion() {
+    using namespace std;
+
     Eigen::MatrixXi constraint_indices;
     Eigen::MatrixXd constraint_values;
     constraint_indices.resize(2, 1);
@@ -297,6 +311,60 @@ class FishPreprocessingMenu :
 
     igl::harmonic(TV, TT, constraint_indices,
                   constraint_values, 1, isovals);
+
+    Eigen::SparseMatrix<double> G;
+    igl::grad(TV, TT, G);
+    Eigen::VectorXd g = G * isovals;
+    cout << "g rows: " << g.rows() << endl;
+    cout << "TT rows: " << TT.rows() << endl;
+    cout << "g.rows / 3: " << g.rows() / 3 << endl;
+
+    Eigen::Map<Eigen::MatrixXd> X(g.data(), TT.rows(), 3);
+    X = X.rowwise().normalized();
+    Eigen::VectorXd incidenceCount(TV.rows());
+    Eigen::MatrixXd X_per_V(TV.rows(), 3);
+    incidenceCount.setZero();
+    X_per_V.setZero();
+
+    for (int i = 0; i < TT.rows(); i++) {
+      Eigen::RowVector3d gf = X.row(i);
+      for (int v = 0; v < 4; v++) {
+        const int vid = TT(i, v);
+        incidenceCount[vid] += 1;
+        const int n = incidenceCount[vid];
+        X_per_V.row(vid) += (gf - X_per_V.row(vid)) / n;
+      }
+    }
+    X_per_V = X_per_V.rowwise().normalized();
+    Vfield = X_per_V;
+
+    Eigen::MatrixXd JX = G * X_per_V;
+    Eigen::VectorXd div = JX.col(0).segment(0, TT.rows()) + JX.col(1).segment(TT.rows(), TT.rows()) + JX.col(2).segment(2*TT.rows(), TT.rows());
+    Eigen::VectorXd div_per_V(TV.rows());
+    incidenceCount.setZero();
+    div_per_V.setZero();
+
+    for (int i = 0; i < TT.rows(); i++) {
+      double divf = div[i];
+      for (int v = 0; v < 4; v++) {
+        const int vid = TT(i, v);
+        incidenceCount[vid] += 1;
+        const int n = incidenceCount[vid];
+        div_per_V[vid] += (divf - div_per_V[vid]) / n;
+      }
+    }
+
+    Eigen::SparseMatrix<double> L;
+    igl::cotmatrix(TV, TT, L);
+
+    Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
+    solver.compute(L);
+    isovals = solver.solve(div_per_V);
+    const double isoval_min = isovals.minCoeff();
+    const double isoval_max = isovals.maxCoeff();
+    const double isoval_spread = isoval_max - isoval_min;
+    const std::size_t n_isovals = isovals.size();
+    isovals = (isovals - isoval_min * Eigen::VectorXd::Ones(n_isovals)) / isoval_spread;
   }
 
   void init_slim(int n, const Eigen::MatrixXd& V_0) {
@@ -338,6 +406,8 @@ public:
 
   Eigen::VectorXd isovals;
   Eigen::VectorXi skeletonV;
+  Eigen::MatrixXd skeletonJoints;
+
 
   FishPreprocessingMenu(const std::string& filename, Viewer& viewer) : m_viewer(viewer) {
     using namespace std;
@@ -461,7 +531,7 @@ public:
     if (m_selected_end_coords[0] >= 0 && m_selected_end_coords[1] >= 0) {
       if (ImGui::CollapsingHeader("Skeleton Extraction",
                                   ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::DragFloat("Distance between bone verts", &m_bone_sep, 0.1f, 0.5f, 4.5f);
+        ImGui::DragInt("Distance between bone verts", &m_num_skel_verts, 1.0f, 5, 100);
         if (ImGui::Button("Extract Skeleton", ImVec2(-1,0))) {
           if (isovals.rows() == 0) {
             cout << "Solving diffusion on tet mesh..." << endl;
@@ -470,7 +540,7 @@ public:
             cout << "Done!" << endl;
           }
           cout << "Extracting Skeleton..." << endl;
-          extract_skeleton(m_bone_sep);
+          extract_skeleton(m_num_skel_verts);
 
           // Need to recompute slim for a new skeleton
           m_first_slim = true;
@@ -499,19 +569,13 @@ public:
       if (ImGui::CollapsingHeader("Straightening Options",
                                   ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::DragInt("SLIM Iterations", &m_num_slim_iterations, 1.0f, 1, 100);
-//        if(ImGui::DragInt("Num Skeleton Vertices", &m_num_skel_verts, 1.0f, 1, m_num_bones)) {
-//          m_first_slim = true;
-//        }
+        ImGui::DragInt("Up-To Vertex", &m_current_vertex, 1.0f, 0, m_num_skel_verts);
+        ImGui::DragFloat("Up Angle", &m_current_vertex_angle, 0.5f, 0.0f, 360.0f);
+
         if (ImGui::Button("Straighten Skeleton", ImVec2(-1,0))) {
           if (m_first_slim) {
             cout << "Initializing SLIM..." << endl;
             init_slim(skeletonV.rows(), TV);
-//            if (m_sData.V_o.rows() != 0) {
-//              cout << "Using last output" << endl;
-//              init_slim(m_num_skel_verts, m_sData.V_o);
-//            } else {
-//              init_slim(m_num_skel_verts, TV);
-//            }
             cout << "Done" << endl;
             m_first_slim = false;
           }
