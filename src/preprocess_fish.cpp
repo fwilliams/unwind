@@ -94,13 +94,15 @@ class FishPreprocessingMenu :
     return idx;
   }
 
-  template <typename T> int sgn(T val) {
-      return (T(0) < val) - (val < T(0));
-  }
 
   bool point_in_tet(int tet, const Eigen::RowVector3d pt) {
     // TODO: check if tet contains vertex
     using namespace  Eigen;
+
+    auto sgn = [](double val) -> int {
+      return (double(0) < val) - (val < double(0));
+    };
+
     Matrix4Xd D0, D1, D2, D3, D4;
     RowVector3d v1 = TV.row(TT(tet, 0)), v2 = TV.row(TT(tet, 1));
     RowVector3d v3 = TV.row(TT(tet, 2)), v4 = TV.row(TT(tet, 3));
