@@ -949,8 +949,14 @@ public:
 int main(int argc, char *argv[]) {
   Viewer viewer;
 //  FishPreprocessingMenu menu("./data/Sternopygus_pejeraton-small.dat.out_.msh", viewer);
-//  FishPreprocessingMenu menu("./data/Sternopygus_arenatus-small.dat.out_.msh", viewer);
-  FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
-  viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
-  return viewer.launch();
+//  FishPreprocessingMenu menu("/home/francis/Sternopygus_arenatus-small.dat.out_.msh", viewer);
+  if (argc == 1) {
+    FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
+    viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
+    return viewer.launch();
+  } else {
+    FishPreprocessingMenu menu(argv[1], viewer);
+    viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
+    return viewer.launch();
+  }
 }
