@@ -14,6 +14,7 @@
 #include <Eigen/SparseQR>
 #include <Eigen/OrderingMethods>
 #include <Eigen/SVD>
+#include <Eigen/CholmodSupport>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -95,17 +96,11 @@ void compute_diffusion(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, int
   typedef SparseMatrix<double> SparseMatrixXd;
 
   // Discrete Laplacian and Discrete Gradient operator
-  SparseMatrixXd L;
   SparseMatrixXd G;
-  cout << "Computing Discrete Gradient... ";
   igl::grad(TV, TT, G);
-  cout << "Done!" << endl;
 
-  cout << "Computing Discrete Laplacian... ";
-  igl::cotmatrix(TV, TT, L);
-  cout << "Done!" << endl;
+  SimplicialLDLT<SparseMatrixXd> solver;
 
-  SparseQR<SparseMatrixXd, COLAMDOrdering<int>> solver;
   MatrixXi constraint_indices;
   MatrixXd constraint_values;
   constraint_indices.resize(2, 1);
@@ -115,76 +110,22 @@ void compute_diffusion(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, int
   constraint_values(0, 0) = 1.0;
   constraint_values(1, 0) = 0.0;
 
-  cout << "Solving harmonic function... ";
   igl::harmonic(TV, TT, constraint_indices,
                 constraint_values, 1, isovals);
-  cout << "Done!" << endl;
+  double isovals_min = isovals.minCoeff();
+  double isovals_max = isovals.maxCoeff();
+  isovals -= isovals_min * Eigen::VectorXd::Ones(isovals.rows());
+  isovals /= (isovals_max - isovals_min);
 
-//  double dt = 0.000001;
-//  SparseMatrixXd I(TV.rows(), TV.rows());
-//  I.setIdentity();
-//  igl::cotmatrix(TV, TT, L);
-//  VectorXd u0(TV.rows());
-//  u0.setZero();
-//  u0[tip] = 1.0;
 
-//  solver.compute(dt * (I - L));
-//  isovals = solver.solve(u0);
+  VectorXd g = G*isovals;
+  Map<MatrixXd> V(g.data(), TT.rows(), 3);
+  V.rowwise().normalize();
 
-//  Eigen::VectorXd g = G * isovals;
-//  Eigen::Map<Eigen::MatrixXd> X(g.data(), TT.rows(), 3);
-//  X = X.rowwise().normalized();
-
-//  // Used to count number of incident faces to a vertex
-//  Eigen::VectorXd incidenceCount(TV.rows());
-//  incidenceCount.setZero();
-
-//  cout << "Calculating gradient per vertex... ";
-//  // Per vertex gradient is average over adjacent faces
-//  Eigen::MatrixXd X_per_V(TV.rows(), 3);
-//  X_per_V.setZero();
-//  for (int i = 0; i < TT.rows(); i++) {
-//    Eigen::RowVector3d gf = X.row(i);
-//    for (int v = 0; v < 4; v++) {
-//      const int vid = TT(i, v);
-//      incidenceCount[vid] += 1;
-//      const int n = incidenceCount[vid];
-//      X_per_V.row(vid) += (gf - X_per_V.row(vid)) / n;
-//    }
-//  }
-//  X_per_V = X_per_V.rowwise().normalized();
-//  cout << "Done!" << endl;
-
-//  Eigen::MatrixXd JX = G * X_per_V;
-//  Eigen::VectorXd div = JX.col(0).segment(0, TT.rows()) +
-//                        JX.col(1).segment(TT.rows(), TT.rows()) +
-//                        JX.col(2).segment(2*TT.rows(), TT.rows());
-
-//  cout << "Calculating divergence per vertex... ";
-//  // Per vertex divergence is average over adjacent faces
-//  Eigen::VectorXd div_per_V(TV.rows());
-//  div_per_V.setZero();
-//  incidenceCount.setZero();
-//  for (int i = 0; i < TT.rows(); i++) {
-//    double divf = div[i];
-//    for (int v = 0; v < 4; v++) {
-//      const int vid = TT(i, v);
-//      incidenceCount[vid] += 1;
-//      const int n = incidenceCount[vid];
-//      div_per_V[vid] += (divf - div_per_V[vid]) / n;
-//    }
-//  }
-//  cout << "Done!" << endl;
-
-//  cout << "Factorizing Laplacian... " << std::flush;
-//  solver.compute(L);
-//  cout << "Done!" << endl;
-
-//  cout << "solving RHS... ";
-//  isovals = solver.solve(div_per_V);
-  cout << "Done!" << endl;
-  const double isovals_min = isovals.minCoeff();
-  const double isovals_max = isovals.maxCoeff();
+  solver.compute(G.transpose()*G);
+  isovals = solver.solve(G.transpose()*g);
+  isovals_min = isovals.minCoeff();
+  isovals_max = isovals.maxCoeff();
   isovals -= isovals_min * Eigen::VectorXd::Ones(isovals.rows());
   isovals /= (isovals_max - isovals_min);
 }
@@ -327,12 +268,21 @@ int nearest_vertex(const Eigen::MatrixXd& TV, const Eigen::RowVector3d& p) {
   return idx;
 }
 
-Eigen::Matrix3d z_rotated_frame(const Eigen::Matrix3d& frame, double angle) {
+Eigen::Matrix3d z_rotated_frame(const Eigen::Matrix3d& frame, double angle, bool flip_xy, bool flip_z) {
   Eigen::Matrix3d R;
   R << cos(angle), -sin(angle), 0,
        sin(angle),  cos(angle), 0,
        0,       0,              1;
-  return R * frame;
+  Eigen::MatrixXd ret = R * frame;
+  if (flip_xy) {
+    Eigen::RowVector3d r0 = ret.row(0);
+    ret.row(0) = ret.row(1);
+    ret.row(1) = r0;
+  }
+  if (flip_z) {
+    ret.row(2) *= -1;
+  }
+  return ret;
 }
 
 
@@ -341,6 +291,7 @@ class FishPreprocessingMenu :
     public igl::opengl::glfw::imgui::ImGuiMenu {
 
   std::string m_current_model_filename;
+
   // Endpoint selection variables
   bool m_selecting_points = false;
   int m_current_endpoint_idx = 0;
@@ -368,6 +319,9 @@ class FishPreprocessingMenu :
   float m_current_vertex_angle = 0; // used to control the up vector
   bool m_just_one_tet = false;  // Only constrain one tet
   bool m_joint_constraints = false; // Constrain joints between orientation constraints
+  bool m_xy_flipped = false; // State about whether the user has flipped the xy axis of the isovalue frame
+  bool m_z_flipped = false; // State about whether the user has flipped the z axis of the isovalue frame
+
 
   // Drawing parameters
   float m_vfield_scale = 150.0f;
@@ -377,12 +331,6 @@ class FishPreprocessingMenu :
   Eigen::MatrixXd m_isovalColors;
 
   Eigen::MatrixXd m_oldTV;
-
-  std::vector<int> m_containing_tet;
-  std::vector<int> m_nearest_vertex;
-
-  // Maps skeleton vertex to up vector angle and tet index
-  std::unordered_map<int, std::pair<double, int>> m_up_vectors;
 
   // Will be set to true if we need to redraw
   bool m_draw_state_changed = false;
@@ -491,7 +439,7 @@ class FishPreprocessingMenu :
       size_t old_data_index = m_viewer.selected_data_index;
       m_viewer.selected_data_index = 0;
       m_viewer.data().set_mesh(isoV, isoF);
-      Matrix3d rFrame = z_rotated_frame(isoFrame, m_current_vertex_angle);
+      Matrix3d rFrame = z_rotated_frame(isoFrame, m_current_vertex_angle, m_xy_flipped, m_z_flipped);
       RowVector3d isoX = rFrame.row(0);
       RowVector3d isoY = rFrame.row(1);
       RowVector3d isoN = rFrame.row(2);
@@ -535,46 +483,26 @@ class FishPreprocessingMenu :
     }
   }
 
+  // This is only used for visualization purposes at this point
   void extract_skeleton(int num_verts) {
     using namespace std;
     using namespace  Eigen;
 
     MatrixXd LV;
     MatrixXi LF;
-    m_up_vectors.clear();
-    m_nearest_vertex.clear();
-    m_containing_tet.clear();
 
     skeletonJoints.resize(num_verts, 3);
     int vcount = 0;
-
-    unordered_map<int, int> tet_to_vertex;
-    unordered_map<int, int> snap_to_vertex;
 
     for(int i = 1; i < num_verts; i++) {
       double isovalue = i * (1.0/num_verts);
       igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
       if (LV.rows() == 0) {
-        cerr << "WARNING: Empty Level Set " << isovalue << endl;
         continue;
       }
       Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
-
-      int tet = containing_tet(TV, TT, C);
-      if (tet < 0) {
-        continue;
-      }
-      if (tet_to_vertex.find(tet) == tet_to_vertex.end()) {
-        int nv = nearest_vertex(TV, C);
-        if (snap_to_vertex.find(nv) == snap_to_vertex.end()) {
-          skeletonJoints.row(vcount) = C;
-          m_nearest_vertex.push_back(nv);
-          m_containing_tet.push_back(tet);
-          tet_to_vertex[tet] = 1;
-          snap_to_vertex[nv] = 1;
-          vcount += 1;
-        }
-      }
+      skeletonJoints.row(vcount) = C;
+      vcount += 1;
     }
     skeletonJoints.conservativeResize(vcount, 3);
   }
@@ -784,10 +712,11 @@ public:
           Eigen::RowVector3d r = isoFrame.row(0);
           isoFrame.row(0) = isoFrame.row(1);
           isoFrame.row(1) = r;
+          m_xy_flipped = !m_xy_flipped;
           m_draw_state_changed = true;
         }
         if (ImGui::Button("Flip Z", ImVec2(-1, 0))) {
-          isoFrame.row(2)*= -1;
+          m_z_flipped = !m_z_flipped;
           m_draw_state_changed = true;
         }
 
@@ -829,7 +758,7 @@ public:
           cout << "Added " << num_constraints_added << " vertex constraints." << endl;
           last_isoval = m_isovalue;
 
-          Eigen::Matrix3d rFrame = z_rotated_frame(isoFrame, m_current_vertex_angle);
+          Eigen::Matrix3d rFrame = z_rotated_frame(isoFrame, m_current_vertex_angle, m_xy_flipped, m_z_flipped);
 
           if (m_just_one_tet) {
             int tet = containing_tet(TV, TT, isoC);
@@ -950,6 +879,7 @@ int main(int argc, char *argv[]) {
   Viewer viewer;
 //  FishPreprocessingMenu menu("./data/Sternopygus_pejeraton-small.dat.out_.msh", viewer);
 //  FishPreprocessingMenu menu("/home/francis/Sternopygus_arenatus-small.dat.out_.msh", viewer);
+//  FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
   if (argc == 1) {
     FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
     viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);

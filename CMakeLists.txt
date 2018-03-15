@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(fish_deformation)
 
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DNDEBUG -O3 -g") # O3 with asserts and debug symbols
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DNDEBUG -O3 -g -DCHOLMOD") # O3 with asserts and debug symbols
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 
