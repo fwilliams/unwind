@@ -385,6 +385,174 @@ struct DrawState {
 };
 
 
+struct FishConstraints {
+
+  std::vector<int> bone_constraints_idx;
+  std::vector<Eigen::RowVector3d> bone_constraints_pos;
+  std::vector<int> orientation_constraints_idx;
+  std::vector<Eigen::RowVector3d> orientation_constraints_pos;
+
+  std::array<int, 2>& endpoints;
+
+  std::vector<double> level_set_isovalues;
+  std::vector<double> level_set_distances;
+
+  std::vector<int> constrained_tets_idx;
+  std::unordered_map<int, std::pair<int, double>> tet_constraints;
+
+  std::pair<Eigen::Matrix3d, Eigen::RowVector3d> frame_for_tet(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, const Eigen::VectorXd& isovals, int idx, double angle) {
+    using namespace Eigen;
+    Eigen::MatrixXd LV;
+    Eigen::MatrixXi LF;
+
+    RowVector3d fwd_dir;
+
+    const int N_LOOKAHEAD = 4;
+    if (idx < constrained_tets_idx.size() - N_LOOKAHEAD) {
+      igl::marching_tets(TV, TT, isovals, level_set_isovalues[idx], LV, LF);
+      RowVector3d c1 = LV.colwise().sum() / LV.rows();
+
+      igl::marching_tets(TV, TT, isovals, level_set_isovalues[idx+N_LOOKAHEAD], LV, LF);
+      RowVector3d c2 = LV.colwise().sum() / LV.rows();
+
+      fwd_dir = (c2 - c1).normalized();
+    } else {
+      igl::marching_tets(TV, TT, isovals, level_set_isovalues[idx-N_LOOKAHEAD], LV, LF);
+      RowVector3d c1 = LV.colwise().sum() / LV.rows();
+
+      igl::marching_tets(TV, TT, isovals, level_set_isovalues[idx], LV, LF);
+      RowVector3d c2 = LV.colwise().sum() / LV.rows();
+
+      fwd_dir = (c2 - c1).normalized();
+    }
+
+    RowVector3d up_dir = RowVector3d(0, 1, 0);
+    up_dir -= fwd_dir*(up_dir.dot(fwd_dir));
+    up_dir = up_dir.normalized();
+    RowVector3d right_dir = fwd_dir.cross(up_dir);
+
+    Matrix3d frame;
+    frame.row(0) = right_dir;
+    frame.row(1) = up_dir;
+    frame.row(2) = fwd_dir;
+
+    Matrix3d rot;
+    rot << cos(angle), -sin(angle), 0,
+           sin(angle),  cos(angle), 0,
+           0,       0,              1;
+
+    MatrixXd ret_frame = rot * frame;
+
+    const RowVector3d tv1 = TV.row(TT(constrained_tets_idx[idx], 0));
+    const RowVector3d tv2 = TV.row(TT(constrained_tets_idx[idx], 1));
+    const RowVector3d tv3 = TV.row(TT(constrained_tets_idx[idx], 2));
+    const RowVector3d tv4 = TV.row(TT(constrained_tets_idx[idx], 3));
+
+    RowVectorXd ret_tet_ctr = (tv1 + tv2 + tv3 + tv4) / 4.0;
+
+    return std::make_pair(ret_frame, ret_tet_ctr);
+  }
+
+  double update_bone_constraints(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, const Eigen::VectorXd& isovals, int num_verts) {
+    using namespace std;
+    using namespace Eigen;
+
+    MatrixXd LV;
+    MatrixXi LF;
+
+    unordered_set<int> vmap;
+    vmap.max_load_factor(0.5);
+    vmap.reserve(num_verts);
+
+    RowVector3d last_ctr = TV.row(endpoints[0]);
+    bone_constraints_idx.push_back(endpoints[0]);
+    bone_constraints_pos.push_back(RowVector3d(0, 0, 0));
+
+    double dist = 0.0;
+    for(int i = 1; i < num_verts; i++) {
+      const double isovalue = i * (1.0/num_verts);
+
+      igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
+
+      if (LV.rows() == 0) {
+        cout << "Empty level set" << endl;
+        continue;
+      }
+
+      RowVector3d ctr = LV.colwise().sum() / LV.rows();
+      dist += (ctr - last_ctr).norm();
+      last_ctr = ctr;
+
+      const int tet = containing_tet(TV, TT, ctr);
+      if (tet < 0) {
+        cout << "Vertex not in tet" << endl;
+        continue;
+      }
+
+      Matrix3d v;
+      for (int k = 0; k < 3; k++) { v.row(k) = TV.row(TT(tet, k)); }
+      int nv = TT(tet, nearest_vertex(v, ctr));
+
+      if (vmap.find(nv) == vmap.end()) {
+        vmap.insert(nv);
+        bone_constraints_idx.push_back(nv);
+        bone_constraints_pos.push_back(RowVector3d(0, 0, dist));
+        constrained_tets_idx.push_back(tet);
+        level_set_distances.push_back(dist);
+        level_set_isovalues.push_back(isovalue);
+      }
+    }
+
+    dist += (TV.row(endpoints[1]) - last_ctr).norm();
+    bone_constraints_idx.push_back(endpoints[1]);
+    bone_constraints_pos.push_back(RowVector3d(0, 0, dist));
+    return dist;
+  }
+
+  double update_orientation_constraint(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, const Eigen::VectorXd& isovals, int idx, double angle) {
+    using namespace Eigen;
+
+    const int tt1 = TT(constrained_tets_idx[idx], 0);
+    const int tt2 = TT(constrained_tets_idx[idx], 1);
+    const int tt3 = TT(constrained_tets_idx[idx], 2);
+    const int tt4 = TT(constrained_tets_idx[idx], 3);
+    const RowVector3d tv1 = TV.row(tt1);
+    const RowVector3d tv2 = TV.row(tt2);
+    const RowVector3d tv3 = TV.row(tt3);
+    const RowVector3d tv4 = TV.row(tt4);
+
+    int bc_idx = -1;
+    auto it = tet_constraints.find(idx);
+    if (it == tet_constraints.end()) {
+      bc_idx = orientation_constraints_idx.size();
+      tet_constraints[idx] = std::make_pair(bc_idx, angle);
+
+      orientation_constraints_idx.push_back(tt1);
+      orientation_constraints_idx.push_back(tt2);
+      orientation_constraints_idx.push_back(tt3);
+      orientation_constraints_idx.push_back(tt4);
+
+      orientation_constraints_pos.push_back(tv1);
+      orientation_constraints_pos.push_back(tv2);
+      orientation_constraints_pos.push_back(tv3);
+      orientation_constraints_pos.push_back(tv4);
+    } else {
+      bc_idx = it->second.first;
+    }
+
+    auto frame_ctr = frame_for_tet(TV, TT, isovals, idx, angle);
+    const Matrix3d frame = frame_ctr.first;
+    const RowVector3d tet_ctr = frame_ctr.second;
+    const RowVector3d constrained_tet_ctr(0, 0, level_set_distances[idx]);
+
+    orientation_constraints_pos[bc_idx+0] = (tv1 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
+    orientation_constraints_pos[bc_idx+1] = (tv2 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
+    orientation_constraints_pos[bc_idx+2] = (tv3 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
+    orientation_constraints_pos[bc_idx+3] = (tv4 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
+  }
+};
+
+
 class FishPreprocessingMenu :
     public igl::opengl::glfw::imgui::ImGuiMenu {
 
