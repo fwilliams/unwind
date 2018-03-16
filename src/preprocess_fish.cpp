@@ -87,7 +87,7 @@ void isoval_colors(const Eigen::VectorXd& isovals, Eigen::MatrixXd& isovalColors
 }
 
 // Compute approximate geodesic distance
-void compute_diffusion(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, int tip, int tail, Eigen::VectorXd& isovals) {
+void compute_diffusion(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, const std::array<int, 2>& endpoints, Eigen::VectorXd& isovals) {
   using namespace std;
   using namespace Eigen;
 
@@ -105,8 +105,8 @@ void compute_diffusion(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, int
   MatrixXd constraint_values;
   constraint_indices.resize(2, 1);
   constraint_values.resize(2, 1);
-  constraint_indices(0, 0) = tail;
-  constraint_indices(1, 0) = tip;
+  constraint_indices(0, 0) = endpoints[1];
+  constraint_indices(1, 0) = endpoints[0];
   constraint_values(0, 0) = 1.0;
   constraint_values(1, 0) = 0.0;
 
@@ -268,7 +268,7 @@ double skeleton_constraints(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT
                           std::vector<int>& b,
                           std::vector<Eigen::RowVector3d>& bc,
                           std::vector<int>& tets,
-                          std::vector<double>& level_sets) {
+                          std::vector<std::pair<double, double>>& level_sets) {
   using namespace std;
   using namespace Eigen;
 
@@ -310,8 +310,7 @@ double skeleton_constraints(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT
       b.push_back(nv);
       bc.push_back(RowVector3d(0, 0, dist));
       tets.push_back(tet);
-      level_sets.push_back(isovalue);
-      cout << level_sets.back() << endl;
+      level_sets.push_back(make_pair(isovalue, dist));
     }
   }
   dist += (TV.row(endpoints[1]) - lastC).norm();
@@ -350,15 +349,6 @@ struct DrawState {
   Eigen::MatrixXd m_bTV;        // Positions of SLIM boundary constraints
   Eigen::MatrixXd m_bV;         // Target positions of SLIM boundary constraints
 
-//  Eigen::Matrix3d frame() {
-//    Eigen::Matrix3d ret;
-//    ret.setIdentity();
-//    if (m_isoV.rows() >= 3) {
-//      fit_plane(m_isoV, m_isoC, ret);
-//    }
-//    return ret;
-//  }
-
   void update_tet_mesh(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT) {
     m_TV = TV;
     m_TT = TT;
@@ -369,10 +359,13 @@ struct DrawState {
     extract_skeleton(m_TV, m_TT, isovals, num_verts, m_joints);
   }
 
-  void update_constraint_points(const std::vector<int>& b, const std::vector<Eigen::RowVector3d>& bc) {
-    for (int i = 0; i < b.size(); i++) {
+  void update_constraint_points(const Eigen::VectorXi& b, const Eigen::MatrixXd& bc) {
+    using namespace std;
+    m_bTV.resize(b.rows(), 3);
+    m_bV.resize(b.rows(), 3);
+    for (int i = 0; i < m_bV.rows(); i++) {
       m_bTV.row(i) = m_TV.row(b[i]);
-      m_bV.row(i) = bc[i];
+      m_bV.row(i) = bc.row(i);
     }
   }
 
@@ -411,10 +404,6 @@ class FishPreprocessingMenu :
 
   // Incremental straightening variables
   float m_current_angle = 0; // used to control the up vector
-  bool m_just_one_tet = false;  // Only constrain one tet
-  bool m_joint_constraints = false; // Constrain joints between orientation constraints
-  bool m_xy_flipped = false; // State about whether the user has flipped the xy axis of the isovalue frame
-  bool m_z_flipped = false; // State about whether the user has flipped the z axis of the isovalue frame
   int m_current_level_set = 0; // The current selected level set
 
   // Drawing parameters
@@ -565,9 +554,7 @@ class FishPreprocessingMenu :
       m_viewer.data().set_mesh(ds.m_isoV, ds.m_isoF);
       Matrix3d rFrame;
       RowVector3d ctr;
-      update_angle(rFrame, ctr, false);
-      // TODO: Draw the frame
-//      Matrix3d rFrame = z_rotated_frame(isoFrame, m_current_angle, m_xy_flipped, m_z_flipped); // TODO: Don't use isoframe
+      compute_frame(rFrame, ctr);
       RowVector3d isoX = rFrame.row(0);
       RowVector3d isoY = rFrame.row(1);
       RowVector3d isoN = rFrame.row(2);
@@ -606,25 +593,68 @@ class FishPreprocessingMenu :
     }
   }
 
-  void add_orientation_constraint() {
+  void update_orientation_constraint() {
     using namespace std;
+    using namespace Eigen;
 
     DrawState& ds = m_ds[m_current_buf];
-    m_tet_constraints[m_current_level_set] = make_pair(m_b.size(), m_current_angle);
-    m_b.push_back(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 0));
-    m_b.push_back(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 1));
-    m_b.push_back(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 2));
-    m_b.push_back(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 3));
-    m_bc.push_back(ds.m_TV.row(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 0)));
-    m_bc.push_back(ds.m_TV.row(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 1)));
-    m_bc.push_back(ds.m_TV.row(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 2)));
-    m_bc.push_back(ds.m_TV.row(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 3)));
+
+    const int tt1 = ds.m_TT(m_constraint_tets_idx[m_current_level_set], 0);
+    const int tt2 = ds.m_TT(m_constraint_tets_idx[m_current_level_set], 1);
+    const int tt3 = ds.m_TT(m_constraint_tets_idx[m_current_level_set], 2);
+    const int tt4 = ds.m_TT(m_constraint_tets_idx[m_current_level_set], 3);
+    const RowVector3d tv1 = ds.m_TV.row(tt1);
+    const RowVector3d tv2 = ds.m_TV.row(tt2);
+    const RowVector3d tv3 = ds.m_TV.row(tt3);
+    const RowVector3d tv4 = ds.m_TV.row(tt4);
+
+    int bc_idx = -1;
+    auto it = m_tet_constraints.find(m_current_level_set);
+    if (it == m_tet_constraints.end()) {
+      bc_idx = m_b.size();
+      m_tet_constraints[m_current_level_set] = make_pair(bc_idx, m_current_angle);
+
+      m_b.push_back(tt1);
+      m_b.push_back(tt2);
+      m_b.push_back(tt3);
+      m_b.push_back(tt4);
+
+      m_bc.push_back(tv1);
+      m_bc.push_back(tv2);
+      m_bc.push_back(tv3);
+      m_bc.push_back(tv4);
+    } else {
+      bc_idx = it->second.first;
+    }
+
     Eigen::Matrix3d rframe;
-    Eigen::RowVector3d c;
-    update_angle(rframe, c, true);
+    Eigen::RowVector3d tet_ctr;
+    compute_frame(rframe, tet_ctr);
+
+    RowVector3d constr_ctr(0, 0, m_level_sets[m_current_level_set].second);
+    cout << rframe << endl << endl;
+    m_bc[bc_idx+0] = (tv1 - tet_ctr) * rframe.transpose() + constr_ctr;
+    m_bc[bc_idx+1] = (tv2 - tet_ctr) * rframe.transpose() + constr_ctr;
+    m_bc[bc_idx+2] = (tv3 - tet_ctr) * rframe.transpose() + constr_ctr;
+    m_bc[bc_idx+3] = (tv4 - tet_ctr) * rframe.transpose() + constr_ctr;
+
+    m_constraints_changed = true;
   }
 
-  void update_angle(Eigen::Matrix3d& rframe, Eigen::RowVector3d& tet_ctr, bool update_constraint) {
+  void update_current_level_set() {
+    m_double_buf_lock.lock();
+    DrawState& ds = m_ds[m_current_buf];
+    m_isovalue = m_level_sets[m_current_level_set].first;
+    auto it = m_tet_constraints.find(m_current_level_set);
+    if (it != m_tet_constraints.end()) {
+      m_current_angle = it->second.second;
+    }
+    ds.update_isovalue(isovals, m_isovalue);
+    m_double_buf_lock.unlock();
+    m_draw_state_changed = true;
+  }
+
+  void compute_frame(Eigen::Matrix3d& rframe, Eigen::RowVector3d& tet_ctr) {
     using namespace Eigen;
     Eigen::MatrixXd LV;
     Eigen::MatrixXi LF;
@@ -632,18 +662,18 @@ class FishPreprocessingMenu :
     DrawState& ds = m_ds[m_current_buf];
     RowVector3d fwd_dir;
     if (m_current_level_set < m_constraint_tets_idx.size()-4) {
-      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set], LV, LF);
+      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set].first, LV, LF);
       RowVector3d c1 = LV.colwise().sum() / LV.rows();
 
-      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set+4], LV, LF);
+      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set+4].first, LV, LF);
       RowVector3d c2 = LV.colwise().sum() / LV.rows();
 
       fwd_dir = (c2 - c1).normalized();
     } else {
-      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set-4], LV, LF);
+      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set-4].first, LV, LF);
       RowVector3d c1 = LV.colwise().sum() / LV.rows();
 
-      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set], LV, LF);
+      igl::marching_tets(ds.m_TV, ds.m_TT, isovals, m_level_sets[m_current_level_set].first, LV, LF);
       RowVector3d c2 = LV.colwise().sum() / LV.rows();
 
       fwd_dir = (c2 - c1).normalized();
@@ -672,33 +702,6 @@ class FishPreprocessingMenu :
     RowVector3d tv4 = ds.m_TV.row(ds.m_TT(m_constraint_tets_idx[m_current_level_set], 3));
 
     tet_ctr = (tv1 + tv2 + tv3 + tv4) / 4.0;
-
-    if (update_constraint) {
-      auto it = m_tet_constraints.find(m_current_level_set);
-      if (it == m_tet_constraints.end()) {
-        return;
-      }
-
-      int bc_idx = it->second.first;
-      m_bc[bc_idx] = tv1 * rframe.transpose();
-      m_bc[bc_idx+1] = tv2 * rframe.transpose();
-      m_bc[bc_idx+2] = tv3 * rframe.transpose();
-      m_bc[bc_idx+3] = tv4 * rframe.transpose();
-      m_constraints_changed = true;
-    }
-  }
-
-  void update_current_level_set() {
-    m_double_buf_lock.lock();
-    DrawState& ds = m_ds[m_current_buf];
-    m_isovalue = m_level_sets[m_current_level_set];
-    auto it = m_tet_constraints.find(m_current_level_set);
-    if (it != m_tet_constraints.end()) {
-      m_current_angle = it->second.second;
-    }
-    ds.update_isovalue(isovals, m_isovalue);
-    m_double_buf_lock.unlock();
-    m_draw_state_changed = true;
   }
 
   void slim_thread() {
@@ -707,16 +710,34 @@ class FishPreprocessingMenu :
 
     igl::SLIMData sData;
 
-    cout << "Starting SLIM background thread.." << endl;
+    cout << "SLIM Thread: Starting SLIM background thread.." << endl;
     while (m_slim_running) {
+
       m_constraints_lock.lock();
-      if (m_last_num_constraints != m_b.size()) {
-        cout << "Reinitializing SLIM with " << m_b.size() << " constraints." << endl;
+      if (m_last_num_constraints != m_b.size() || m_constraints_changed) {
+        cout << "SLIM Thread: Reinitializing SLIM with " << m_b.size() << " constraints." << endl;
         VectorXi slim_b(m_b.size());
         MatrixXd slim_bc(m_bc.size(), 3);
-        for (int i = 0; i < m_b.size(); i++) {
-          slim_b[i] = m_b[i];
-          slim_bc.row(i) = m_bc[i];
+        if (m_only_ends_and_tets) {
+          int ccount = 0;
+          for (int i = m_num_skel_constraints; i < m_b.size(); i++) {
+            slim_b[ccount] = m_b[i];
+            slim_bc.row(ccount) = m_bc[i];
+            ccount += 1;
+          }
+          slim_b[ccount] = m_b[0];
+          slim_bc.row(ccount) = m_bc[0];
+          ccount += 1;
+          slim_b[ccount] = m_b[m_num_skel_constraints-1];
+          slim_bc.row(ccount) = m_bc[m_num_skel_constraints-1];
+          ccount += 1;
+          slim_b.conservativeResize(ccount);
+          slim_bc.conservativeResize(ccount, 3);
+        } else {
+          for (int i = 0; i < m_b.size(); i++) {
+            slim_b[i] = m_b[i];
+            slim_bc.row(i) = m_bc[i];
+          }
         }
         m_last_num_constraints = m_b.size();
         double soft_const_p = 1e5;
@@ -726,7 +747,8 @@ class FishPreprocessingMenu :
         m_double_buf_lock.unlock();
         slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
                         slim_b, slim_bc, soft_const_p);
-        cout << "Done reinitializing SLIM" << endl;
+        cout << "SLIM Thread: Done reinitializing SLIM" << endl;
+        m_constraints_changed = false;
       }
       m_constraints_lock.unlock();
 
@@ -734,6 +756,7 @@ class FishPreprocessingMenu :
         // this_thread::yield();
         continue;
       }
+
       igl::slim_solve(sData, 1);
 
       int buffer = (m_current_buf + 1) % 2;
@@ -741,7 +764,7 @@ class FishPreprocessingMenu :
       ds.update_tet_mesh(sData.V_o, TT);
       ds.update_isovalue(isovals, m_isovalue);
       ds.update_skeleton(isovals, m_num_skel_verts);
-
+      ds.update_constraint_points(sData.b, sData.bc);
       m_double_buf_lock.lock();
       m_current_buf = buffer;
       m_double_buf_lock.unlock();
@@ -772,11 +795,12 @@ public:
   std::vector<int> m_b;
   std::vector<Eigen::RowVector3d> m_bc;
   std::vector<int> m_constraint_tets_idx;
-  std::vector<double> m_level_sets;
+  std::vector<std::pair<double, double>> m_level_sets;
+  std::vector<double> m_level_set_dists;
   std::unordered_map<int, std::pair<int, double>> m_tet_constraints;
   int m_num_skel_constraints = 0;
+  bool m_only_ends_and_tets = false;
   bool m_constraints_changed = false;
-
   FishPreprocessingMenu(const std::string& filename, Viewer& viewer) : m_viewer(viewer) {
     using namespace std;
 
@@ -886,8 +910,10 @@ public:
     case GLFW_KEY_LEFT:
       m_current_level_set = std::max(m_current_level_set-step, 0);
       update_current_level_set();
+      break;
     }
   }
+
   virtual void draw_viewer_menu() override {
     using namespace std;
 
@@ -943,14 +969,14 @@ public:
     // Skeleton extraction interface
     //
     if (m_selected_end_coords[0] >= 0 && m_selected_end_coords[1] >= 0) {
-      if (ImGui::CollapsingHeader("Skeleton Extraction",
+      if (ImGui::CollapsingHeader("Diffusion Options",
                                   ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::DragInt("Number of Joints", &m_num_skel_verts, 1.0f, 5, 100);
 
         if (ImGui::Button("Compute Diffusion Distances", ImVec2(-1,0))) {
           if (isovals.rows() == 0) {
             cout << "Solving diffusion on tet mesh..." << endl;
-            compute_diffusion(TV, TT, m_selected_end_coords[0], m_selected_end_coords[1], isovals);
+            compute_diffusion(TV, TT, m_selected_end_coords, isovals);
             isoval_colors(isovals, m_isovalColors);
             cout << "Done!" << endl;
           }
@@ -975,10 +1001,6 @@ public:
           m_draw_level_set = true;
           m_draw_original_mesh = false;
         }
-
-        if (ImGui::Button("Save Diffusion", ImVec2(-1,0))) {
-          // TODO: Implement
-        }
       }
     }
 
@@ -997,26 +1019,22 @@ public:
           m_draw_state_changed = true;
         }
 
-        if (ImGui::Button("Flip X-Y", ImVec2(-1, 0))) {
-          m_draw_state_changed = true;
-        }
-        if (ImGui::Button("Flip Z", ImVec2(-1, 0))) {
-          m_z_flipped = !m_z_flipped;
-          m_draw_state_changed = true;
-        }
-
-        if (ImGui::Button("Add Orientation Constraint", ImVec2(-1, 0))) {
-          add_orientation_constraint();
+        if (ImGui::Button("Set Orientation Constraint", ImVec2(-1, 0))) {
+          m_double_buf_lock.lock();
+          m_constraints_lock.lock();
+          update_orientation_constraint();
+          m_constraints_lock.unlock();
+          m_double_buf_lock.unlock();
           m_draw_state_changed = true;
         }
 
-        if (ImGui::Button("Reset Mesh", ImVec2(-1, 0))) {
-          // TODO: Implement
+        if(ImGui::Checkbox("Only Tets and Ends", &m_only_ends_and_tets)) {
+          m_constraints_lock.lock();
+          m_constraints_changed = true;
+          m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }
 
-        ImGui::Checkbox("Joint Constraints", &m_joint_constraints);
-        ImGui::Checkbox("Just One Tet", &m_just_one_tet);
       }
     }
 
@@ -1070,7 +1088,7 @@ int main(int argc, char *argv[]) {
 //  FishPreprocessingMenu menu("/home/francis/Sternopygus_arenatus-small.dat.out_.msh", viewer);
 //  FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
   if (argc == 1) {
-    FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
+    FishPreprocessingMenu menu("./data/sar2_.msh", viewer);
     viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
     return viewer.launch();
   } else {
