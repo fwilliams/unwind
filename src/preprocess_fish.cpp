@@ -26,6 +26,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <tuple>
 
 #include "yixin_loader.h"
 #include "auto.h"
@@ -339,12 +340,12 @@ struct ConstraintState {
 
   // Indices of tets which can possibly have rotation constraints
   std::vector<int> m_constrainable_tets_idx;
-  std::unordered_map<int, std::pair<int, double>> m_tet_constraints;
+  std::unordered_map<int, std::tuple<int, double, bool>> m_tet_constraints;
 
   std::pair<Eigen::Matrix3d, Eigen::RowVector3d> frame_for_tet(const Eigen::MatrixXd& TV,
                                                                const Eigen::MatrixXi& TT,
                                                                const Eigen::VectorXd& isovals,
-                                                               int idx, double angle) {
+                                                               int idx, double angle, bool flip_x) {
     using namespace Eigen;
     Eigen::MatrixXd LV;
     Eigen::MatrixXi LF;
@@ -373,7 +374,10 @@ struct ConstraintState {
     RowVector3d up_dir = RowVector3d(0, 1, 0);
     up_dir -= fwd_dir*(up_dir.dot(fwd_dir));
     up_dir = up_dir.normalized();
-    RowVector3d right_dir = fwd_dir.cross(up_dir);
+    RowVector3d right_dir = up_dir.cross(fwd_dir);
+    if (flip_x) {
+      right_dir *= -1;
+    }
 
     Matrix3d frame;
     frame.row(0) = right_dir;
@@ -415,6 +419,12 @@ struct ConstraintState {
 
   int num_constrainable_tets() const {
     return m_constrainable_tets_idx.size();
+  }
+
+  void clear_orientation_constraints() {
+    m_orientation_constraints_idx.clear();
+    m_orientation_constraints_pos.clear();
+    m_tet_constraints.clear();
   }
 
   double update_bone_constraints(const Eigen::MatrixXd& TV,
@@ -480,7 +490,7 @@ struct ConstraintState {
   double update_orientation_constraint(const Eigen::MatrixXd& TV,
                                        const Eigen::MatrixXi& TT,
                                        const Eigen::VectorXd& isovals,
-                                       int idx, double angle) {
+                                       int idx, double angle, bool flipped_x) {
     using namespace Eigen;
 
     const int tt1 = TT(m_constrainable_tets_idx[idx], 0);
@@ -496,7 +506,7 @@ struct ConstraintState {
     auto it = m_tet_constraints.find(idx);
     if (it == m_tet_constraints.end()) {
       bc_idx = m_orientation_constraints_idx.size();
-      m_tet_constraints[idx] = std::make_pair(bc_idx, angle);
+      m_tet_constraints[idx] = std::make_tuple(bc_idx, angle, flipped_x);
 
       m_orientation_constraints_idx.push_back(tt1);
       m_orientation_constraints_idx.push_back(tt2);
@@ -508,10 +518,10 @@ struct ConstraintState {
       m_orientation_constraints_pos.push_back(tv3);
       m_orientation_constraints_pos.push_back(tv4);
     } else {
-      bc_idx = it->second.first;
+      bc_idx = std::get<0>(it->second);
     }
 
-    auto frame_ctr = frame_for_tet(TV, TT, isovals, idx, angle);
+    auto frame_ctr = frame_for_tet(TV, TT, isovals, idx, angle, flipped_x);
     const Matrix3d frame = frame_ctr.first;
     const RowVector3d tet_ctr = frame_ctr.second;
     const RowVector3d constrained_tet_ctr(0, 0, m_level_set_distances[idx]);
@@ -576,6 +586,7 @@ struct UIState {
   float m_current_angle = 0; // used to control the up vector
   int m_current_level_set = 0; // The current selected level set
   bool m_only_ends_and_tets = false; // Only constrain the endpoints and selected tets
+  bool m_flip_x = false;
 
   // Appearance parameters when we draw overlay points
   float m_vfield_scale = 150.0f;
@@ -674,7 +685,8 @@ class FishPreprocessingMenu :
     DrawState& ds = m_ds[m_current_buf];
     auto it = m_constraints.m_tet_constraints.find(m_ui_state.m_current_level_set);
     if (it != m_constraints.m_tet_constraints.end()) {
-      m_ui_state.m_current_angle = it->second.second;
+      m_ui_state.m_current_angle = std::get<1>(it->second);
+      m_ui_state.m_flip_x = std::get<2>(it->second);
     }
     ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
     m_double_buf_lock.unlock();
@@ -853,7 +865,7 @@ public:
       select_overlay_mesh();
       if (m_ui_state.m_draw_level_set) {
         m_viewer.data().set_mesh(ds.m_isoV, ds.m_isoF);
-        pair<Matrix3d, RowVector3d> frame_ctr = m_constraints.frame_for_tet(ds.m_TV, ds.m_TT, isovals, m_ui_state.m_current_level_set, m_ui_state.m_current_angle);
+        pair<Matrix3d, RowVector3d> frame_ctr = m_constraints.frame_for_tet(ds.m_TV, ds.m_TT, isovals, m_ui_state.m_current_level_set, m_ui_state.m_current_angle, m_ui_state.m_flip_x);
         Matrix3d frame = frame_ctr.first;
         RowVector3d ctr = frame_ctr.second;
 
@@ -1046,7 +1058,7 @@ public:
           m_constraints_lock.lock();
 
           DrawState& ds = m_ds[m_current_buf];
-          m_constraints.update_orientation_constraint(ds.m_TV, ds.m_TT, isovals, m_ui_state.m_current_level_set, m_ui_state.m_current_angle);
+          m_constraints.update_orientation_constraint(ds.m_TV, ds.m_TT, isovals, m_ui_state.m_current_level_set, m_ui_state.m_current_angle, m_ui_state.m_flip_x);
           m_constraints_changed = true;
 
           m_constraints_lock.unlock();
@@ -1055,9 +1067,18 @@ public:
           m_draw_state_changed = true;
         }
 
-        if(ImGui::Checkbox("Only Tets and Ends", &m_ui_state.m_only_ends_and_tets)) {
+        if (ImGui::Checkbox("Flip X", &m_ui_state.m_flip_x)) {
+          m_draw_state_changed = true;
+        }
+        if (ImGui::Checkbox("Only Tets and Ends", &m_ui_state.m_only_ends_and_tets)) {
           m_constraints_lock.lock();
           m_constraints_changed = true;
+          m_constraints_lock.unlock();
+          m_draw_state_changed = true;
+        }
+        if (ImGui::Button("Clear Orientation Constraints")) {
+          m_constraints_lock.lock();
+          m_constraints.clear_orientation_constraints();
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }
@@ -1112,7 +1133,7 @@ int main(int argc, char *argv[]) {
 //  FishPreprocessingMenu menu("/home/francis/Sternopygus_arenatus-small.dat.out_.msh", viewer);
 //  FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
   if (argc == 1) {
-    FishPreprocessingMenu menu("./data/sar2_.msh", viewer);
+    FishPreprocessingMenu menu("./data/small_fish/Sternopygus_arenatus-small.dat.out_.msh", viewer);
     viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
     return viewer.launch();
   } else {
