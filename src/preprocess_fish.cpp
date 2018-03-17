@@ -1079,6 +1079,7 @@ public:
         if (ImGui::Button("Clear Orientation Constraints")) {
           m_constraints_lock.lock();
           m_constraints.clear_orientation_constraints();
+          m_constraints_changed = true;
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }

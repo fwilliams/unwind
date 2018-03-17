@@ -1,7 +1,6 @@
 CMakeLists.txt
 cmake/FindLIBIGL.cmake
 src/extract_surface.cpp
-src/main.cpp
 src/preprocess_fish.cpp
 src/tests/test_cgal_tet_meshing.cpp
 src/tests/test_marching_tets.cpp
