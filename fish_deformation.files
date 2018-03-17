@@ -7,6 +7,7 @@ src/tests/test_cgal_tet_meshing.cpp
 src/tests/test_marching_tets.cpp
 src/tests/test_marching_tets_basic.cpp
 src/tests/test_meshing_harish_data.cpp
+src/utils/auto.h
 src/utils/cgal_tetmesh.h
 src/utils/cgal_tetrahedralize.cpp
 src/utils/cgal_tetrahedralize.h
