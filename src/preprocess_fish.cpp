@@ -27,6 +27,7 @@
 #include <mutex>
 #include <atomic>
 #include <tuple>
+#include <chrono>
 
 #include "yixin_loader.h"
 #include "auto.h"
@@ -593,6 +594,41 @@ struct UIState {
   float m_overlay_linewidth = 1.5;
   float m_overlay_point_size = 7.0;
 
+  // Keyboard state
+  uint8_t m_key_held_flag = 0;
+  bool m_alt_modifier = false;
+  enum { KEY_UP = 0, KEY_DOWN, KEY_RIGHT = 2, KEY_LEFT = 3 };
+
+  // Timing statistics
+  double m_avg_draw_state_update_time = 0.0;
+  double m_avg_slim_time = 0.0;
+  double m_avg_draw_time = 0.0;
+  double alpha = 0.5;
+
+  void update_draw_state_ema(double time_ms) {
+    if (m_avg_draw_state_update_time == 0.0) {
+      m_avg_draw_state_update_time = time_ms;
+    } else {
+      m_avg_draw_state_update_time = alpha * time_ms + (1.0 - alpha) * m_avg_draw_state_update_time;
+    }
+  }
+
+  void update_slim_ema(double time_ms) {
+    if (m_avg_slim_time == 0.0) {
+      m_avg_slim_time = time_ms;
+    } else {
+      m_avg_slim_time = alpha * time_ms + (1.0 - alpha) * m_avg_slim_time;
+    }
+  }
+
+  void update_draw_ema(double time_ms) {
+    if (m_avg_draw_time == 0.0) {
+      m_avg_draw_time = time_ms;
+    } else {
+      m_avg_draw_time = alpha * time_ms + (1.0 - alpha) * m_avg_draw_time;
+    }
+  }
+
   void begin_endpoint_selection() {
     m_show_point_selection_mode = true;
 
@@ -680,24 +716,14 @@ class FishPreprocessingMenu :
     m_viewer.selected_data_index = m_background_mesh_id;
   }
 
-  void update_current_level_set() {
-    m_double_buf_lock.lock();
-    DrawState& ds = m_ds[m_current_buf];
-    auto it = m_constraints.m_tet_constraints.find(m_ui_state.m_current_level_set);
-    if (it != m_constraints.m_tet_constraints.end()) {
-      m_ui_state.m_current_angle = std::get<1>(it->second);
-      m_ui_state.m_flip_x = std::get<2>(it->second);
-    }
-    ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
-    m_double_buf_lock.unlock();
-    m_draw_state_changed = true;
-  }
-
   void slim_thread() {
     using namespace std;
     using namespace Eigen;
 
     igl::SLIMData sData;
+
+    m_ui_state.m_avg_draw_state_update_time = 0.0;
+    m_ui_state.m_avg_slim_time = 0.0;
 
     cout << "SLIM Thread: Starting SLIM background thread.." << endl;
     while (m_slim_running) {
@@ -725,7 +751,12 @@ class FishPreprocessingMenu :
         continue;
       }
 
+      auto slim_start_time= chrono::high_resolution_clock::now();
       igl::slim_solve(sData, 1);
+      auto slim_end_time = chrono::high_resolution_clock::now();
+      m_ui_state.update_slim_ema(chrono::duration<double, milli>(slim_end_time - slim_start_time).count());
+
+      auto ds_update_start_time= chrono::high_resolution_clock::now();
 
       int buffer = (m_current_buf + 1) % 2;
       DrawState& ds = m_ds[buffer];
@@ -733,11 +764,30 @@ class FishPreprocessingMenu :
       ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
       ds.update_skeleton(isovals, m_ui_state.m_num_skel_verts);
       ds.update_constraint_points(sData.b, sData.bc);
+
+      auto ds_update_end_time = chrono::high_resolution_clock::now();
+      m_ui_state.update_draw_state_ema(chrono::duration<double, milli>(ds_update_end_time - ds_update_start_time).count());
+
       m_double_buf_lock.lock();
       m_current_buf = buffer;
-      m_double_buf_lock.unlock();
       m_draw_state_changed = true;
+      m_double_buf_lock.unlock();
+
+
     }
+  }
+
+  void update_current_level_set() {
+    m_double_buf_lock.lock();
+    DrawState& ds = m_ds[m_current_buf];
+    auto it = m_constraints.m_tet_constraints.find(m_ui_state.m_current_level_set);
+    if (it != m_constraints.m_tet_constraints.end()) {
+      m_ui_state.m_current_angle = std::get<1>(it->second);
+      m_ui_state.m_flip_x = std::get<2>(it->second);
+    }
+    ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
+    m_double_buf_lock.unlock();
+    m_draw_state_changed = true;
   }
 
 public:
@@ -777,6 +827,7 @@ public:
     m_draw_state_changed = true;
 
     viewer.plugins.push_back(this);
+    viewer.core.is_animating = true;
   }
 
   ~FishPreprocessingMenu() {
@@ -788,7 +839,10 @@ public:
     using namespace Eigen;
     using namespace std;
 
+    key_hold();
     if (m_draw_state_changed) {
+      auto draw_start_time = chrono::high_resolution_clock::now();
+
       m_draw_state_changed = false;
 
       m_double_buf_lock.lock();
@@ -891,6 +945,9 @@ public:
         m_viewer.data().add_points(v1, ColorRGB::CRIMSON);
         m_viewer.data().add_points(v2.row(ds.m_joints.rows()-2), ColorRGB::CRIMSON);
       }
+
+      auto draw_end_time = chrono::high_resolution_clock::now();
+      m_ui_state.update_draw_ema(chrono::duration<double, milli>(draw_end_time - draw_start_time).count());
     }
 
     return ImGuiMenu::pre_draw();
@@ -904,10 +961,14 @@ public:
       Eigen::Vector3f bc; // Barycentric coords of the click point on the face
       double x = m_viewer.current_mouse_x;
       double y = m_viewer.core.viewport(3) - m_viewer.current_mouse_y;
+      m_double_buf_lock.lock();
+      DrawState& ds = m_ds[m_current_buf];
       if(igl::unproject_onto_mesh(Eigen::Vector2f(x,y),
                                   m_viewer.core.view * m_viewer.core.model,
                                   m_viewer.core.proj, m_viewer.core.viewport,
-                                  TV, TF, fid, bc)) {
+                                  ds.m_TV, ds.m_TF, fid, bc)) {
+        m_double_buf_lock.unlock();
+
         if (!m_ui_state.m_show_point_selection_mode) {
           return false;
         }
@@ -927,37 +988,74 @@ public:
         }
         m_draw_state_changed = true;
       }
+      m_double_buf_lock.unlock();
     }
 
     return ImGuiMenu::mouse_down(button, modifier);
   }
 
+  virtual bool key_down(int key, int modifier) override {
+
+    int step = 1;
+    if (modifier & GLFW_MOD_ALT) {
+      step = 10;
+      m_ui_state.m_alt_modifier = true;
+    }
+
+    switch (key) {
+    case GLFW_KEY_RIGHT:
+      m_ui_state.m_current_level_set = std::min(m_ui_state.m_current_level_set+step, m_constraints.num_constrainable_tets()-1);
+      update_current_level_set();
+      break;
+    case GLFW_KEY_LEFT:
+      m_ui_state.m_current_level_set = std::max(m_ui_state.m_current_level_set-step, 0);
+      update_current_level_set();
+      break;
+    case GLFW_KEY_UP:
+      m_ui_state.m_key_held_flag |= 1 << UIState::KEY_UP;
+      break;
+    case GLFW_KEY_DOWN:
+      m_ui_state.m_key_held_flag |= 1 << UIState::KEY_DOWN;
+      break;
+    }
+
+    return ImGuiMenu::key_down(key, modifier);
+  }
+
   virtual bool key_up(int key, int modifier) override {
 
+    switch (key) {
+    case GLFW_KEY_UP:
+      m_ui_state.m_key_held_flag &= ~(1 << UIState::KEY_UP);
+      break;
+    case GLFW_KEY_DOWN:
+      m_ui_state.m_key_held_flag &= ~(1 << UIState::KEY_DOWN);
+      break;
+    }
+
+    if (modifier & GLFW_MOD_ALT) {
+      m_ui_state.m_alt_modifier = false;
+    }
+
+    return ImGuiMenu::key_up(key, modifier);
+  }
+
+  void key_hold() {
     if (m_ui_state.m_show_straighteining_menu) {
+
       const double one_deg = M_PI / 180.0;
+
       int step = 1;
-      if (modifier & GLFW_MOD_ALT) {
+      if (m_ui_state.m_alt_modifier) {
         step = 10;
       }
-      switch(key) {
-      case GLFW_KEY_RIGHT:
-        m_ui_state.m_current_level_set = std::min(m_ui_state.m_current_level_set+step, m_constraints.num_constrainable_tets()-1);
-        update_current_level_set();
-        break;
-      case GLFW_KEY_LEFT:
-        m_ui_state.m_current_level_set = std::max(m_ui_state.m_current_level_set-step, 0);
-        update_current_level_set();
-        break;
-      case GLFW_KEY_UP:
+
+      if (m_ui_state.m_key_held_flag == 1 << UIState::KEY_UP) {
         m_ui_state.m_current_angle = std::min(m_ui_state.m_current_angle+one_deg*step, 2*M_PI);
-        break;
-      case GLFW_KEY_DOWN:
+      } else if (m_ui_state.m_key_held_flag == 1 << UIState::KEY_DOWN) {
         m_ui_state.m_current_angle = std::max(m_ui_state.m_current_angle-one_deg*step, -2*M_PI);
-        break;
       }
     }
-    return ImGuiMenu::key_pressed(key, modifier);
   }
 
   virtual void draw_viewer_menu() override {
@@ -1048,7 +1146,7 @@ public:
           m_draw_state_changed = true;
         }
 
-        if (ImGui::DragInt("Level Set", &m_ui_state.m_current_level_set, 1.0f, 0, m_constraints.num_constrainable_tets())) {
+        if (ImGui::DragInt("Level Set", &m_ui_state.m_current_level_set, 1.0f, 0, m_constraints.num_constrainable_tets()-1)) {
           update_current_level_set();
           m_draw_state_changed = true;
         }
@@ -1123,6 +1221,12 @@ public:
           m_draw_state_changed = true;
         }
       }
+    }
+
+    if (ImGui::CollapsingHeader("Timing Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Text("SLIM Time: %1.3f ms", m_ui_state.m_avg_slim_time);
+      ImGui::Text("Update Time: %1.3f ms", m_ui_state.m_avg_draw_state_update_time);
+      ImGui::Text("Draw Time: %f ms", m_ui_state.m_avg_draw_time);
     }
   }
 
