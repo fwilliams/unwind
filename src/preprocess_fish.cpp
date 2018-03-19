@@ -10,6 +10,7 @@
 #include <igl/adjacency_list.h>
 #include <igl/massmatrix.h>
 #include <igl/cotmatrix.h>
+
 #include <GLFW/glfw3.h>
 
 #include <Eigen/SparseQR>
@@ -31,79 +32,12 @@
 
 #include "yixin_loader.h"
 #include "auto.h"
+#include "utils.h"
+#include "colors.h"
+
 
 typedef igl::opengl::glfw::Viewer Viewer;
 
-namespace ColorRGB {
-  const Eigen::RowVector3d RED = Eigen::RowVector3d(1, 0, 0);
-  const Eigen::RowVector3d GREEN = Eigen::RowVector3d(0, 1, 0);
-  const Eigen::RowVector3d BLUE = Eigen::RowVector3d(0, 0, 1);
-  const Eigen::RowVector3d DARK_GRAY = Eigen::RowVector3d(0.1, 0.1, 0.1);
-  const Eigen::RowVector3d GRAY = Eigen::RowVector3d(0.5, 0.5, 0.5);
-  const Eigen::RowVector3d STEEL_BLUE = Eigen::RowVector3d(70.0/255.0, 130.0/255.0, 180.0/255.0);
-  const Eigen::RowVector3d LIGHT_GREEN = Eigen::RowVector3d(144.0/255.0, 238.0/255.0, 144.0/255.0);
-  const Eigen::RowVector3d CRIMSON = Eigen::RowVector3d(220.0/255.0, 20.0/255.0, 60.0/255.0);
-  const Eigen::RowVector3d BLACK = Eigen::RowVector3d(0, 0, 0);
-  const Eigen::RowVector3d DARK_MAGENTA = Eigen::RowVector3d(139.0/255.0, 0.0/255.0, 139.0/255.0);
-}
-
-
-// Calculate the endpoints of edges for the tetmesh. Used for drawing.
-void tet_mesh_edges(const Eigen::MatrixXd& TV,
-                    const Eigen::MatrixXi& TT,
-                    Eigen::MatrixXd& V1,
-                    Eigen::MatrixXd& V2) {
-  // Make a black line for each edge in the tet mesh which we'll draw
-  std::vector<std::pair<int, int>> edges;
-  for (int i = 0; i < TT.rows(); i++) {
-    int tf1 = TT(i, 0);
-    int tf2 = TT(i, 1);
-    int tf3 = TT(i, 2);
-    int tf4 = TT(i, 2);
-    edges.push_back(std::make_pair(tf1, tf2));
-    edges.push_back(std::make_pair(tf1, tf3));
-    edges.push_back(std::make_pair(tf1, tf4));
-    edges.push_back(std::make_pair(tf2, tf3));
-    edges.push_back(std::make_pair(tf2, tf4));
-    edges.push_back(std::make_pair(tf3, tf4));
-  }
-  std::vector<std::pair<int, int>> deduped_edges;
-  std::sort(edges.begin(), edges.end());
-  for (int i = 0; i < edges.size();) {
-    const int v1 = edges[i].first;
-    const int v2 = edges[i].second;
-    deduped_edges.push_back(edges[i]);
-    while (v1 == edges[i].first && v2 == edges[i].second) {
-      i += 1;
-    }
-  }
-
-  V1.resize(deduped_edges.size(), 3);
-  V2.resize(deduped_edges.size(), 3);
-  for (int i = 0; i < deduped_edges.size(); i++) {
-    V1.row(i) = TV.row(deduped_edges[i].first);
-    V2.row(i) = TV.row(deduped_edges[i].second);
-  }
-}
-
-// Calculate the colors for a set of isovalues
-void isoval_colors(const Eigen::VectorXd& isovals,
-                   Eigen::MatrixXd& isovalColors) {
-  using namespace Eigen;
-
-  // Normalize the isovalues between 0 and 1 for the colormap
-  const double isoval_min = isovals.minCoeff();
-  const double isoval_max = isovals.maxCoeff();
-  const double isoval_spread = isoval_max - isoval_min;
-  const std::size_t n_isovals = isovals.size();
-  VectorXd isovals_normalized =
-      (isovals - isoval_min * VectorXd::Ones(n_isovals)) / isoval_spread;
-
-  // Draw colored vertices of tet mesh based on their isovalue and black
-  // lines connecting the vertices
-  igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized,
-                false, isovalColors);
-}
 
 // Compute approximate geodesic distance
 void diffusion_distances(const Eigen::MatrixXd& TV,
@@ -154,128 +88,7 @@ void diffusion_distances(const Eigen::MatrixXd& TV,
   isovals /= (isovals_max - isovals_min);
 }
 
-// Fit a plane to the set of points P and return the center c and a frame
-bool fit_plane(const Eigen::MatrixXd& P,
-               Eigen::RowVector3d& c,
-               Eigen::Matrix3d& frame) {
-  using namespace std;
-  if (P.rows() < 3) {
-    return false;
-  }
 
-  c = P.colwise().sum() / P.rows();
-  Eigen::MatrixXd A = P.rowwise() - c;
-  Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
-  Eigen::Matrix3d f = svd.matrixV();
-  for (int i = 0; i < 3; i++) {
-    double n = f.col(i).norm();
-    if (n > 1e-6) {
-      f.col(i) /= n;
-    } else {
-      return false;
-    }
-  }
-  frame = f.transpose();
-  return true;
-}
-
-// Check if the point pt is in the tet at ID tet
-bool point_in_tet(const Eigen::MatrixXd& TV,
-                  const Eigen::MatrixXi& TT,
-                  const Eigen::RowVector3d& pt,
-                  int tet) {
-  using namespace  Eigen;
-
-  auto sgn = [](double val) -> int {
-    return (double(0) < val) - (val < double(0));
-  };
-
-  Matrix4d D0, D1, D2, D3, D4;
-  RowVector3d v1 = TV.row(TT(tet, 0)), v2 = TV.row(TT(tet, 1));
-  RowVector3d v3 = TV.row(TT(tet, 2)), v4 = TV.row(TT(tet, 3));
-
-  D0 << v1[0], v1[1], v1[2], 1,
-        v2[0], v2[1], v2[2], 1,
-        v3[0], v3[1], v3[2], 1,
-        v4[0], v4[1], v4[2], 1;
-
-  RowVector4d pt_row(pt[0], pt[1], pt[2], 1);
-  D1 = D0;
-  D1.row(0) = pt_row;
-
-  D2 = D0;
-  D2.row(1) = pt_row;
-
-  D3 = D0;
-  D3.row(2) = pt_row;
-
-  D4 = D0;
-  D4.row(3) = pt_row;
-
-  const double det0 = D0.determinant();
-  assert(det0 != 0);
-  const double det1 = D1.determinant();
-  const double det2 = D2.determinant();
-  const double det3 = D3.determinant();
-  const double det4 = D4.determinant();
-
-  return sgn(det1) == sgn(det2) && sgn(det1) == sgn(det3) && sgn(det1) == sgn(det4);
-}
-
-// Return the index of the tet containing the point p or -1 if the vertex is in no tets
-int containing_tet(const Eigen::MatrixXd& TV,
-                   const Eigen::MatrixXi& TT,
-                   const Eigen::RowVector3d& p) {
-  for (int i = 0; i < TT.rows(); i++) {
-    if (point_in_tet(TV, TT, p, i)) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-// Return the index of the closest vertex to p
-int nearest_vertex(const Eigen::MatrixXd& TV,
-                   const Eigen::RowVector3d& p) {
-  int idx = -1;
-  double min_norm = std::numeric_limits<double>::infinity();
-  for (int k = 0; k < TV.rows(); k++) {
-    double norm = (TV.row(k) - p).norm();
-    if (norm < min_norm) {
-      idx = k;
-      min_norm = norm;
-    }
-  }
-  return idx;
-}
-
-// Sample the level sets to extract a skeleton
-void extract_skeleton(const Eigen::MatrixXd& TV,
-                      const Eigen::MatrixXi& TT,
-                      const Eigen::VectorXd& isovals,
-                      int num_verts,
-                      Eigen::MatrixXd& joints) {
-  using namespace std;
-  using namespace  Eigen;
-
-  MatrixXd LV;
-  MatrixXi LF;
-
-  joints.resize(num_verts, 3);
-  int vcount = 0;
-
-  for(int i = 1; i < num_verts; i++) {
-    double isovalue = i * (1.0/num_verts);
-    igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
-    if (LV.rows() == 0) {
-      continue;
-    }
-    Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
-    joints.row(vcount) = C;
-    vcount += 1;
-  }
-  joints.conservativeResize(vcount, 3);
-}
 
 
 
@@ -284,24 +97,45 @@ struct DrawState {
   Eigen::MatrixXi m_TT; // Tet mesh tets
   Eigen::MatrixXi m_TF; // Tet mesh faces
   Eigen::MatrixXd m_TEV1, m_TEV2; // Endoints of tet mesh edges
-  Eigen::MatrixXd m_isoV;       // Vertices in the level set
-  Eigen::MatrixXi m_isoF;       // Faces in the level set
-  Eigen::VectorXi m_isoT;       // Indices into TT of tetrahedra in the level set
-  Eigen::RowVector3d m_isoC;    // Centroid of the level set
-  Eigen::MatrixXd m_isoTV;      // Vertices of tetrahedra in level set
-  Eigen::MatrixXi m_isoTT;      // Tetrahedra in level set
-  Eigen::MatrixXd m_joints;     // Skeleton Joints
-  Eigen::MatrixXd m_bTV;        // Positions of SLIM boundary constraints
-  Eigen::MatrixXd m_bV;         // Target positions of SLIM boundary constraints
+
+  Eigen::MatrixXd m_isoV;         // Vertices in the current level set
+  Eigen::MatrixXi m_isoF;         // Faces in the current level set
+  Eigen::VectorXi m_isoT;         // Indices into TT of tetrahedra in the current level set
+  Eigen::RowVector3d m_isoC;      // Centroid of the current level set
+  Eigen::MatrixXd m_isoTV;        // Vertices of tetrahedra in current level set
+  Eigen::MatrixXi m_isoTT;        // Tetrahedra in current level set
+
+  Eigen::MatrixXd m_joints;       // Skeleton Joints
+  Eigen::MatrixXd m_bTV;          // Positions of SLIM boundary constraints
+  Eigen::MatrixXd m_bV;           // Target positions of SLIM boundary constraints
 
   void update_tet_mesh(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT) {
     m_TV = TV;
     m_TT = TT;
-    tet_mesh_edges(m_TV, m_TT, m_TEV1, m_TEV2);
+    edge_endpoints(m_TV, m_TT, m_TEV1, m_TEV2);
   }
 
   void update_skeleton(const Eigen::VectorXd& isovals, int num_verts) {
-    extract_skeleton(m_TV, m_TT, isovals, num_verts, m_joints);
+    using namespace std;
+    using namespace  Eigen;
+
+    MatrixXd LV;
+    MatrixXi LF;
+
+    m_joints.resize(num_verts, 3);
+    int vcount = 0;
+
+    for(int i = 1; i < num_verts; i++) {
+      double isovalue = i * (1.0/num_verts);
+      igl::marching_tets(m_TV, m_TT, isovals, isovalue, LV, LF);
+      if (LV.rows() == 0) {
+        continue;
+      }
+      Eigen::RowVector3d C = LV.colwise().sum() / LV.rows();
+      m_joints.row(vcount) = C;
+      vcount += 1;
+    }
+    m_joints.conservativeResize(vcount, 3);
   }
 
   void update_constraint_points(const Eigen::VectorXi& b, const Eigen::MatrixXd& bc) {
@@ -567,7 +401,8 @@ struct UIState {
   // Overlay draw toggles
   bool m_draw_isovalues = false;
   bool m_draw_surface = true;
-  bool m_draw_tet_wireframe = false;
+  bool m_draw_tet_wireframe = false;// Check if the point pt is in the tet at ID tet
+
   bool m_draw_skeleton = false;
   bool m_draw_level_set = false;
   bool m_draw_constraints = false;
@@ -677,7 +512,7 @@ class FishPreprocessingMenu :
   Eigen::MatrixXi TT;
   Eigen::MatrixXd TEV1, TEV2;
   Eigen::VectorXd isovals;
-  Eigen::MatrixXd m_isovalColors;
+  Eigen::MatrixXd m_isoval_colors;
 
   // UI variables set by imgui
   UIState m_ui_state;
@@ -797,7 +632,7 @@ public:
     // Load the tet mesh
     m_current_model_filename = filename;
     load_yixin_tetmesh(filename, TV, TF, TT);
-    tet_mesh_edges(TV, TT, TEV1, TEV2);
+    edge_endpoints(TV, TT, TEV1, TEV2);
 
     cout << "Loaded " << filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
@@ -905,7 +740,7 @@ public:
       // Draw the isovalues
       select_overlay_mesh();
       if (m_ui_state.m_draw_isovalues) {
-        m_viewer.data().add_points(ds.m_TV, m_isovalColors);
+        m_viewer.data().add_points(ds.m_TV, m_isoval_colors);
       }
 
       // Draw the SLIM constraints
@@ -1112,7 +947,9 @@ public:
           if (isovals.rows() == 0) {
             cout << "Solving diffusion on tet mesh..." << endl;
             diffusion_distances(TV, TT, m_ui_state.m_selected_end_coords, isovals);
-            isoval_colors(isovals, m_isovalColors);
+            Eigen::VectorXd isovals_normalized;
+            scale_zero_one(isovals, isovals_normalized);
+            igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_isoval_colors);
             cout << "Done!" << endl;
           }
 
@@ -1221,8 +1058,18 @@ public:
           m_draw_state_changed = true;
         }
       }
+
+      if (ImGui::Button("Align Camera", ImVec2(-1, 0))) {
+        m_double_buf_lock.lock();
+        DrawState& ds = m_ds[m_current_buf];
+        m_viewer.core.align_camera_center(ds.m_TV, ds.m_TF);
+        m_double_buf_lock.unlock();
+      }
     }
 
+    //
+    // Draw timing statistics
+    //
     if (ImGui::CollapsingHeader("Timing Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Text("SLIM Time: %1.3f ms", m_ui_state.m_avg_slim_time);
       ImGui::Text("Update Time: %1.3f ms", m_ui_state.m_avg_draw_state_update_time);
