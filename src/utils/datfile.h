@@ -8,32 +8,75 @@
 #include <fstream>
 #include <cstdlib>
 
+#ifndef _MSC_VER
 #include <libgen.h>
-
+#else
+#include <Windows.h>
+#endif
 
 struct DatFile {
 private:
-  bool set_filename(const std::string& filename) {
-    std::ifstream is(filename);
-    if (!is.good()) {
-      std::cerr << "Error .dat file '" << filename << "' does not exist." << std::endl;
-      return false;
+#ifdef _MSC_VER
+    std::pair<std::string, std::string> dir_and_base_name(const char* name) {
+        std::string filename = std::string(name);
+        std::string::size_type separator = filename.rfind('\\');
+        if (separator != std::string::npos) {
+            return { filename.substr(0, separator), filename.substr(separator + 1) };
+        }
+        else {
+            return { filename, filename };
+        }
     }
 
-    char* datfile_full_path = realpath(filename.c_str(), NULL);
-    char* datfile_full_path_dup = strdup(datfile_full_path);
+    bool set_filename(const std::string& filename) {
+        std::ifstream is(filename);
+        if (!is.good()) {
+            std::cerr << "Error .dat file '" << filename << "' does not exist." << std::endl;
+            return false;
+        }
 
-    m_filename = std::string(filename);
-    char* dat_directory = dirname(datfile_full_path);
-    m_directory = std::string(dat_directory);
+        constexpr const int BufferSize = 1024;
+        char datfile_full_path[1024];
+        const DWORD success = GetFullPathName(filename.c_str(), BufferSize, datfile_full_path, 0);
+        char* datfile_full_path_dup = strdup(datfile_full_path);
+        m_filename = std::string(datfile_full_path);
 
-    char* dat_basename = basename(datfile_full_path_dup);
-    m_basename = std::string(dat_basename);
+        auto [m_directory, m_basename] = dir_and_base_name(datfile_full_path);
+        //m_filename = std::string(filename);
+        //m_directory = dirname(datfile_full_path);
 
-    free(datfile_full_path);
-    free(datfile_full_path_dup);
-    return true;
-  }
+        //char* dat_basename = basename(datfile_full_path_dup);
+        //m_basename = std::string(dat_basename);
+
+        free(datfile_full_path);
+        free(datfile_full_path_dup);
+        return true;
+    }
+#else
+    bool set_filename(const std::string& filename) {
+        std::ifstream is(filename);
+        if (!is.good()) {
+            std::cerr << "Error .dat file '" << filename << "' does not exist." << std::endl;
+            return false;
+        }
+
+        char* datfile_full_path = realpath(filename.c_str(), NULL);
+        char* datfile_full_path_dup = strdup(datfile_full_path);
+
+        m_filename = std::string(filename);
+        char* dat_directory = dirname(datfile_full_path);
+        m_directory = std::string(dat_directory);
+
+        char* dat_basename = basename(datfile_full_path_dup);
+        m_basename = std::string(dat_basename);
+
+        free(datfile_full_path);
+        free(datfile_full_path_dup);
+        return true;
+    }
+#endif
+
+
 
 public:
   int w, h, d;

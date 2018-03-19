@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <array>
+#include <algorithm>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
