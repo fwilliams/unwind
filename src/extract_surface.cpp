@@ -24,9 +24,7 @@ bool compute_surface_mesh(DatFile& datfile,
     return false;
   }
   rawfile.read(data, num_datfile_bytes);
-  if (rawfile) {
-    datfile.m_raw_filename = raw_filename;
-  } else {
+  if (!rawfile) {
     cout << "ERROR: Only read " << rawfile.gcount() <<
             " bytes from Raw File '" << datfile.m_raw_filename <<
             "' but expected to read " << num_datfile_bytes <<
@@ -151,14 +149,12 @@ int main(int argc, char *argv[]) {
   V.col(2) = V.col(1);
   V.col(1) = V2;
 
-  string out_mesh_filename = out_datfile.m_directory + string("/") +
-                             out_datfile.m_basename + string(".out.off");
+  string out_mesh_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename + string(".off");
   cout << "Saving mesh file " << out_mesh_filename << endl;
   igl::writeOFF(out_mesh_filename, V, F_max_component);
-  out_datfile.m_mesh_filename = out_mesh_filename;
+  out_datfile.m_mesh_filename = out_datfile.m_basename + string(".off");
 
-  string out_dat_filename = out_datfile.m_directory + string("/") +
-                            out_datfile.m_basename + string(".out.dat");
+  string out_dat_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename;
   cout << "Saving output dat file" << endl;
   if (!out_datfile.serialize(out_dat_filename)) {
     return EXIT_FAILURE;

@@ -424,6 +424,9 @@ struct UIState {
   double m_avg_draw_time = 0.0;
   double alpha = 0.5;
 
+  // Colors for the isovalues
+  Eigen::MatrixXd m_isoval_colors;
+
   void update_draw_state_ema(double time_ms) {
     if (m_avg_draw_state_update_time == 0.0) {
       m_avg_draw_state_update_time = time_ms;
@@ -496,7 +499,7 @@ class FishPreprocessingMenu :
   Eigen::MatrixXi TT;
   Eigen::MatrixXd TEV1, TEV2;
   Eigen::VectorXd isovals;
-  Eigen::MatrixXd m_isoval_colors;
+  Eigen::MatrixXd texcoords;
 
   // UI variables set by imgui
   UIState m_ui_state;
@@ -608,12 +611,23 @@ public:
   FishPreprocessingMenu(const std::string& filename, Viewer& viewer) : m_viewer(viewer) {
     using namespace std;
 
+    DatFile f(filename);
+
     // Load the tet mesh
-    m_current_model_filename = filename;
-    load_yixin_tetmesh(filename, TV, TF, TT);
+    cout << f.m_basename << endl;
+    cout << f.m_filename << endl;
+    m_current_model_filename = f.m_basename.substr(0, f.m_basename.length()-4) + string("_.msh");
+    cout << "INFO: Loading tet mesh " << m_current_model_filename << endl;
+    load_yixin_tetmesh(f.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
 
-    cout << "INFO: Loaded " << filename << " with " << TV.rows() << " vertices, " <<
+    texcoords.resize(TV.rows(), 3);
+    for (int i = 0; i < TV.rows(); i++) {
+      // Subtract 1 since we pad the grid with a zero cell all around
+      texcoords.row(i) = TV.row(i) - f.m_bb_min - Eigen::RowVector3d::Ones();
+    }
+
+    cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
             " tets." << endl;
 
@@ -720,7 +734,7 @@ public:
       // Draw the isovalues
       select_overlay_mesh();
       if (m_ui_state.m_draw_isovalues) {
-        m_viewer.data().add_points(ds.m_TV, m_isoval_colors);
+        m_viewer.data().add_points(ds.m_TV, m_ui_state.m_isoval_colors);
       }
 
       // Draw the SLIM constraints
@@ -928,7 +942,7 @@ public:
             diffusion_distances(TV, TT, m_ui_state.m_selected_end_coords, isovals);
             Eigen::VectorXd isovals_normalized;
             scale_zero_one(isovals, isovals_normalized);
-            igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_isoval_colors);
+            igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_ui_state.m_isoval_colors);
           }
 
           m_double_buf_lock.lock();
@@ -1061,13 +1075,9 @@ public:
 
 int main(int argc, char *argv[]) {
   Viewer viewer;
-//  FishPreprocessingMenu menu("./data/Sternopygus_pejeraton-small.dat.out_.msh", viewer);
-//  FishPreprocessingMenu menu("/home/francis/Sternopygus_arenatus-small.dat.out_.msh", viewer);
-//  FishPreprocessingMenu menu("./data/p-tapinosoma.dat.out_.msh", viewer);
-  if (argc == 1) {
-    FishPreprocessingMenu menu("./data/small_fish/Sternopygus_arenatus-small.dat.out_.msh", viewer);
-    viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
-    return viewer.launch();
+  if (argc != 2) {
+    cerr << "Error. Invalid number of arguments. Should be:" << endl << endl << "preprocess_fish /path/to/.dat/file" << endl << endl;
+    return EXIT_FAILURE;
   } else {
     FishPreprocessingMenu menu(argv[1], viewer);
     viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
