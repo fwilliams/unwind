@@ -38,6 +38,10 @@ void scale_zero_one(const Eigen::VectorXd& V, Eigen::VectorXd& V_scaled) {
   }
 }
 
+void scale_zero_one(Eigen::VectorXd& V) {
+  scale_zero_one(V, V);
+}
+
 // Check if the point pt is in the tet at ID tet
 bool point_in_tet(const Eigen::MatrixXd& TV,
                   const Eigen::MatrixXi& TT,

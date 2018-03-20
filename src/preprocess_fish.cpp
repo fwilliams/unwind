@@ -1,25 +1,20 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
-#include <igl/readOFF.h>
+
 #include <igl/unproject_onto_mesh.h>
 #include <igl/marching_tets.h>
 #include <igl/colormap.h>
 #include <igl/harmonic.h>
 #include <igl/slim.h>
 #include <igl/grad.h>
-#include <igl/adjacency_list.h>
-#include <igl/massmatrix.h>
 #include <igl/cotmatrix.h>
 
-#include <GLFW/glfw3.h>
-
-#include <Eigen/SparseQR>
-#include <Eigen/OrderingMethods>
-#include <Eigen/SVD>
 #include <Eigen/CholmodSupport>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+
+#include <GLFW/glfw3.h>
 
 #include <array>
 #include <unordered_map>
@@ -49,11 +44,9 @@ void diffusion_distances(const Eigen::MatrixXd& TV,
 
   typedef SparseMatrix<double> SparseMatrixXd;
 
-  // Discrete Laplacian and Discrete Gradient operator
+  // Discrete Gradient operator
   SparseMatrixXd G;
-  cout << "Computing Discrete Gradient" << endl;
   igl::grad(TV, TT, G);
-  cout << "Done" << endl;
 
   SimplicialLDLT<SparseMatrixXd> solver;
 
@@ -66,26 +59,17 @@ void diffusion_distances(const Eigen::MatrixXd& TV,
   constraint_values(0, 0) = 1.0;
   constraint_values(1, 0) = 0.0;
 
-  cout << "Computing harmonic..." << endl;
   igl::harmonic(TV, TT, constraint_indices,
                 constraint_values, 1, isovals);
-  cout << "Done." << endl;
-  double isovals_min = isovals.minCoeff();
-  double isovals_max = isovals.maxCoeff();
-  isovals -= isovals_min * Eigen::VectorXd::Ones(isovals.rows());
-  isovals /= (isovals_max - isovals_min);
 
-
+  scale_zero_one(isovals);
   VectorXd g = G*isovals;
   Map<MatrixXd> V(g.data(), TT.rows(), 3);
   V.rowwise().normalize();
 
   solver.compute(G.transpose()*G);
   isovals = solver.solve(G.transpose()*g);
-  isovals_min = isovals.minCoeff();
-  isovals_max = isovals.maxCoeff();
-  isovals -= isovals_min * Eigen::VectorXd::Ones(isovals.rows());
-  isovals /= (isovals_max - isovals_min);
+  scale_zero_one(isovals);
 }
 
 
@@ -288,7 +272,7 @@ struct ConstraintState {
       igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
 
       if (LV.rows() == 0) {
-        cout << "Empty level set" << endl;
+        cerr << "WARNING: Empty level set" << endl;
         continue;
       }
 
@@ -298,7 +282,7 @@ struct ConstraintState {
 
       const int tet = containing_tet(TV, TT, ctr);
       if (tet < 0) {
-        cout << "Vertex not in tet" << endl;
+        cerr << "WARNING: Vertex not in tet" << endl;
         continue;
       }
 
@@ -418,7 +402,7 @@ struct UIState {
   std::array<int, 2> m_selected_end_coords{{-1, -1}}; // The indexes of selected endpoints
 
   // Straightening UI parameters
-  int m_num_skel_verts = 100;
+  int m_num_skel_verts = 25;
   float m_current_angle = 0; // used to control the up vector
   int m_current_level_set = 0; // The current selected level set
   bool m_only_ends_and_tets = false; // Only constrain the endpoints and selected tets
@@ -427,7 +411,7 @@ struct UIState {
   // Appearance parameters when we draw overlay points
   float m_vfield_scale = 150.0f;
   float m_overlay_linewidth = 1.5;
-  float m_overlay_point_size = 7.0;
+  float m_overlay_point_size = 4.5;
 
   // Keyboard state
   uint8_t m_key_held_flag = 0;
@@ -489,9 +473,9 @@ struct UIState {
   }
 
   void after_compute_diffusion() {
-    m_draw_surface = false;
-    m_draw_skeleton = true;
-    m_draw_tet_wireframe = true;
+    m_draw_surface = true;
+    m_draw_skeleton = false;
+    m_draw_tet_wireframe = false;
     m_draw_isovalues = true;
     m_draw_level_set = true;
     m_draw_original_mesh = false;
@@ -560,13 +544,11 @@ class FishPreprocessingMenu :
     m_ui_state.m_avg_draw_state_update_time = 0.0;
     m_ui_state.m_avg_slim_time = 0.0;
 
-    cout << "SLIM Thread: Starting SLIM background thread.." << endl;
+    cout << "INFO: SLIM Thread: Starting SLIM background thread." << endl;
     while (m_slim_running) {
 
       m_constraints_lock.lock();
       if (m_constraints_changed) {
-        cout << "SLIM Thread: Reinitializing SLIM with " << m_constraints.num_constraints() << " constraints." << endl;
-
         VectorXi slim_b;
         MatrixXd slim_bc;
         m_constraints.slim_constraints(slim_b, slim_bc, m_ui_state.m_only_ends_and_tets);
@@ -576,7 +558,6 @@ class FishPreprocessingMenu :
         sData.exp_factor = 5.0;
         slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
                         slim_b, slim_bc, soft_const_p);
-        cout << "SLIM Thread: Done reinitializing SLIM" << endl;
         m_constraints_changed = false;
       }
       m_constraints_lock.unlock();
@@ -607,8 +588,6 @@ class FishPreprocessingMenu :
       m_current_buf = buffer;
       m_draw_state_changed = true;
       m_double_buf_lock.unlock();
-
-
     }
   }
 
@@ -634,7 +613,7 @@ public:
     load_yixin_tetmesh(filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
 
-    cout << "Loaded " << filename << " with " << TV.rows() << " vertices, " <<
+    cout << "INFO: Loaded " << filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
             " tets." << endl;
 
@@ -663,6 +642,7 @@ public:
 
     viewer.plugins.push_back(this);
     viewer.core.is_animating = true;
+    viewer.core.orthographic = true;
   }
 
   ~FishPreprocessingMenu() {
@@ -945,12 +925,10 @@ public:
 
         if (ImGui::Button("Compute Diffusion Distances", ImVec2(-1,0))) {
           if (isovals.rows() == 0) {
-            cout << "Solving diffusion on tet mesh..." << endl;
             diffusion_distances(TV, TT, m_ui_state.m_selected_end_coords, isovals);
             Eigen::VectorXd isovals_normalized;
             scale_zero_one(isovals, isovals_normalized);
             igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_isoval_colors);
-            cout << "Done!" << endl;
           }
 
           m_double_buf_lock.lock();
@@ -964,7 +942,7 @@ public:
           m_constraints_changed = true;
           m_constraints_lock.unlock();
 
-          cout << "Skeleton is " << dist << " units long." << endl;
+          cout << "INFO: Skeleton is " << dist << " units long." << endl;
 
           // Show the diffusion menu and draw the isovalues
           m_ui_state.after_compute_diffusion();
@@ -1058,6 +1036,8 @@ public:
           m_draw_state_changed = true;
         }
       }
+
+      ImGui::Checkbox("Orthographic View", &m_viewer.core.orthographic);
 
       if (ImGui::Button("Align Camera", ImVec2(-1, 0))) {
         m_double_buf_lock.lock();
