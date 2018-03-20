@@ -148,6 +148,8 @@ struct DrawState {
 };
 
 
+
+
 struct ConstraintState {
   std::vector<int> m_bone_constraints_idx;
   std::vector<Eigen::RowVector3d> m_bone_constraints_pos;
@@ -381,6 +383,8 @@ struct ConstraintState {
 };
 
 
+
+
 struct UIState {
   // Overlay draw toggles
   bool m_draw_isovalues = false;
@@ -486,6 +490,8 @@ struct UIState {
     m_show_straighteining_menu = true;
   }
 };
+
+
 
 
 class FishPreprocessingMenu :
@@ -616,7 +622,7 @@ public:
     // Load the tet mesh
     cout << f.m_basename << endl;
     cout << f.m_filename << endl;
-    m_current_model_filename = f.m_basename.substr(0, f.m_basename.length()-4) + string("_.msh");
+    m_current_model_filename = f.m_basename + string("_.msh");
     cout << "INFO: Loading tet mesh " << m_current_model_filename << endl;
     load_yixin_tetmesh(f.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
@@ -1074,6 +1080,8 @@ public:
 };
 
 int main(int argc, char *argv[]) {
+  using namespace std;
+
   Viewer viewer;
   if (argc != 2) {
     cerr << "Error. Invalid number of arguments. Should be:" << endl << endl << "preprocess_fish /path/to/.dat/file" << endl << endl;
