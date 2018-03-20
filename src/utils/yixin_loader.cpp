@@ -619,7 +619,7 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
     int v1 = tris_sorted[i][0], v2 = tris_sorted[i][1], v3 = tris_sorted[i][2];
     int tid = tris_sorted[i][3];
     int count = 0;
-    while (v1 == tris_sorted[i][0] && v2 == tris_sorted[i][1] && v3 == tris_sorted[i][2]) {
+    while (i < TF.rows() && v1 == tris_sorted[i][0] && v2 == tris_sorted[i][1] && v3 == tris_sorted[i][2]) {
       i += 1;
       count += 1;
     }

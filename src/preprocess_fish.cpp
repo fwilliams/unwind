@@ -74,7 +74,18 @@ void diffusion_distances(const Eigen::MatrixXd& TV,
 
 
 
+// DrawState is a function in the Windows API
+#ifdef DrawState
+#undef DrawState
+#endif
 
+#ifdef min
+#undef min
+#endif
+
+#ifdef max
+#undef max
+#endif
 
 struct DrawState {
   Eigen::MatrixXd m_TV; // Tet mesh vertices
@@ -308,7 +319,7 @@ struct ConstraintState {
     return dist;
   }
 
-  double update_orientation_constraint(const Eigen::MatrixXd& TV,
+  void update_orientation_constraint(const Eigen::MatrixXd& TV,
                                        const Eigen::MatrixXi& TT,
                                        const Eigen::VectorXd& isovals,
                                        int idx, double angle, bool flipped_x) {
@@ -807,7 +818,7 @@ public:
         if (!m_ui_state.m_show_point_selection_mode) {
           return false;
         }
-        assert(m_current_endpoint_idx <= 1);
+        assert(m_ui_state.m_current_endpoint_idx <= 1);
 
         int max;
         bc.maxCoeff(&max);

@@ -41,15 +41,17 @@ private:
         char* datfile_full_path_dup = strdup(datfile_full_path);
         m_filename = std::string(datfile_full_path);
 
-        auto [m_directory, m_basename] = dir_and_base_name(datfile_full_path);
+        const std::pair<std::string, std::string>& v = dir_and_base_name(datfile_full_path);
+        m_directory = v.first;
+        m_basename = v.second;
         //m_filename = std::string(filename);
         //m_directory = dirname(datfile_full_path);
 
         //char* dat_basename = basename(datfile_full_path_dup);
         //m_basename = std::string(dat_basename);
 
-        free(datfile_full_path);
-        free(datfile_full_path_dup);
+        //free(datfile_full_path);
+        //free(datfile_full_path_dup);
         return true;
     }
 #else

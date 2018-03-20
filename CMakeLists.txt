@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 3.1)
 project(fish_deformation)
 
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DNDEBUG -O3 -g -DCHOLMOD") # O3 with asserts and debug symbols
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
+if (WIN32)
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DCHOLMOD")
+  include_directories("C:/ab7512/SuiteSparse/include")
+  include_directories("C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/include")
+else ()
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DNDEBUG -O3 -g -DCHOLMOD")
+  include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
+endif ()
 option(BUILD_TESTS "Build test binaries" OFF)
+
 
 
 # libigl
@@ -33,14 +40,46 @@ find_package(LIBIGL REQUIRED QUIET)
 set(INCLUDE_DIRS src src/utils src/tests)
 
 add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/utils/yixin_loader.cpp)
-set_property(TARGET preprocess_fish_bin PROPERTY CXX_STANDARD 17)
-set_property(TARGET preprocess_fish_bin PROPERTY CXX_STANDARD_REQUIRED ON)
 target_include_directories(preprocess_fish_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui cholmod)
+target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+if (WIN32)
+  target_link_libraries(preprocess_fish_bin
+    "C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/lib/libopenblas.dll.a"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libcholmodd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/suitesparseconfigd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/metisd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libamdd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libbtfd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libcamdd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libccolamdd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libcolamdd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libcxsparsed.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libklud.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libldld.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libspqrd.lib"
+    debug "C:/ab7512/SuiteSparse/lib/Debug/x64/libumfpackd.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libcholmod.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/suitesparseconfig.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/metis.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libamd.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libbtf.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libcamd.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libccolamd.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libcolamd.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libcxsparse.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libklu.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libldl.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libspqr.lib"
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libumfpack.lib"
+  )
+
+else ()
+  target_link_libraries(preprocess_fish_bin cholmod)
+endif ()
+
+
 
 add_executable(extract_surface_bin src/extract_surface.cpp)
-set_property(TARGET extract_surface_bin PROPERTY CXX_STANDARD 17)
-set_property(TARGET extract_surface_bin PROPERTY CXX_STANDARD_REQUIRED ON)
 target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(extract_surface_bin igl::core)
 
