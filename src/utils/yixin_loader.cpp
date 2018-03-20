@@ -575,8 +575,9 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
   TT.resize(tt_rows, vol_loader.m_nodes_per_element);
   TV.resize(tv_rows, 3);
 
-  std::vector<array<int, 3>> tris;
+  std::vector<array<int, 4>> tris_sorted;
 
+  std::vector<array<int, 4>> tris;
   int vcount = 0;
   for (int i = 0; i < vol_loader.m_nodes.rows(); i += 3) {
     TV.row(vcount++) = Eigen::RowVector3d(vol_loader.m_nodes[i], vol_loader.m_nodes[i+2], vol_loader.m_nodes[i+1]);
@@ -588,33 +589,42 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
     const int e3 = vol_loader.m_elements[i+2];
     const int e4 = vol_loader.m_elements[i+3];
     TT.row(tcount++) = Eigen::RowVector4i(e1, e2, e3, e4);
-    array<int, 3> t1, t2, t3, t4;
-    t1 = array<int, 3>{{ e1, e2, e3 }};
-    t2 = array<int, 3>{{ e1, e2, e3 }};
-    t3 = array<int, 3>{{ e2, e3, e4 }};
-    t4 = array<int, 3>{{ e1, e3, e4 }};
-    sort(t1.begin(), t1.end());
-    sort(t2.begin(), t2.end());
-    sort(t3.begin(), t3.end());
-    sort(t4.begin(), t4.end());
+    array<int, 4> t1, t2, t3, t4;
+    t1 = array<int, 4>{{ e1, e2, e3, INT_MAX }};
+    t2 = array<int, 4>{{ e1, e3, e4, INT_MAX }};
+    t3 = array<int, 4>{{ e2, e4, e3, INT_MAX }};
+    t4 = array<int, 4>{{ e1, e4, e2, INT_MAX }};
     tris.push_back(t1);
     tris.push_back(t2);
     tris.push_back(t3);
     tris.push_back(t4);
+    t1[3] = tris_sorted.size();
+    t2[3] = tris_sorted.size()+1;
+    t3[3] = tris_sorted.size()+2;
+    t4[3] = tris_sorted.size()+3;
+    sort(t1.begin(), t1.end());
+    sort(t2.begin(), t2.end());
+    sort(t3.begin(), t3.end());
+    sort(t4.begin(), t4.end());
+    tris_sorted.push_back(t1);
+    tris_sorted.push_back(t2);
+    tris_sorted.push_back(t3);
+    tris_sorted.push_back(t4);
   }
 
   int fcount = 0;
-  TF.resize(tris.size(), 3);
-  sort(tris.begin(), tris.end());
+  TF.resize(tris_sorted.size(), 3);
+  sort(tris_sorted.begin(), tris_sorted.end());
   for (int i = 0; i < TF.rows();) {
-    int v1 = tris[i][0], v2 = tris[i][1], v3 = tris[i][2];
+    int v1 = tris_sorted[i][0], v2 = tris_sorted[i][1], v3 = tris_sorted[i][2];
+    int tid = tris_sorted[i][3];
     int count = 0;
-    while (v1 == tris[i][0] && v2 == tris[i][1] && v3 == tris[i][2]) {
+    while (v1 == tris_sorted[i][0] && v2 == tris_sorted[i][1] && v3 == tris_sorted[i][2]) {
       i += 1;
       count += 1;
     }
     if (count == 1) {
-      TF.row(fcount++) = Eigen::RowVector3i(v1, v2, v3);
+      TF.row(fcount++) = Eigen::RowVector3i(tris[tid][0], tris[tid][1], tris[tid][2]);
     }
   }
 

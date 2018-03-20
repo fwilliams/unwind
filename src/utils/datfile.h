@@ -88,6 +88,12 @@ public:
   std::string m_directory;
   std::string m_basename;
 
+  DatFile(const std::string& filename) {
+    deserialize(filename);
+  }
+
+  DatFile() = default;
+
   bool serialize(const std::string& filename) {
     using namespace std;
 
@@ -95,7 +101,7 @@ public:
     of << "RawFile: " << m_raw_filename << endl;
     of << "Resolution: " << w << " " << h << " " << d << endl;
     of << "Format: " << m_format << endl;
-    of << "Mesh: " << m_mesh_filename << endl;
+    of << "SurfaceMesh: " << m_mesh_filename << endl;
     of << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
     of << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
     of.close();
@@ -124,9 +130,9 @@ public:
       } else if (token == "Format:") {
         is >> m_format;
         cout << "Format: " << m_format << endl;
-      } else if(token == "Mesh:") {
+      } else if(token == "SurfaceMesh:") {
         is >> m_mesh_filename;
-        cout << "Mesh: " << m_mesh_filename << endl;
+        cout << "SurfaceMesh: " << m_mesh_filename << endl;
       } else if (token == "BBmin:") {
         is >> m_bb_min[0];
         is >> m_bb_min[1];
