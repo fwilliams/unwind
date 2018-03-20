@@ -834,7 +834,9 @@ public:
         }
         m_draw_state_changed = true;
       }
-      m_double_buf_lock.unlock();
+      else {
+        m_double_buf_lock.unlock();
+      }
     }
 
     return ImGuiMenu::mouse_down(button, modifier);
