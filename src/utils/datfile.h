@@ -89,6 +89,7 @@ public:
   std::string m_filename;
   std::string m_directory;
   std::string m_basename;
+  std::string m_texture_filename;
 
   DatFile(const std::string& filename) {
     deserialize(filename);
@@ -104,6 +105,7 @@ public:
     of << "Resolution: " << w << " " << h << " " << d << endl;
     of << "Format: " << m_format << endl;
     of << "SurfaceMesh: " << m_mesh_filename << endl;
+    of << "TextureFile: " << m_texture_filename << endl;
     of << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
     of << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
     of.close();
@@ -145,6 +147,9 @@ public:
         is >> m_bb_max[1];
         is >> m_bb_max[2];
         cout << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
+      } else if (token == "TextureFile:") {
+        is >> m_texture_filename;
+        cout << "TextureFile: " << m_texture_filename << endl;
       } else {
         cerr << "ERROR: Unexpected token " << token << endl;
         return false;
