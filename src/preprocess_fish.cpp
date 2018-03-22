@@ -519,13 +519,6 @@ class FishPreprocessingMenu :
   Eigen::VectorXd isovals;
   Eigen::MatrixXd texcoords;
 
-  Eigen::VectorXd texvals;
-  Eigen::MatrixXd texpos;
-  Eigen::MatrixXd texcolors;
-
-  Eigen::VectorXd vertex_texvals;
-  Eigen::MatrixXd vertex_texcolors;
-
   DatFile m_datfile;
 
   // UI variables set by imgui
@@ -649,34 +642,6 @@ public:
     load_yixin_tetmesh(m_datfile.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
 
-    texvals.resize(m_datfile.w * m_datfile.h * m_datfile.d);
-    vector<char> data(texvals.rows());
-    ifstream texifs(m_datfile.m_directory + string("/") + m_datfile.m_texture_filename, ios::in | ios::binary);
-    assert(texifs.good());
-    texifs.read(data.data(), texvals.rows());
-    assert(texifs.good());
-    for (int i = 0; i < data.size(); i++) {
-      texvals[i] = data[i] / 255.0;
-    }
-
-    vertex_texvals.resize(TV.rows());
-    for (int i = 0; i < TV.rows(); i++) {
-
-      const RowVector3i texcoord = TV.row(i).cast<int>();
-      if (texcoord[0] == 0 || texcoord[0] == m_datfile.w+1 || texcoord[1] == 0 || texcoord[1] == m_datfile.h+1 || texcoord[2] == 0 || texcoord[2] == m_datfile.d+1) {
-        vertex_texvals[i] = 0.0;
-      } else {
-        const RowVector3i tc = texcoord - RowVector3i::Ones();
-        const int idx = tc[2] * (m_datfile.w * m_datfile.h) + tc[1] * (m_datfile.w) + tc[0];
-        vertex_texvals[i] = texvals[idx];
-      }
-    }
-
-    cout << vertex_texvals.maxCoeff() << endl;
-    cout << vertex_texvals.minCoeff() << endl;
-    vertex_texvals /= vertex_texvals.maxCoeff();
-    igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, vertex_texvals, false, vertex_texcolors);
-
     cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
             " tets." << endl;
@@ -769,7 +734,6 @@ public:
       select_main_mesh();
       if (m_ui_state.m_draw_tet_wireframe) {
         m_viewer.data().add_edges(ds.m_TEV1, ds.m_TEV2, ColorRGB::DARK_GRAY);
-        m_viewer.data().add_points(ds.m_TV, vertex_texcolors);
       } else if (m_ui_state.m_draw_tet_wireframe && !m_ui_state.m_draw_isovalues) {
         m_viewer.data().add_points(ds.m_TV, ColorRGB::GRAY);
         m_viewer.data().add_edges(ds.m_TEV1, ds.m_TEV2, ColorRGB::DARK_GRAY);
@@ -779,8 +743,7 @@ public:
       select_main_mesh();
       if (m_ui_state.m_draw_original_mesh) {
         m_viewer.data().add_edges(TEV1, TEV2, ColorRGB::DARK_GRAY);
-        m_viewer.data().add_points(TV, vertex_texcolors);
-//        m_viewer.data().add_points(TV, ColorRGB::DARK_MAGENTA);
+        m_viewer.data().add_points(TV, ColorRGB::DARK_MAGENTA);
       }
 
       // Draw the isovalues
@@ -827,10 +790,6 @@ public:
         m_viewer.data().add_points(v2.row(ds.m_joints.rows()-2), ColorRGB::CRIMSON);
       }
 
-      select_overlay_mesh();
-      if (texvals.rows() != 0) {
-        m_viewer.data().add_points(texpos, texcolors);
-      }
       auto draw_end_time = chrono::high_resolution_clock::now();
       m_ui_state.update_draw_ema(chrono::duration<double, milli>(draw_end_time - draw_start_time).count());
     }
@@ -1070,74 +1029,6 @@ public:
           m_draw_state_changed = true;
         }
         if (ImGui::Button("Rasterize!")) {
-          string filename = m_datfile.m_basename + string(".tex");
-          const size_t num_bytes = m_datfile.w * m_datfile.h * m_datfile.d;
-          char* data = new char[num_bytes];
-          ifstream texfile(m_datfile.m_directory + string("/") + filename, ifstream::binary);
-          if (!texfile.good()) {
-            cerr << "ERROR: Could not read texture file " << filename << endl;
-            exit(EXIT_FAILURE);
-          }
-
-          texfile.read(data, num_bytes);
-          if (!texfile.good()) {
-            cerr << "ERROR: Only read " << texfile.gcount() <<
-                    "bytes from texture file " << filename <<
-                    " but expected to read " << num_bytes <<
-                    " bytes." << endl;
-            exit(EXIT_FAILURE);
-          }
-          texfile.close();
-
-          VectorXd TV(num_bytes);
-          for (int i = 0; i < TV.rows(); i++) {
-            TV[i] = data[i] / 255.0;
-          }
-
-          m_double_buf_lock.lock();
-          DrawState& ds = m_ds[m_current_buf];
-          rasterize_tets(ds.m_TV, ds.m_TT,
-                         RowVector3i(m_datfile.w, m_datfile.h, m_datfile.d), // grid size
-                         RowVector3d::Ones(), // cell size
-                         RowVector3d::Ones(), // origin
-                         texcoords,
-                         TV, texvals);
-          m_double_buf_lock.unlock();
-
-          texpos.resize(texvals.rows(), 3);
-          texcolors.resize(texvals.rows(), 3);
-          MatrixXd colors;
-          texvals /= texvals.maxCoeff();
-          igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, texvals, false, colors);
-          int count1 = 0;
-          int count2 = 0;
-          cout << "size " << texvals.rows() << endl;
-          cout << "expected " << m_datfile.d*m_datfile.h*m_datfile.w << endl;
-          for (int z = 0; z < m_datfile.d; z++) {
-            for (int y = 0; y < m_datfile.h; y++) {
-              for (int x = 0; x < m_datfile.w; x++) {
-                if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0 && fabs(texvals[count2]) > 1e-10) {
-                  texpos.row(count1) = RowVector3d(x, y, z);
-                  texcolors.row(count1) = colors.row(count2);
-                  count1 += 1;
-                }
-                count2 += 1;
-              }
-            }
-          }
-          cout << "count is " << count1 << endl;
-          texpos.conservativeResize(count1, 3);
-          texcolors.conservativeResize(count1, 3);
-//          delete data;
-
-//          ofstream out_texfile;
-//          out_texfile.open(m_datfile.m_directory + string("/") + "out.raw", ios::binary | ios::out);
-//          out_texfile.write((char*)texvals.data(), texvals.rows()*sizeof(double));
-//          out_texfile.close();
-
-
-
-          cout << "INFO: Done writing texture!" << endl;
         }
       }
     }

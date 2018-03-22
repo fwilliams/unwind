@@ -119,76 +119,10 @@ int nearest_vertex(const Eigen::MatrixXd& TV,
   return idx;
 }
 
-
-void rasterize_tets(const Eigen::MatrixXd& TV, const Eigen::MatrixXi&TT,
-                    const Eigen::RowVector3i& grid_size,
-                    const Eigen::RowVector3d& cell_size,
-                    const Eigen::RowVector3d& origin,
-                    const Eigen::MatrixXd& TTC,
-                    const Eigen::VectorXd& inV,
-                    Eigen::VectorXd& outV) {
-  using namespace Eigen;
-  using namespace std;
-
-  outV.resize(grid_size[0]*grid_size[1]*grid_size[2]);
-  outV.setZero(grid_size[0]*grid_size[1]*grid_size[2]);
-
-  const RowVector3d bb_min = TV.colwise().minCoeff();
-  const RowVector3d bb_max = TV.colwise().maxCoeff();
-  const RowVector3d bb_dims = bb_max - bb_min;
-
-  for (int i = 0; i < TT.rows(); i++) {
-    // These are in [0, 1]
-    const RowVector3d v1 = (TV.row(TT(i, 0)) - bb_min).array() / bb_dims.array();
-    const RowVector3d v2 = (TV.row(TT(i, 1)) - bb_min).array() / bb_dims.array();
-    const RowVector3d v3 = (TV.row(TT(i, 2)) - bb_min).array() / bb_dims.array();
-    const RowVector3d v4 = (TV.row(TT(i, 3)) - bb_min).array() / bb_dims.array();
-
-    // Determine the grid cell each tet vertex belongs to
-    const RowVector3i g1 = v1.cwiseProduct(grid_size.cast<double>()).cast<int>();
-    const RowVector3i g2 = v2.cwiseProduct(grid_size.cast<double>()).cast<int>();
-    const RowVector3i g3 = v3.cwiseProduct(grid_size.cast<double>()).cast<int>();
-    const RowVector3i g4 = v4.cwiseProduct(grid_size.cast<double>()).cast<int>();
-
-    const int min_x = min(g1[0], min(g2[0], min(g3[0], g4[0])));
-    const int max_x = max(g1[0], max(g2[0], max(g3[0], g4[0])));
-
-    const int min_y = min(g1[1], min(g2[1], min(g3[1], g4[1])));
-    const int max_y = max(g1[1], max(g2[1], max(g3[1], g4[1])));
-
-    const int min_z = min(g1[2], min(g2[2], min(g3[2], g4[2])));
-    const int max_z = max(g1[2], max(g2[2], max(g3[2], g4[2])));
-
-//    cout << g1 << " - " << g2 << " - " << g3 << " - " << g4 << endl;
-
-    for (int z = min_z; z < max_z; z++) {
-      for (int y = min_y; y < max_y; y++) {
-        for (int x = min_x; x < max_x; x++) {
-          const RowVector3d ctr((x+0.5)/grid_size[0], (y+0.5)/grid_size[1], (z+0.5)/grid_size[2]);
-          RowVector4d bctr;
-
-          igl::barycentric_coordinates(ctr, v1, v2, v3, v4, bctr);
-          // If the center is inside the tet
-          if (bctr[0] >= 0 && bctr[0] <= 1 &&
-              bctr[1] >= 0 && bctr[1] <= 1 &&
-              bctr[2] >= 0 && bctr[2] <= 1 &&
-              bctr[3] >= 0 && bctr[3] <= 1) {
-            const RowVector3d tc1 = TTC.row(TT(i, 0));
-            const RowVector3d tc2 = TTC.row(TT(i, 0));
-            const RowVector3d tc3 = TTC.row(TT(i, 0));
-            const RowVector3d tc4 = TTC.row(TT(i, 0));
-
-            const RowVector3d texcoord = tc1*bctr[0] + tc2*bctr[1] + tc3*bctr[2] + tc4*bctr[3];
-
-            const int in_idx = z*(grid_size[0]*grid_size[1]) + y*grid_size[0] + x;
-            const int out_idx = int(texcoord[2])*(grid_size[0]*grid_size[1]) + int(texcoord[1])*grid_size[0] + int(texcoord[0]);
-            outV[in_idx] = inV[out_idx];
-//            cout << "outV[" << in_idx << "] = inV[" << out_idx << "] => " << inV[out_idx] << endl;
-          }
-        }
-      }
-    }
-  }
+template <typename T>
+T clamp(T val, T vmin, T vmax) {
+  return std::min(vmax, std::max(val, vmin));
 }
+
 
 #endif // UTILS_H
