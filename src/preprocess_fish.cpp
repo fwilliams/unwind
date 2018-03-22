@@ -30,6 +30,7 @@
 #include "auto.h"
 #include "utils.h"
 #include "colors.h"
+#include "texture_utils.h"
 
 
 typedef igl::opengl::glfw::Viewer Viewer;
@@ -517,7 +518,11 @@ class FishPreprocessingMenu :
   Eigen::MatrixXi TT;
   Eigen::MatrixXd TEV1, TEV2;
   Eigen::VectorXd isovals;
-  Eigen::MatrixXd texcoords;
+  Eigen::MatrixXd TC; // Texture coordinates
+
+  // The volume texture
+  Eigen::VectorXd tex;
+  Eigen::RowVector3i tex_size;
 
   DatFile m_datfile;
 
@@ -641,6 +646,12 @@ public:
     cout << "INFO: Loading tet mesh " << m_current_model_filename << endl;
     load_yixin_tetmesh(m_datfile.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
+
+    read_texture(m_datfile, 1, tex_size, tex);
+    TC = TV;
+    TC.col(0) /= tex_size[0];
+    TC.col(1) /= tex_size[1];
+    TC.col(2) /= tex_size[2];
 
     cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
@@ -1021,14 +1032,23 @@ public:
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }
-        if (ImGui::Button("Clear Orientation Constraints")) {
+        if (ImGui::Button("Clear Orientation Constraints", ImVec2(-1, 0))) {
           m_constraints_lock.lock();
           m_constraints.clear_orientation_constraints();
           m_constraints_changed = true;
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }
-        if (ImGui::Button("Rasterize!")) {
+        if (ImGui::Button("Rasterize!", ImVec2(-1, 0))) {
+          m_double_buf_lock.lock();
+          DrawState& ds = m_ds[m_current_buf];
+          VectorXd out_tex;
+          RowVector3i out_tex_size = tex_size;
+          rasterize_tet_mesh(ds.m_TV, ds.m_TT, TC, tex_size, out_tex_size, tex, out_tex);
+          m_double_buf_lock.unlock();
+
+          write_texture("out.raw", out_tex);
+          cout << "INFO: Wrote output texture of size " << out_tex_size << endl;
         }
       }
     }

@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
   RowVector3i in_tex_size;
   RowVector3i out_tex_size;
 
-  load_texture(f, 1, in_tex_size, in_texture);
+  read_texture(f, 1, in_tex_size, in_texture);
   out_tex_size = in_tex_size;
 
   Viewer viewer;
@@ -36,12 +36,15 @@ int main(int argc, char *argv[]) {
 
   rasterize_tet_mesh(TV, TT, TC, in_tex_size, out_tex_size, in_texture, out_texture);
 
+  write_texture("out.raw", out_texture);
 
   MatrixXd pt_positions, pt_colors;
   VectorXd pt_vals;
 
   sample_volume_texture(out_tex_size, out_texture, 4 /* downsample_factor */, 10.0 /* thresh */, true /* rescale */, pt_positions, pt_vals);
   igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, pt_vals, false, pt_colors);
+
+
 
   viewer.data().add_points(pt_positions, pt_colors);
   viewer.core.align_camera_center(pt_positions);

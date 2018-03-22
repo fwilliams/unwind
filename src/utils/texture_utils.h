@@ -3,7 +3,7 @@
 
 #include <fstream>
 #include <string>
-#include <exception>
+#include <vector>
 
 #include "datfile.h"
 #include "utils.h"
@@ -65,7 +65,7 @@ void sample_volume_texture(const Eigen::RowVector3i tex_size,
 }
 
 
-bool load_texture(const DatFile& f, int zero_pad, Eigen::RowVector3i& out_tex_size, Eigen::VectorXd& out_texture) {
+bool read_texture(const DatFile& f, int zero_pad, Eigen::RowVector3i& out_tex_size, Eigen::VectorXd& out_texture) {
   using namespace std;
   using namespace Eigen;
 
@@ -108,6 +108,18 @@ bool load_texture(const DatFile& f, int zero_pad, Eigen::RowVector3i& out_tex_si
   return true;
 }
 
+void write_texture(const std::string& out_filename, const Eigen::VectorXd& texture) {
+  using namespace std;
+
+  ofstream ofs(out_filename, ios::out | ios::binary);
+  vector<unsigned char> outdata;
+  outdata.reserve(texture.rows());
+  for (int i = 0; i < texture.rows(); i++) {
+    outdata.push_back((unsigned char)(texture[i]));
+  }
+
+  ofs.write((char*)outdata.data(), outdata.size());
+}
 
 void rasterize_tet_mesh(const Eigen::MatrixXd& TV,              // #V x 3  Tet mesh vertex positions
                         const Eigen::MatrixXi& TT,              // #T x 4  Tet mesh tet indices
