@@ -280,6 +280,26 @@ struct ConstraintState {
     m_bone_constraints_idx.push_back(endpoints[0]);
     m_bone_constraints_pos.push_back(RowVector3d(0, 0, 0));
 
+//    vector<double> dists;
+
+//    double fish_length = 0.0;
+//    dists.push_back(fish_length);
+//    for (int i = 0; i < 1000; i++) {
+//      const double isovalue = i * (1.0/num_verts);
+//      igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
+//      if (LV.rows() == 0) {
+//        continue;
+//      }
+//      RowVector3d ctr = LV.colwise().sum() / LV.rows();
+//      fish_length += (ctr - last_ctr).norm();
+//      last_ctr = ctr;
+//      dists.push_back(fish_length);
+//    }
+//    fish_length += (TV.row(endpoints[1]) - last_ctr).norm();
+//    dists.push_back(fish_length);
+
+
+    last_ctr = TV.row(endpoints[0]);
     double dist = 0.0;
     for(int i = 1; i < num_verts; i++) {
       const double isovalue = i * (1.0/num_verts);
@@ -292,6 +312,8 @@ struct ConstraintState {
       }
 
       RowVector3d ctr = LV.colwise().sum() / LV.rows();
+//      int dist_idx = int(isovalue * dists.size());
+//      dist = dists[dist_idx];
       dist += (ctr - last_ctr).norm();
       last_ctr = ctr;
 
@@ -647,15 +669,22 @@ public:
     load_yixin_tetmesh(m_datfile.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
 
-    read_texture(m_datfile, 1, tex_size, tex);
+    cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
+            TF.rows() << " boundary faces, and " << TT.rows() <<
+            " tets." << endl;
+
+    cout << "INFO: Loading volume texture " << m_datfile.m_texture_filename << endl;
+    if (!read_texture(m_datfile, 1, tex_size, tex)) {
+      throw runtime_error("Unable to load texture");
+    }
+
+    cout << "INFO: Read volume texture of size " << tex_size[0] << " x " << tex_size[1] << " x " << tex_size[2] << "." << endl;
+
     TC = TV;
     TC.col(0) /= tex_size[0];
     TC.col(1) /= tex_size[1];
     TC.col(2) /= tex_size[2];
 
-    cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
-            TF.rows() << " boundary faces, and " << TT.rows() <<
-            " tets." << endl;
 
     // Initialize the draw state
     m_current_buf = 0;
@@ -719,6 +748,7 @@ public:
       m_viewer.data().set_mesh(ds.m_TV, ds.m_TF);
       m_viewer.data().show_lines = false;
       m_viewer.data().show_faces = false;
+      m_viewer.data().set_face_based(true);
 
       // Clear the overlay mesh
       select_overlay_mesh();
@@ -1043,7 +1073,9 @@ public:
           m_double_buf_lock.lock();
           DrawState& ds = m_ds[m_current_buf];
           VectorXd out_tex;
-          RowVector3i out_tex_size = tex_size;
+          RowVector3d bb_min = ds.m_TV.colwise().minCoeff();
+          RowVector3d bb_max = ds.m_TV.colwise().maxCoeff();
+          RowVector3i out_tex_size = (bb_max - bb_min).cast<int>();
           rasterize_tet_mesh(ds.m_TV, ds.m_TT, TC, tex_size, out_tex_size, tex, out_tex);
           m_double_buf_lock.unlock();
 
