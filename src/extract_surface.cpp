@@ -44,7 +44,7 @@ bool compute_surface_mesh(DatFile& datfile,
       for (int xi = 0; xi < datfile.w+2; xi++) {
         if (xi == 0 || yi == 0 || zi == 0 || xi == (datfile.w+1) ||
             yi == (datfile.h+1) || zi == (datfile.d+1)) {
-          SV[readcount] = 0.0;
+          SV[readcount] = -1.0;
         } else {
           SV[readcount] = double(data[appendcount]);
           appendcount += 1;

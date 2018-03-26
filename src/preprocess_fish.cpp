@@ -6,6 +6,7 @@
 #include <igl/colormap.h>
 #include <igl/harmonic.h>
 #include <igl/slim.h>
+#include <igl/lim/lim.h>
 #include <igl/grad.h>
 #include <igl/cotmatrix.h>
 
@@ -29,6 +30,7 @@
 #include "auto.h"
 #include "utils.h"
 #include "colors.h"
+#include "texture_utils.h"
 
 
 typedef igl::opengl::glfw::Viewer Viewer;
@@ -278,6 +280,26 @@ struct ConstraintState {
     m_bone_constraints_idx.push_back(endpoints[0]);
     m_bone_constraints_pos.push_back(RowVector3d(0, 0, 0));
 
+//    vector<double> dists;
+
+//    double fish_length = 0.0;
+//    dists.push_back(fish_length);
+//    for (int i = 0; i < 1000; i++) {
+//      const double isovalue = i * (1.0/num_verts);
+//      igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
+//      if (LV.rows() == 0) {
+//        continue;
+//      }
+//      RowVector3d ctr = LV.colwise().sum() / LV.rows();
+//      fish_length += (ctr - last_ctr).norm();
+//      last_ctr = ctr;
+//      dists.push_back(fish_length);
+//    }
+//    fish_length += (TV.row(endpoints[1]) - last_ctr).norm();
+//    dists.push_back(fish_length);
+
+
+    last_ctr = TV.row(endpoints[0]);
     double dist = 0.0;
     for(int i = 1; i < num_verts; i++) {
       const double isovalue = i * (1.0/num_verts);
@@ -290,6 +312,8 @@ struct ConstraintState {
       }
 
       RowVector3d ctr = LV.colwise().sum() / LV.rows();
+//      int dist_idx = int(isovalue * dists.size());
+//      dist = dists[dist_idx];
       dist += (ctr - last_ctr).norm();
       last_ctr = ctr;
 
@@ -516,7 +540,13 @@ class FishPreprocessingMenu :
   Eigen::MatrixXi TT;
   Eigen::MatrixXd TEV1, TEV2;
   Eigen::VectorXd isovals;
-  Eigen::MatrixXd texcoords;
+  Eigen::MatrixXd TC; // Texture coordinates
+
+  // The volume texture
+  Eigen::VectorXd tex;
+  Eigen::RowVector3i tex_size;
+
+  DatFile m_datfile;
 
   // UI variables set by imgui
   UIState m_ui_state;
@@ -576,7 +606,7 @@ class FishPreprocessingMenu :
         const double soft_const_p = 1e5;
         const MatrixXd TV_0 = m_ds[m_current_buf].m_TV;
         sData.exp_factor = 5.0;
-        slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
+        slim_precompute(m_ds[m_current_buf].m_TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
                         slim_b, slim_bc, soft_const_p);
         m_constraints_changed = false;
       }
@@ -627,26 +657,34 @@ class FishPreprocessingMenu :
 public:
   FishPreprocessingMenu(const std::string& filename, Viewer& viewer) : m_viewer(viewer) {
     using namespace std;
+    using namespace Eigen;
 
-    DatFile f(filename);
+    m_datfile = DatFile(filename);
 
     // Load the tet mesh
-    cout << f.m_basename << endl;
-    cout << f.m_filename << endl;
-    m_current_model_filename = f.m_basename + string("_.msh");
+    cout << m_datfile.m_basename << endl;
+    cout << m_datfile.m_filename << endl;
+    m_current_model_filename = m_datfile.m_basename + string("_.msh");
     cout << "INFO: Loading tet mesh " << m_current_model_filename << endl;
-    load_yixin_tetmesh(f.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
+    load_yixin_tetmesh(m_datfile.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
     edge_endpoints(TV, TT, TEV1, TEV2);
-
-    texcoords.resize(TV.rows(), 3);
-    for (int i = 0; i < TV.rows(); i++) {
-      // Subtract 1 since we pad the grid with a zero cell all around
-      texcoords.row(i) = TV.row(i) - f.m_bb_min - Eigen::RowVector3d::Ones();
-    }
 
     cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
             TF.rows() << " boundary faces, and " << TT.rows() <<
             " tets." << endl;
+
+    cout << "INFO: Loading volume texture " << m_datfile.m_texture_filename << endl;
+    if (!read_texture(m_datfile, 1, tex_size, tex)) {
+      throw runtime_error("Unable to load texture");
+    }
+
+    cout << "INFO: Read volume texture of size " << tex_size[0] << " x " << tex_size[1] << " x " << tex_size[2] << "." << endl;
+
+    TC = TV;
+    TC.col(0) /= tex_size[0];
+    TC.col(1) /= tex_size[1];
+    TC.col(2) /= tex_size[2];
+
 
     // Initialize the draw state
     m_current_buf = 0;
@@ -710,6 +748,7 @@ public:
       m_viewer.data().set_mesh(ds.m_TV, ds.m_TF);
       m_viewer.data().show_lines = false;
       m_viewer.data().show_faces = false;
+      m_viewer.data().set_face_based(true);
 
       // Clear the overlay mesh
       select_overlay_mesh();
@@ -908,6 +947,7 @@ public:
 
   virtual void draw_viewer_menu() override {
     using namespace std;
+    using namespace Eigen;
 
     string title_text = string("Current Model: ") + m_current_model_filename;
     ImGui::Text("%s", title_text.c_str());
@@ -1022,12 +1062,25 @@ public:
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }
-        if (ImGui::Button("Clear Orientation Constraints")) {
+        if (ImGui::Button("Clear Orientation Constraints", ImVec2(-1, 0))) {
           m_constraints_lock.lock();
           m_constraints.clear_orientation_constraints();
           m_constraints_changed = true;
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
+        }
+        if (ImGui::Button("Rasterize!", ImVec2(-1, 0))) {
+          m_double_buf_lock.lock();
+          DrawState& ds = m_ds[m_current_buf];
+          VectorXd out_tex;
+          RowVector3d bb_min = ds.m_TV.colwise().minCoeff();
+          RowVector3d bb_max = ds.m_TV.colwise().maxCoeff();
+          RowVector3i out_tex_size = (bb_max - bb_min).cast<int>();
+          rasterize_tet_mesh(ds.m_TV, ds.m_TT, TC, tex_size, out_tex_size, tex, out_tex);
+          m_double_buf_lock.unlock();
+
+          write_texture("out.raw", out_tex);
+          cout << "INFO: Wrote output texture of size " << out_tex_size << endl;
         }
       }
     }

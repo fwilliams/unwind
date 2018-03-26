@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <igl/edges.h>
+#include <igl/barycentric_coordinates.h>
 
 #include <Eigen/Core>
 
@@ -116,6 +117,11 @@ int nearest_vertex(const Eigen::MatrixXd& TV,
     }
   }
   return idx;
+}
+
+template <typename T>
+T clamp(T val, T vmin, T vmax) {
+  return std::min(vmax, std::max(val, vmin));
 }
 
 
