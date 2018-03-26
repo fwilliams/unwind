@@ -287,6 +287,9 @@ class FishPreprocessingMenu :
     m_ui_state.m_avg_draw_state_update_time = 0.0;
     m_ui_state.m_avg_slim_time = 0.0;
 
+    // This is false until we initialize SLIM for the first time
+    bool slim_ready = false;
+
     cout << "INFO: SLIM Thread: Starting SLIM background thread." << endl;
     while (m_slim_running) {
 
@@ -302,10 +305,11 @@ class FishPreprocessingMenu :
         slim_precompute(m_ds[m_current_buf].m_TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
                         slim_b, slim_bc, soft_const_p);
         m_constraints_changed = false;
+        slim_ready = true;
       }
       m_constraints_lock.unlock();
 
-      if (m_constraints.num_constraints() == 0) {
+      if (!slim_ready) {
         this_thread::yield();
         continue;
       }
