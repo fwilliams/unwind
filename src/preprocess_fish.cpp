@@ -749,6 +749,8 @@ public:
       m_viewer.data().show_lines = false;
       m_viewer.data().show_faces = false;
       m_viewer.data().set_face_based(true);
+      m_viewer.data().shininess = 10000000.0;
+      m_viewer.data().set_colors(ColorRGB::SILVER);
 
       // Clear the overlay mesh
       select_overlay_mesh();
