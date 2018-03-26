@@ -4,6 +4,7 @@
 #include <igl/writeOFF.h>
 
 #include <iostream>
+#include <fstream>
 
 #include "datfile.h"
 

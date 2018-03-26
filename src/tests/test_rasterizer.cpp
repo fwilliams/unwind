@@ -2,7 +2,7 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/colormap.h>
 
-#include "texture_utils.h"
+#include "rasterizer.h"
 #include "yixin_loader.h"
 
 

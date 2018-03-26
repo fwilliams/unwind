@@ -2,13 +2,13 @@
 #define TEXTURE_UTILS_H
 
 #include <fstream>
-#include <string>
 #include <vector>
+#include <iostream>
+
+#include <igl/barycentric_coordinates.h>
 
 #include "datfile.h"
 #include "utils.h"
-
-
 
 
 void sample_volume_texture(const Eigen::RowVector3i tex_size,

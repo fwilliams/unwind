@@ -39,7 +39,19 @@ find_package(LIBIGL REQUIRED QUIET)
 
 set(INCLUDE_DIRS src src/utils src/tests)
 
-add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/utils/yixin_loader.cpp)
+
+
+
+file(GLOB UTILS_SRCS src/utils/*.cpp)
+list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
+
+message(STATUS "UTILS SRC FILES: ${UTILS_SRCS}")
+
+add_executable(extract_surface_bin src/extract_surface.cpp ${UTILS_SRCS})
+target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(extract_surface_bin igl::core)
+
+add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/deformation_constraints.cpp ${UTILS_SRCS})
 target_include_directories(preprocess_fish_bin PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 if (WIN32)
@@ -72,22 +84,17 @@ if (WIN32)
     optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libspqr.lib"
     optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libumfpack.lib"
   )
-
 else ()
   target_link_libraries(preprocess_fish_bin cholmod)
 endif ()
 
 
-
-add_executable(extract_surface_bin src/extract_surface.cpp)
-target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(extract_surface_bin igl::core)
-
-add_executable(debug_tex_bin src/texture_debugging.cpp src/utils/yixin_loader.cpp)
-target_include_directories(debug_tex_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(debug_tex_bin igl::core igl::opengl_glfw)
-
 IF (BUILD_TESTS)
+  # Test and debug the rasterizer
+  add_executable(debug_tex_bin src/test_rasterizer.cpp ${UTILS_SRCS})
+  target_include_directories(debug_tex_bin PRIVATE ${INCLUDE_DIRS})
+  target_link_libraries(debug_tex_bin igl::core igl::opengl_glfw)
+
   # Test loading Harish's dat files
   add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/utils/yixin_loader.cpp)
   target_include_directories(test_meshing_harish_data_bin PRIVATE ${INCLUDE_DIRS})
