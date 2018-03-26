@@ -302,7 +302,7 @@ class FishPreprocessingMenu :
         const double soft_const_p = 1e5;
         const MatrixXd TV_0 = m_ds[m_current_buf].m_TV;
         sData.exp_factor = 5.0;
-        slim_precompute(m_ds[m_current_buf].m_TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
+        slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
                         slim_b, slim_bc, soft_const_p);
         m_constraints_changed = false;
         slim_ready = true;
@@ -853,7 +853,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   } else {
     FishPreprocessingMenu menu(argv[1], viewer);
-    viewer.core.background_color = Eigen::RowVector4f(0.9, 0.9, 1.0, 1.0);
+    viewer.core.background_color = Eigen::RowVector4f(1.0, 1.0, 1.0, 1.0);
     return viewer.launch();
   }
 }
