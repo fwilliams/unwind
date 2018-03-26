@@ -37,7 +37,7 @@ private:
 
         constexpr const int BufferSize = 1024;
         char datfile_full_path[1024];
-        const DWORD success = GetFullPathName(filename.c_str(), BufferSize, datfile_full_path, 0);
+        const DWORD success = GetFullPathNameA(filename.c_str(), BufferSize, datfile_full_path, 0);
         char* datfile_full_path_dup = strdup(datfile_full_path);
         m_filename = std::string(datfile_full_path);
 
