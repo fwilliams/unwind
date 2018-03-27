@@ -8,6 +8,7 @@
 
 #include <Eigen/CholmodSupport>
 
+#include <array>
 #include <numeric>
 
 
