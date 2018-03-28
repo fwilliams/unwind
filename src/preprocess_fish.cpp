@@ -58,32 +58,29 @@ struct DrawingState {
     edge_endpoints(m_TV, m_TT, m_TEV1, m_TEV2);
   }
 
-  void update_skeleton(const Eigen::VectorXd& isovals, int num_verts,
-                       const std::vector<std::array<int, 2>>& endpoints,
-                       const Eigen::VectorXi& components) {
+  void update_skeleton(
+      const Eigen::MatrixXd& TV_thin, const Eigen::MatrixXi& TT_thin,
+      const Eigen::VectorXd& isovals, int num_verts,
+      const std::vector<std::array<int, 2>>& endpoints,
+      const Eigen::VectorXi& components) {
     using namespace std;
     using namespace  Eigen;
 
     MatrixXd LV;
     MatrixXi LF;
     vector<MatrixXi> TTcomps;
-    split_mesh_components(m_TT, components, TTcomps);
-
-
+    split_mesh_components(TT_thin, components, TTcomps);
 
     m_joints.resize(2*endpoints.size()*num_verts, 3);
     int vcount = 0;
 
-    cout << "endpoints size is " << endpoints.size() << endl;
     for (int c = 0; c < endpoints.size(); c++) {
       double isovalue = isovals[endpoints[c][0]];
       const int component = components[endpoints[c][0]];
-      cout << "component of endpoint " << c << " is " << component << endl;
 
       const double isoval_incr = (isovals[endpoints[c][1]] - isovals[endpoints[c][0]]) / num_verts;
       for(int i = 1; i < num_verts; i++) {
-        cout << "isovalue " << isovalue << endl;;
-        igl::marching_tets(m_TV, TTcomps[component], isovals, isovalue, LV, LF);
+        igl::marching_tets(TV_thin, TTcomps[component], isovals, isovalue, LV, LF);
         if (LV.rows() == 0) {
           isovalue += isoval_incr;
           continue;
@@ -260,15 +257,16 @@ class FishPreprocessingMenu :
   std::string m_current_model_filename;
 
   // Original mesh data. This will not change after we load the mesh in the constructor
-  Eigen::MatrixXd TV;
-  Eigen::MatrixXi TF;
-  Eigen::MatrixXi TT;
-  Eigen::MatrixXd TEV1, TEV2;
+  Eigen::MatrixXd TV_fat, TV_thin;
+  Eigen::MatrixXi TF_fat, TF_thin;
+  Eigen::MatrixXi TT_fat, TT_thin;
+  Eigen::MatrixXd TEV1_fat, TEV2_fat, TEV1_thin, TEV2_thin;
+
   Eigen::VectorXd isovals;
   Eigen::MatrixXd TC; // Texture coordinates
 
   Eigen::VectorXi components; // Component index of each vertex
-  std::vector<Eigen::MatrixXi> TTcomp;
+  std::vector<Eigen::MatrixXi> TT_thin_comp;
   int m_current_ttcomp = 0;
   int m_num_components = 0; // Number of connected components
 
@@ -337,7 +335,7 @@ class FishPreprocessingMenu :
         const double soft_const_p = 1e5;
         const MatrixXd TV_0 = m_ds[m_current_buf].m_TV;
         sData.exp_factor = 5.0;
-        slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_SYMMETRIC_DIRICHLET,
+        slim_precompute(TV_fat, TT_fat, TV_0, sData, igl::SLIMData::EXP_SYMMETRIC_DIRICHLET,
                         slim_b, slim_bc, soft_const_p);
         m_constraints_changed = false;
         slim_ready = true;
@@ -358,9 +356,9 @@ class FishPreprocessingMenu :
 
       int buffer = (m_current_buf + 1) % 2;
       DrawingState& ds = m_ds[buffer];
-      ds.update_tet_mesh(sData.V_o, TT);
+      ds.update_tet_mesh(sData.V_o, TT_fat);
       ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
-      ds.update_skeleton(isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
+      ds.update_skeleton(TV_thin, TT_thin, isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
       ds.update_constraint_points(sData.b, sData.bc);
 
       auto ds_update_end_time = chrono::high_resolution_clock::now();
@@ -396,16 +394,30 @@ public:
     // Load the tet mesh
     cout << m_datfile.m_basename << endl;
     cout << m_datfile.m_filename << endl;
-    m_current_model_filename = m_datfile.m_basename + string(".thin_.msh");
-    cout << "INFO: Loading tet mesh " << m_current_model_filename << endl;
-    load_yixin_tetmesh(m_datfile.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
-//    load_tet_file(m_datfile.m_directory + string("/") + m_datfile.m_basename + string(".tet"), TV, TF, TT);
+    m_current_model_filename = m_datfile.m_basename;
 
-    edge_endpoints(TV, TT, TEV1, TEV2);
 
-    cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
-            TF.rows() << " boundary faces, and " << TT.rows() <<
+    const string fat_basename = m_current_model_filename + string("_.msh");
+    const string thin_basename = m_current_model_filename + string(".thin_.msh");
+    const string fat_filename = m_datfile.m_directory + string("/") + fat_basename;
+    const string thin_filename = m_datfile.m_directory + string("/") + thin_basename;
+
+    cout << "INFO: Loading fat tet mesh " << fat_basename << endl;
+    load_yixin_tetmesh(fat_filename, TV_fat, TF_fat, TT_fat);
+    // load_tet_file(m_datfile.m_directory + string("/") + m_datfile.m_basename + string(".tet"), TV, TF, TT);
+    edge_endpoints(TV_fat, TT_fat, TEV1_fat, TEV2_fat);
+    cout << "INFO: Loaded fat mesh " << fat_basename << " with " << TV_fat.rows() << " vertices, " <<
+            TF_fat.rows() << " boundary faces, and " << TT_fat.rows() <<
             " tets." << endl;
+
+    cout << "INFO: Loading thin tet mesh " << thin_basename << endl;
+    load_yixin_tetmesh(thin_filename, TV_thin, TF_thin, TT_thin);
+    // load_tet_file(m_datfile.m_directory + string("/") + m_datfile.m_basename + string(".tet"), TV, TF, TT);
+    edge_endpoints(TV_thin, TT_thin, TEV1_thin, TEV2_thin);
+    cout << "INFO: Loaded thin mesh " << thin_basename << " with " << TV_thin.rows() << " vertices, " <<
+            TV_thin.rows() << " boundary faces, and " << TT_thin.rows() <<
+            " tets." << endl;
+
 
     cout << "INFO: Loading volume texture " << m_datfile.m_texture_filename << endl;
     if (!read_texture(m_datfile, 1, tex_size, tex)) {
@@ -414,20 +426,20 @@ public:
 
     cout << "INFO: Read volume texture of size " << tex_size[0] << " x " << tex_size[1] << " x " << tex_size[2] << "." << endl;
 
-    TC = TV;
+    TC = TV_fat;
     TC.col(0) /= tex_size[0];
     TC.col(1) /= tex_size[1];
     TC.col(2) /= tex_size[2];
 
-    igl::components(TT, components);
+    igl::components(TT_thin, components);
     m_num_components = components.maxCoeff() + 1;
-    split_mesh_components(TT, components, TTcomp);
+    split_mesh_components(TT_thin, components, TT_thin_comp);
 
     // Initialize the draw state
     m_current_buf = 0;
-    m_ds[m_current_buf].update_tet_mesh(TV, TT);
-    m_ds[0].m_TF = TF;
-    m_ds[1].m_TF = TF;
+    m_ds[m_current_buf].update_tet_mesh(TV_fat, TT_fat);
+    m_ds[0].m_TF = TF_fat;
+    m_ds[1].m_TF = TF_fat;
     m_draw_state_changed = true;
 
     // Start the SLIM background thread
@@ -442,7 +454,7 @@ public:
     m_viewer.append_mesh();
     m_background_mesh_id = m_viewer.selected_data_index;
     select_main_mesh();
-    viewer.core.align_camera_center(TV, TF);
+    viewer.core.align_camera_center(TV_fat, TF_fat);
 
     // Make sure we draw the first frame
     m_draw_state_changed = true;
@@ -483,7 +495,11 @@ public:
       select_main_mesh();
       m_viewer.data().clear();
       m_viewer.data().point_size = 5.0;
-      m_viewer.data().set_mesh(ds.m_TV, ds.m_TF);
+      if (m_ui_state.m_show_point_selection_mode) {
+        m_viewer.data().set_mesh(TV_thin, TF_thin);
+      } else {
+        m_viewer.data().set_mesh(ds.m_TV, ds.m_TF);
+      }
       m_viewer.data().show_lines = false;
       m_viewer.data().show_faces = false;
       m_viewer.data().set_face_based(true);
@@ -509,36 +525,39 @@ public:
       if (m_ui_state.m_show_point_selection_mode) {
         for (int i = 0; i < m_ui_state.m_current_endpoint_idx; i++) {
           const int vid = m_ui_state.m_selected_end_coords[i];
-          m_viewer.data().add_points(ds.m_TV.row(vid), i == 0 ? ColorRGB::GREEN : ColorRGB::RED);
+          m_viewer.data().add_points(TV_thin.row(vid), i == 0 ? ColorRGB::GREEN : ColorRGB::RED);
         }
       }
       for (int i = 0; i < m_ui_state.m_selected_end_pairs.size(); i++) {
         array<int, 2> endpoints = m_ui_state.m_selected_end_pairs[i];
-        m_viewer.data().add_points(TV.row(endpoints[0]), ColorRGB::GREEN);
-        m_viewer.data().add_points(TV.row(endpoints[1]), ColorRGB::RED);
+        m_viewer.data().add_points(TV_thin.row(endpoints[0]), ColorRGB::GREEN);
+        m_viewer.data().add_points(TV_thin.row(endpoints[1]), ColorRGB::RED);
       }
 
       // Draw the tet mesh wireframe
       select_main_mesh();
       if (m_ui_state.m_draw_tet_wireframe) {
-        m_viewer.data().add_edges(ds.m_TEV1, ds.m_TEV2, ColorRGB::DARK_GRAY);
-      } else if (m_ui_state.m_draw_tet_wireframe && !m_ui_state.m_draw_isovalues) {
-        m_viewer.data().add_points(ds.m_TV, ColorRGB::GRAY);
-        m_viewer.data().add_edges(ds.m_TEV1, ds.m_TEV2, ColorRGB::DARK_GRAY);
+        if (m_ui_state.m_show_point_selection_mode) {
+          m_viewer.data().add_points(ds.m_TV, ColorRGB::GRAY);
+          m_viewer.data().add_edges(TEV1_thin, TEV2_thin, ColorRGB::DARK_GRAY);
+        } else {
+          m_viewer.data().add_points(ds.m_TV, ColorRGB::GRAY);
+          m_viewer.data().add_edges(ds.m_TEV1, ds.m_TEV2, ColorRGB::DARK_GRAY);
+        }
       }
 
       // Draw the original mesh
       select_main_mesh();
       if (m_ui_state.m_draw_original_mesh) {
-        edge_endpoints(TV, TTcomp[m_current_ttcomp], TEV1, TEV2);
-        m_viewer.data().add_edges(TEV1, TEV2, ColorRGB::DARK_GRAY);
-        m_viewer.data().add_points(TV, ColorRGB::DARK_MAGENTA);
+        edge_endpoints(TV_fat, TT_thin_comp[m_current_ttcomp], TEV1_fat, TEV2_fat);
+        m_viewer.data().add_edges(TEV1_fat, TEV2_fat, ColorRGB::DARK_GRAY);
+        m_viewer.data().add_points(TV_fat, ColorRGB::DARK_MAGENTA);
       }
 
       // Draw the isovalues
       select_overlay_mesh();
       if (m_ui_state.m_draw_isovalues) {
-        m_viewer.data().add_points(ds.m_TV, m_ui_state.m_isoval_colors);
+        m_viewer.data().add_points(TV_thin, m_ui_state.m_isoval_colors);
       }
 
       // Draw the SLIM constraints
@@ -599,7 +618,7 @@ public:
       if(igl::unproject_onto_mesh(Eigen::Vector2f(x,y),
                                   m_viewer.core.view * m_viewer.core.model,
                                   m_viewer.core.proj, m_viewer.core.viewport,
-                                  ds.m_TV, ds.m_TF, fid, bc)) {
+                                  TV_thin, TF_thin, fid, bc)) {
         m_double_buf_lock.unlock();
 
         if (!m_ui_state.m_show_point_selection_mode) {
@@ -609,7 +628,7 @@ public:
 
         int max;
         bc.maxCoeff(&max);
-        int vid = TF(fid, max);
+        int vid = TF_thin(fid, max);
         m_ui_state.m_selected_end_coords[m_ui_state.m_current_endpoint_idx] = vid;
 
         m_ui_state.m_current_endpoint_idx += 1;
@@ -783,7 +802,7 @@ public:
             m_ui_state.m_error_message = string("Error: Cannot have more than one pair of endpoints per component.");
           } else {
             if (isovals.rows() == 0) {
-              geodesic_distances(TV, TT, m_ui_state.m_selected_end_pairs, isovals);
+              geodesic_distances(TV_thin, TT_thin, m_ui_state.m_selected_end_pairs, isovals);
 //              diffusion_distances(TV, TT, m_ui_state.m_selected_end_pairs, isovals);
               Eigen::VectorXd isovals_normalized;
               scale_zero_one(isovals, isovals_normalized);
@@ -792,21 +811,19 @@ public:
 
             m_double_buf_lock.lock();
             DrawingState& ds = m_ds[m_current_buf];
-            ds.update_skeleton(isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
+            ds.update_skeleton(TV_thin, TT_thin, isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
             m_double_buf_lock.unlock();
 
             // Add constraints at each of the skeleton joints
             m_constraints_lock.lock();
             double dist = m_constraints.update_bone_constraints(
-                  TV, TT, isovals, components, m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
+                  TV_fat, TT_fat, TV_thin, TT_thin, isovals, components, m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
             m_constraints_changed = true;
             m_constraints_lock.unlock();
-
             cout << "INFO: Skeleton is " << dist << " units long." << endl;
 
             // Show the diffusion menu and draw the isovalues
             m_ui_state.after_compute_diffusion();
-
             m_draw_state_changed = true;
           }
         }
@@ -853,6 +870,12 @@ public:
         if (ImGui::Button("Clear Orientation Constraints", ImVec2(-1, 0))) {
           m_constraints_lock.lock();
           m_constraints.clear_orientation_constraints();
+          m_constraints_changed = true;
+          m_constraints_lock.unlock();
+          m_draw_state_changed = true;
+        }
+        if (ImGui::DragFloat("Scale Skeleton", &m_constraints.m_scale, 0.001f, 0.9, 1.2)) {
+          m_constraints_lock.lock();
           m_constraints_changed = true;
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
