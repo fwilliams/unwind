@@ -98,12 +98,14 @@ void DeformationConstraints::clear_orientation_constraints() {
 }
 
 
-double DeformationConstraints::update_bone_constraints(
+double DeformationConstraints::one_pair_bone_constraints(
     const Eigen::MatrixXd& TV,
     const Eigen::MatrixXi& TT,
     const Eigen::VectorXd& isovals,
     const std::array<int, 2>& endpoints,
-    int num_verts) {
+    int num_verts,
+    const Eigen::RowVector3d& start_constraint,
+    double isovalue_incr) {
   using namespace std;
   using namespace Eigen;
 
@@ -114,34 +116,18 @@ double DeformationConstraints::update_bone_constraints(
   vmap.max_load_factor(0.5);
   vmap.reserve(num_verts);
 
+  const int num_endpoint_pairs = endpoints.size();
+  assert(num_endpoint_pairs > 0);
+
   RowVector3d last_ctr = TV.row(endpoints[0]);
   m_bone_constraints_idx.push_back(endpoints[0]);
-  m_bone_constraints_pos.push_back(RowVector3d(0, 0, 0));
-
-//    vector<double> dists;
-
-//    double fish_length = 0.0;
-//    dists.push_back(fish_length);
-//    for (int i = 0; i < 1000; i++) {
-//      const double isovalue = i * (1.0/num_verts);
-//      igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
-//      if (LV.rows() == 0) {
-//        continue;
-//      }
-//      RowVector3d ctr = LV.colwise().sum() / LV.rows();
-//      fish_length += (ctr - last_ctr).norm();
-//      last_ctr = ctr;
-//      dists.push_back(fish_length);
-//    }
-//    fish_length += (TV.row(endpoints[1]) - last_ctr).norm();
-//    dists.push_back(fish_length);
-
+  m_bone_constraints_pos.push_back(start_constraint);
 
   last_ctr = TV.row(endpoints[0]);
   double dist = 0.0;
+  double isovalue = isovals[endpoints[0]];
   for(int i = 1; i < num_verts; i++) {
-    const double isovalue = i * (1.0/num_verts);
-
+    isovalue += isovalue_incr;
     igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
 
     if (LV.rows() == 0) {
@@ -150,8 +136,6 @@ double DeformationConstraints::update_bone_constraints(
     }
 
     RowVector3d ctr = LV.colwise().sum() / LV.rows();
-//      int dist_idx = int(isovalue * dists.size());
-//      dist = dists[dist_idx];
     dist += (ctr - last_ctr).norm();
     last_ctr = ctr;
 
@@ -168,7 +152,7 @@ double DeformationConstraints::update_bone_constraints(
     if (vmap.find(nv) == vmap.end()) {
       vmap.insert(nv);
       m_bone_constraints_idx.push_back(nv);
-      m_bone_constraints_pos.push_back(RowVector3d(0, 0, dist));
+      m_bone_constraints_pos.push_back(start_constraint + RowVector3d(0, 0, dist));
       m_constrainable_tets_idx.push_back(tet);
       m_level_set_distances.push_back(dist);
       m_level_set_isovalues.push_back(isovalue);
@@ -177,7 +161,32 @@ double DeformationConstraints::update_bone_constraints(
 
   dist += (TV.row(endpoints[1]) - last_ctr).norm();
   m_bone_constraints_idx.push_back(endpoints[1]);
-  m_bone_constraints_pos.push_back(RowVector3d(0, 0, dist));
+  m_bone_constraints_pos.push_back(start_constraint + RowVector3d(0, 0, dist));
+  return dist;
+}
+
+double DeformationConstraints::update_bone_constraints(
+    const Eigen::MatrixXd& TV,
+    const Eigen::MatrixXi& TT,
+    const Eigen::VectorXd& isovals,
+    const Eigen::VectorXd& components,
+    const std::vector<std::array<int, 2>>& endpoints,
+    int num_verts) {
+  using namespace std;
+  using namespace Eigen;
+
+  double dist = 0.0;
+  const double isovalue_increment = 1.0 / (num_verts+1);
+  const int num_endpoint_pairs = endpoints.size();
+  const int num_verts_per_segment = int(ceil(double(num_verts) / num_endpoint_pairs));
+  assert(num_endpoint_pairs != 0);
+
+  for (int i = 0; i < num_endpoint_pairs; i++) {
+    dist += one_pair_bone_constraints(TV, TT, isovals, endpoints[i],
+                                      num_verts_per_segment,
+                                      RowVector3d(0, 0, dist),
+                                      isovalue_increment);
+  }
   return dist;
 }
 

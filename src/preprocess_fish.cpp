@@ -131,6 +131,7 @@ struct UIState {
   // Selection Mode Parameters
   bool m_show_point_selection_mode = false; // True if we're in point selection mode
   int m_current_endpoint_idx = 0; // The index of the endpoint we're selecting. Will be 2 if we've made a selection
+  std::vector<std::array<int, 2>> m_selected_end_pairs; // The indexes of selected endpoints
   std::array<int, 2> m_selected_end_coords{{-1, -1}}; // The indexes of selected endpoints
 
   // Straightening UI parameters
@@ -183,6 +184,15 @@ struct UIState {
     }
   }
 
+  void remove_endpoints(size_t i) {
+    assert(i < m_selected_end_pairs.size());
+    m_selected_end_pairs.erase(m_selected_end_pairs.begin() + i);
+    if (m_selected_end_pairs.size() == 0) {
+      m_show_diffusion_menu = false;
+      m_show_straighteining_menu = false;
+    }
+  }
+
   void begin_endpoint_selection() {
     m_show_point_selection_mode = true;
 
@@ -203,8 +213,9 @@ struct UIState {
   void end_endpoint_selection(std::array<int, 2>& endpoints) {
     m_show_diffusion_menu = true;
     m_show_straighteining_menu = false;
-    m_selected_end_coords = endpoints;
-    m_current_endpoint_idx = 2;
+    m_selected_end_pairs.push_back(endpoints);
+    m_selected_end_coords = {{ -1, -1 }};
+    m_current_endpoint_idx = 0;
   }
 
   void after_compute_diffusion() {
@@ -290,9 +301,7 @@ class FishPreprocessingMenu :
     // This is false until we initialize SLIM for the first time
     bool slim_ready = false;
 
-    cout << "INFO: SLIM Thread: Starting SLIM background thread." << endl;
     while (m_slim_running) {
-
       m_constraints_lock.lock();
       if (m_constraints_changed) {
         VectorXi slim_b;
@@ -392,6 +401,7 @@ public:
 
     // Start the SLIM background thread
     m_slim_running = true;
+    m_constraints_changed = false;
     m_slim_thread = thread(&FishPreprocessingMenu::slim_thread, this);
 
     // Create mesh layers in viewer
@@ -463,11 +473,18 @@ public:
         m_viewer.data().show_faces = true;
       }
 
-      // Draw selected endpoints
+      // Draw endpoints pairss
       select_overlay_mesh();
-      for (int i = 0; i < m_ui_state.m_current_endpoint_idx; i++) {
-        const int vid = m_ui_state.m_selected_end_coords[i];
-        m_viewer.data().add_points(ds.m_TV.row(vid), i == 0 ? ColorRGB::GREEN : ColorRGB::RED);
+      if (m_ui_state.m_show_point_selection_mode) {
+        for (int i = 0; i < m_ui_state.m_current_endpoint_idx; i++) {
+          const int vid = m_ui_state.m_selected_end_coords[i];
+          m_viewer.data().add_points(ds.m_TV.row(vid), i == 0 ? ColorRGB::GREEN : ColorRGB::RED);
+        }
+      }
+      for (int i = 0; i < m_ui_state.m_selected_end_pairs.size(); i++) {
+        array<int, 2> endpoints = m_ui_state.m_selected_end_pairs[i];
+        m_viewer.data().add_points(TV.row(endpoints[0]), ColorRGB::GREEN);
+        m_viewer.data().add_points(TV.row(endpoints[1]), ColorRGB::RED);
       }
 
       // Draw the tet mesh wireframe
@@ -668,12 +685,24 @@ public:
         }
       }
 
+      for (int i = 0; i < m_ui_state.m_selected_end_pairs.size(); i++) {
+        string rm_button_text = string("Remove Endpoint ") + std::to_string(i);
+        if (ImGui::Button(rm_button_text.c_str(), ImVec2(-1, 0))) {
+          m_ui_state.remove_endpoints(i);
+          m_draw_state_changed = true;
+        }
+      }
+
       if (ImGui::Button(button_text.c_str(), ImVec2(-1,0))) {
         m_ui_state_stack.push_back(m_ui_state);
         m_ui_state.begin_endpoint_selection();
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
         m_draw_state_changed = true;
+        for (int i = 0; i < m_constraints.m_bone_constraints_idx.size(); i++) {
+          cout << "bone constraint i: v_i = " << m_constraints.m_bone_constraints_idx[i] <<
+                  ", pos = " << m_constraints.m_bone_constraints_pos[i] << endl;
+        }
       }
 
       if (m_ui_state.m_show_point_selection_mode) {
@@ -697,7 +726,9 @@ public:
 
         if (ImGui::Button("Compute Diffusion Distances", ImVec2(-1,0))) {
           if (isovals.rows() == 0) {
-            geodesic_distances(TV, TT, m_ui_state.m_selected_end_coords, isovals);
+            array<int, 2> endpoints{{ m_ui_state.m_selected_end_pairs.front()[0],
+                                      m_ui_state.m_selected_end_pairs.back()[1] }};
+            geodesic_distances(TV, TT, endpoints, isovals);
             Eigen::VectorXd isovals_normalized;
             scale_zero_one(isovals, isovals_normalized);
             igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_ui_state.m_isoval_colors);
@@ -710,7 +741,8 @@ public:
 
           // Add constraints at each of the skeleton joints
           m_constraints_lock.lock();
-          double dist = m_constraints.update_bone_constraints(TV, TT, isovals, m_ui_state.m_selected_end_coords, m_ui_state.m_num_skel_verts);
+          double dist = m_constraints.update_bone_constraints(
+                TV, TT, isovals, VectorXd(), m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
           m_constraints_changed = true;
           m_constraints_lock.unlock();
 

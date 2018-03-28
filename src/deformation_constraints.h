@@ -12,7 +12,16 @@
 #include <array>
 
 
-struct DeformationConstraints {
+class DeformationConstraints {
+  double one_pair_bone_constraints(
+      const Eigen::MatrixXd& TV,
+      const Eigen::MatrixXi& TT,
+      const Eigen::VectorXd& isovals,
+      const std::array<int, 2>& endpoints,
+      int num_verts,
+      const Eigen::RowVector3d& start_constraint,
+      double isovalue_incr);
+public:
   std::vector<int> m_bone_constraints_idx;
   std::vector<Eigen::RowVector3d> m_bone_constraints_pos;
   std::vector<int> m_orientation_constraints_idx;
@@ -43,7 +52,8 @@ struct DeformationConstraints {
   double update_bone_constraints(const Eigen::MatrixXd& TV,
                                  const Eigen::MatrixXi& TT,
                                  const Eigen::VectorXd& isovals,
-                                 const std::array<int, 2>& endpoints,
+                                 const Eigen::VectorXd& components,
+                                 const std::vector<std::array<int, 2>>& endpoint_pairs,
                                  int num_verts);
 
   void update_orientation_constraint(const Eigen::MatrixXd& TV,
