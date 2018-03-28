@@ -35,30 +35,6 @@ typedef igl::opengl::glfw::Viewer Viewer;
 #endif
 
 
-void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& components, std::vector<Eigen::MatrixXi>& out) {
-  const int num_components = components.maxCoeff() + 1;
-
-  for (int c = 0; c < num_components; c++) {
-    int count = 0;
-    Eigen::MatrixXi TTcomp(TT.rows(), 4);
-    for (int i = 0; i < TT.rows(); i++) {
-      const int t1 = TT(i, 0), t2 = TT(i, 1), t3 = TT(i, 2), t4 = TT(i, 3);
-      const int comp = components[t1];
-      assert(components[t1] == components[t2] && components[t1] == components[t3] && components[t1] == components[t4]);
-      if (!(components[t1] == components[t2] && components[t1] == components[t3] && components[t1] == components[t4])) {
-        std::cerr << "FUCK" << std::endl;
-        exit(1);
-      }
-      if (comp == c) {
-        TTcomp.row(count) = Eigen::RowVector4i(t1, t2, t3, t4);
-        count += 1;
-      }
-    }
-    TTcomp.conservativeResize(count, 4);
-    out.push_back(TTcomp);
-  }
-}
-
 struct DrawingState {
   Eigen::MatrixXd m_TV; // Tet mesh vertices
   Eigen::MatrixXi m_TT; // Tet mesh tets
@@ -819,26 +795,17 @@ public:
             ds.update_skeleton(isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
             m_double_buf_lock.unlock();
 
-            m_ui_state.m_draw_surface = false;
-            m_ui_state.m_draw_skeleton = true;
-            m_ui_state.m_draw_tet_wireframe = true;
-            m_ui_state.m_draw_isovalues = true;
-            m_ui_state.m_draw_level_set = false;
-            m_ui_state.m_draw_original_mesh = false;
-
-            m_ui_state.m_show_straighteining_menu = true;
-
             // Add constraints at each of the skeleton joints
-//            m_constraints_lock.lock();
-//            double dist = m_constraints.update_bone_constraints(
-//                  TV, TT, isovals, VectorXd(), m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
-//            m_constraints_changed = true;
-//            m_constraints_lock.unlock();
+            m_constraints_lock.lock();
+            double dist = m_constraints.update_bone_constraints(
+                  TV, TT, isovals, components, m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
+            m_constraints_changed = true;
+            m_constraints_lock.unlock();
 
-//            cout << "INFO: Skeleton is " << dist << " units long." << endl;
+            cout << "INFO: Skeleton is " << dist << " units long." << endl;
 
             // Show the diffusion menu and draw the isovalues
-//            m_ui_state.after_compute_diffusion();
+            m_ui_state.after_compute_diffusion();
 
             m_draw_state_changed = true;
           }

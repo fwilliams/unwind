@@ -18,9 +18,9 @@ class DeformationConstraints {
       const Eigen::MatrixXi& TT,
       const Eigen::VectorXd& isovals,
       const std::array<int, 2>& endpoints,
-      int num_verts,
-      const Eigen::RowVector3d& start_constraint,
-      double isovalue_incr);
+      const Eigen::RowVector3d& straight_dir,
+      const Eigen::RowVector3d& straight_origin,
+      int num_verts);
 public:
   static bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components);
 
@@ -54,7 +54,7 @@ public:
   double update_bone_constraints(const Eigen::MatrixXd& TV,
                                  const Eigen::MatrixXi& TT,
                                  const Eigen::VectorXd& isovals,
-                                 const Eigen::VectorXd& components,
+                                 const Eigen::VectorXi& components,
                                  const std::vector<std::array<int, 2>>& endpoint_pairs,
                                  int num_verts);
 

@@ -14,6 +14,31 @@
 #include <iostream>
 
 
+void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& components, std::vector<Eigen::MatrixXi>& out) {
+  const int num_components = components.maxCoeff() + 1;
+
+  for (int c = 0; c < num_components; c++) {
+    int count = 0;
+    Eigen::MatrixXi TTcomp(TT.rows(), 4);
+    for (int i = 0; i < TT.rows(); i++) {
+      const int t1 = TT(i, 0), t2 = TT(i, 1), t3 = TT(i, 2), t4 = TT(i, 3);
+      const int comp = components[t1];
+      assert(components[t1] == components[t2] && components[t1] == components[t3] && components[t1] == components[t4]);
+      if (!(components[t1] == components[t2] && components[t1] == components[t3] && components[t1] == components[t4])) {
+        std::cerr << "FUCK" << std::endl;
+        exit(1);
+      }
+      if (comp == c) {
+        TTcomp.row(count) = Eigen::RowVector4i(t1, t2, t3, t4);
+        count += 1;
+      }
+    }
+    TTcomp.conservativeResize(count, 4);
+    out.push_back(TTcomp);
+  }
+}
+
+
 void tet_mesh_faces(const Eigen::MatrixXi& TT, Eigen::MatrixXi& TF, bool flip) {
   using namespace std;
 

@@ -126,9 +126,9 @@ double DeformationConstraints::one_pair_bone_constraints(
     const Eigen::MatrixXi& TT,
     const Eigen::VectorXd& isovals,
     const std::array<int, 2>& endpoints,
-    int num_verts,
-    const Eigen::RowVector3d& start_constraint,
-    double isovalue_incr) {
+    const Eigen::RowVector3d& straight_dir,
+    const Eigen::RowVector3d& straight_origin,
+    int num_verts) {
   using namespace std;
   using namespace Eigen;
 
@@ -144,11 +144,13 @@ double DeformationConstraints::one_pair_bone_constraints(
 
   RowVector3d last_ctr = TV.row(endpoints[0]);
   m_bone_constraints_idx.push_back(endpoints[0]);
-  m_bone_constraints_pos.push_back(start_constraint);
+  m_bone_constraints_pos.push_back(straight_origin);
 
   last_ctr = TV.row(endpoints[0]);
   double dist = 0.0;
   double isovalue = isovals[endpoints[0]];
+  const double isovalue_incr = (isovals[endpoints[1]] - isovals[endpoints[0]]) / num_verts;
+
   for(int i = 1; i < num_verts; i++) {
     isovalue += isovalue_incr;
     igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
@@ -175,7 +177,7 @@ double DeformationConstraints::one_pair_bone_constraints(
     if (vmap.find(nv) == vmap.end()) {
       vmap.insert(nv);
       m_bone_constraints_idx.push_back(nv);
-      m_bone_constraints_pos.push_back(start_constraint + RowVector3d(0, 0, dist));
+      m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
       m_constrainable_tets_idx.push_back(tet);
       m_level_set_distances.push_back(dist);
       m_level_set_isovalues.push_back(isovalue);
@@ -184,7 +186,7 @@ double DeformationConstraints::one_pair_bone_constraints(
 
   dist += (TV.row(endpoints[1]) - last_ctr).norm();
   m_bone_constraints_idx.push_back(endpoints[1]);
-  m_bone_constraints_pos.push_back(start_constraint + RowVector3d(0, 0, dist));
+  m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
   return dist;
 }
 
@@ -192,23 +194,27 @@ double DeformationConstraints::update_bone_constraints(
     const Eigen::MatrixXd& TV,
     const Eigen::MatrixXi& TT,
     const Eigen::VectorXd& isovals,
-    const Eigen::VectorXd& components,
+    const Eigen::VectorXi& components,
     const std::vector<std::array<int, 2>>& endpoints,
     int num_verts) {
   using namespace std;
   using namespace Eigen;
 
   double dist = 0.0;
-  const double isovalue_increment = 1.0 / (num_verts+1);
   const int num_endpoint_pairs = endpoints.size();
   const int num_verts_per_segment = int(ceil(double(num_verts) / num_endpoint_pairs));
   assert(num_endpoint_pairs != 0);
 
+  vector<MatrixXi> TTcomp;
+  split_mesh_components(TT, components, TTcomp);
   for (int i = 0; i < num_endpoint_pairs; i++) {
-    dist += one_pair_bone_constraints(TV, TT, isovals, endpoints[i],
-                                      num_verts_per_segment,
+    dist += one_pair_bone_constraints(TV, TTcomp[i], isovals, endpoints[i],
+                                      RowVector3d(0, 0, 1),
                                       RowVector3d(0, 0, dist),
-                                      isovalue_increment);
+                                      num_verts_per_segment);
+    if (i != num_endpoint_pairs-1) {
+      dist += (TV.row(endpoints[i+1][0]) - TV.row(endpoints[i][1])).norm();
+    }
   }
   return dist;
 }
