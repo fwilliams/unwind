@@ -89,6 +89,10 @@ else ()
 endif ()
 
 
+add_executable(view_tet_bin src/tests/view_tet_file.cpp ${UTILS_SRCS})
+target_include_directories(view_tet_bin PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(view_tet_bin igl::core igl::opengl_glfw)
+
 IF (BUILD_TESTS)
   # Test and debug the rasterizer
   add_executable(debug_tex_bin src/test_rasterizer.cpp ${UTILS_SRCS})

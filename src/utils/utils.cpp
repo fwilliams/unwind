@@ -10,7 +10,99 @@
 
 #include <array>
 #include <numeric>
+#include <fstream>
+#include <iostream>
 
+
+void tet_mesh_faces(const Eigen::MatrixXi& TT, Eigen::MatrixXi& TF, bool flip) {
+  using namespace std;
+
+  vector<array<int, 4>> tris_sorted;
+
+  vector<array<int, 4>> tris;
+  for (int i = 0; i < TT.rows(); i++) {
+    const int e1 = TT(i, 0);
+    const int e2 = TT(i, 1);
+    const int e3 = TT(i, 2);
+    const int e4 = TT(i, 3);
+    array<int, 4> t1, t2, t3, t4;
+    if (!flip) {
+      t1 = array<int, 4>{{ e1, e2, e3, INT_MAX }};
+      t2 = array<int, 4>{{ e1, e3, e4, INT_MAX }};
+      t3 = array<int, 4>{{ e2, e4, e3, INT_MAX }};
+      t4 = array<int, 4>{{ e1, e4, e2, INT_MAX }};
+    } else {
+      t1 = array<int, 4>{{ e1, e3, e2, INT_MAX }};
+      t2 = array<int, 4>{{ e1, e4, e3, INT_MAX }};
+      t3 = array<int, 4>{{ e2, e3, e4, INT_MAX }};
+      t4 = array<int, 4>{{ e1, e2, e4, INT_MAX }};
+    }
+    tris.push_back(t1);
+    tris.push_back(t2);
+    tris.push_back(t3);
+    tris.push_back(t4);
+    t1[3] = tris_sorted.size();
+    t2[3] = tris_sorted.size()+1;
+    t3[3] = tris_sorted.size()+2;
+    t4[3] = tris_sorted.size()+3;
+    sort(t1.begin(), t1.end());
+    sort(t2.begin(), t2.end());
+    sort(t3.begin(), t3.end());
+    sort(t4.begin(), t4.end());
+    tris_sorted.push_back(t1);
+    tris_sorted.push_back(t2);
+    tris_sorted.push_back(t3);
+    tris_sorted.push_back(t4);
+  }
+
+  int fcount = 0;
+  TF.resize(tris_sorted.size(), 3);
+  sort(tris_sorted.begin(), tris_sorted.end());
+  for (int i = 0; i < TF.rows();) {
+    int v1 = tris_sorted[i][0], v2 = tris_sorted[i][1], v3 = tris_sorted[i][2];
+    int tid = tris_sorted[i][3];
+    int count = 0;
+    while (i < TF.rows() && v1 == tris_sorted[i][0] && v2 == tris_sorted[i][1] && v3 == tris_sorted[i][2]) {
+      i += 1;
+      count += 1;
+    }
+    if (count == 1) {
+      TF.row(fcount++) = Eigen::RowVector3i(tris[tid][0], tris[tid][1], tris[tid][2]);
+    }
+  }
+
+  TF.conservativeResize(fcount, 3);
+}
+
+
+int load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT) {
+  using namespace std;
+  using namespace Eigen;
+
+  ifstream ifs(tet);
+
+  int nv = 0;
+  int nt = 0;
+  string header;
+  ifs >> header;
+  ifs >> nv;
+  ifs >> nt;
+
+  TV.resize(nv, 3);
+  TT.resize(nt, 4);
+  for (int i = 0; i < nv; i++) {
+    double x, y, z;
+    ifs >> x >> y >> z;
+    TV.row(i) = RowVector3d(x, y, z);
+  }
+  for (int i = 0; i < nt; i++) {
+    int a = -1, b = -1, c = -1, d = -1;
+    ifs >> a >> b >> c >> d;
+    TT.row(i) = RowVector4i(a, b, c, d);
+  }
+
+  tet_mesh_faces(TT, TF, true /*flip*/);
+}
 
 // Compute heat diffusion
 void diffusion_distances(const Eigen::MatrixXd& TV,

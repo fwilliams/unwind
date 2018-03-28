@@ -1,4 +1,4 @@
-#include <fstream>
+﻿#include <fstream>
 #include <map>
 #include <string>
 #include <vector>
@@ -8,6 +8,9 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
+
+#include "utils.h"
+
 
 typedef double Float;
 typedef Eigen::VectorXd VectorF;
@@ -562,7 +565,6 @@ int MshLoader::num_nodes_per_elem_type(int elem_type) {
     return nodes_per_element;
 }
 
-
 void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT) {
   using namespace std;
   MshLoader vol_loader(filename);
@@ -575,9 +577,6 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
   TT.resize(tt_rows, vol_loader.m_nodes_per_element);
   TV.resize(tv_rows, 3);
 
-  std::vector<array<int, 4>> tris_sorted;
-
-  std::vector<array<int, 4>> tris;
   int vcount = 0;
   for (int i = 0; i < vol_loader.m_nodes.rows(); i += 3) {
     TV.row(vcount++) = Eigen::RowVector3d(vol_loader.m_nodes[i], vol_loader.m_nodes[i+2], vol_loader.m_nodes[i+1]);
@@ -589,44 +588,7 @@ void load_yixin_tetmesh(const std::string& filename, Eigen::MatrixXd& TV, Eigen:
     const int e3 = vol_loader.m_elements[i+2];
     const int e4 = vol_loader.m_elements[i+3];
     TT.row(tcount++) = Eigen::RowVector4i(e1, e2, e3, e4);
-    array<int, 4> t1, t2, t3, t4;
-    t1 = array<int, 4>{{ e1, e2, e3, INT_MAX }};
-    t2 = array<int, 4>{{ e1, e3, e4, INT_MAX }};
-    t3 = array<int, 4>{{ e2, e4, e3, INT_MAX }};
-    t4 = array<int, 4>{{ e1, e4, e2, INT_MAX }};
-    tris.push_back(t1);
-    tris.push_back(t2);
-    tris.push_back(t3);
-    tris.push_back(t4);
-    t1[3] = tris_sorted.size();
-    t2[3] = tris_sorted.size()+1;
-    t3[3] = tris_sorted.size()+2;
-    t4[3] = tris_sorted.size()+3;
-    sort(t1.begin(), t1.end());
-    sort(t2.begin(), t2.end());
-    sort(t3.begin(), t3.end());
-    sort(t4.begin(), t4.end());
-    tris_sorted.push_back(t1);
-    tris_sorted.push_back(t2);
-    tris_sorted.push_back(t3);
-    tris_sorted.push_back(t4);
   }
 
-  int fcount = 0;
-  TF.resize(tris_sorted.size(), 3);
-  sort(tris_sorted.begin(), tris_sorted.end());
-  for (int i = 0; i < TF.rows();) {
-    int v1 = tris_sorted[i][0], v2 = tris_sorted[i][1], v3 = tris_sorted[i][2];
-    int tid = tris_sorted[i][3];
-    int count = 0;
-    while (i < TF.rows() && v1 == tris_sorted[i][0] && v2 == tris_sorted[i][1] && v3 == tris_sorted[i][2]) {
-      i += 1;
-      count += 1;
-    }
-    if (count == 1) {
-      TF.row(fcount++) = Eigen::RowVector3i(tris[tid][0], tris[tid][1], tris[tid][2]);
-    }
-  }
-
-  TF.conservativeResize(fcount, 3);
+  tet_mesh_faces(TT, TF);
 }

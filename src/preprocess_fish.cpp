@@ -311,7 +311,7 @@ class FishPreprocessingMenu :
         const double soft_const_p = 1e5;
         const MatrixXd TV_0 = m_ds[m_current_buf].m_TV;
         sData.exp_factor = 5.0;
-        slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_CONFORMAL,
+        slim_precompute(TV, TT, TV_0, sData, igl::SLIMData::EXP_SYMMETRIC_DIRICHLET,
                         slim_b, slim_bc, soft_const_p);
         m_constraints_changed = false;
         slim_ready = true;
@@ -373,6 +373,8 @@ public:
     m_current_model_filename = m_datfile.m_basename + string("_.msh");
     cout << "INFO: Loading tet mesh " << m_current_model_filename << endl;
     load_yixin_tetmesh(m_datfile.m_directory + string("/") + m_current_model_filename, TV, TF, TT);
+//    load_tet_file(m_datfile.m_directory + string("/") + m_datfile.m_basename + string(".tet"), TV, TF, TT);
+
     edge_endpoints(TV, TT, TEV1, TEV2);
 
     cout << "INFO: Loaded " << m_current_model_filename << " with " << TV.rows() << " vertices, " <<
