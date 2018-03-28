@@ -2,6 +2,8 @@
 #define UTILS_H
 
 #include <Eigen/Core>
+#include <vector>
+#include <array>
 
 
 void tet_mesh_faces(const Eigen::MatrixXi& TT, Eigen::MatrixXi& TF, bool flip=false);
@@ -12,14 +14,14 @@ int load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& 
 // Compute heat diffusion
 void diffusion_distances(const Eigen::MatrixXd& TV,
                          const Eigen::MatrixXi& TT,
-                         const std::array<int, 2>& endpoints,
+                         const std::vector<std::array<int, 2>>& endpoints,
                          Eigen::VectorXd& isovals);
 
 
 // Compute approximate geodesic distance
 void geodesic_distances(const Eigen::MatrixXd& TV,
                         const Eigen::MatrixXi& TT,
-                        const std::array<int, 2>& endpoints,
+                        const std::vector<std::array<int, 2>>& endpoints,
                         Eigen::VectorXd& isovals);
 
 

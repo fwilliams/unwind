@@ -5,6 +5,7 @@
 #include <igl/marching_tets.h>
 #include <igl/colormap.h>
 #include <igl/slim.h>
+#include <igl/components.h>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -157,6 +158,10 @@ struct UIState {
   double m_avg_draw_time = 0.0;
   double alpha = 0.5;
 
+  // Set this to true and the to display a modal with the error message error_message
+  bool m_error_flag = false;
+  std::string m_error_message;
+
   // Colors for the isovalues
   Eigen::MatrixXd m_isoval_colors;
 
@@ -245,6 +250,9 @@ class FishPreprocessingMenu :
   Eigen::MatrixXd TEV1, TEV2;
   Eigen::VectorXd isovals;
   Eigen::MatrixXd TC; // Texture coordinates
+
+  Eigen::VectorXi components; // Component index of each vertex
+  int m_num_components = 0; // Number of connected components
 
   // The volume texture
   Eigen::VectorXd tex;
@@ -393,6 +401,8 @@ public:
     TC.col(1) /= tex_size[1];
     TC.col(2) /= tex_size[2];
 
+    igl::components(TT, components);
+    m_num_components = components.maxCoeff();
 
     // Initialize the draw state
     m_current_buf = 0;
@@ -586,7 +596,15 @@ public:
         if (m_ui_state.m_current_endpoint_idx == 2) {
           UIState restore_ui_state = m_ui_state_stack.back();
           m_ui_state_stack.pop_back();
-          restore_ui_state.end_endpoint_selection(m_ui_state.m_selected_end_coords);
+          if (components[m_ui_state.m_selected_end_coords[0]] != components[m_ui_state.m_selected_end_coords[1]]) {
+            m_ui_state.m_error_flag = true;
+            m_ui_state.m_error_message = string("Error: Cannot set two endpoints in different components.");
+          } else if (!DeformationConstraints::validate_endpoint_pairs(m_ui_state.m_selected_end_pairs, components)) {
+            m_ui_state.m_error_flag = true;
+            m_ui_state.m_error_message = string("Error: Cannot have more than one pair of endpoints per component.");
+          } else {
+            restore_ui_state.end_endpoint_selection(m_ui_state.m_selected_end_coords);
+          }
           m_ui_state = restore_ui_state;
         }
         m_draw_state_changed = true;
@@ -670,6 +688,19 @@ public:
     string title_text = string("Current Model: ") + m_current_model_filename;
     ImGui::Text("%s", title_text.c_str());
 
+    if (m_ui_state.m_error_flag) {
+      ImGui::OpenPopup("Error!");
+      m_ui_state.m_error_flag = false;
+    }
+    if(ImGui::BeginPopupModal("Error!")){
+      ImGui::Text("%s", m_ui_state.m_error_message.c_str());
+      ImGui::Separator();
+      if (ImGui::Button("Close")) {
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
+    }
+
     //
     // Interface for selecting endpoints
     //
@@ -727,33 +758,36 @@ public:
         ImGui::DragInt("Number of Joints", &m_ui_state.m_num_skel_verts, 1.0f, 5, 100);
 
         if (ImGui::Button("Compute Diffusion Distances", ImVec2(-1,0))) {
-          if (isovals.rows() == 0) {
-            array<int, 2> endpoints{{ m_ui_state.m_selected_end_pairs.front()[0],
-                                      m_ui_state.m_selected_end_pairs.back()[1] }};
-            geodesic_distances(TV, TT, endpoints, isovals);
-            Eigen::VectorXd isovals_normalized;
-            scale_zero_one(isovals, isovals_normalized);
-            igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_ui_state.m_isoval_colors);
+          if (!DeformationConstraints::validate_endpoint_pairs(m_ui_state.m_selected_end_pairs, components)) {
+            m_ui_state.m_error_flag = true;
+            m_ui_state.m_error_message = string("Error: Cannot have more than one pair of endpoints per component.");
+          } else {
+            if (isovals.rows() == 0) {
+              geodesic_distances(TV, TT, m_ui_state.m_selected_end_pairs, isovals);
+              Eigen::VectorXd isovals_normalized;
+              scale_zero_one(isovals, isovals_normalized);
+              igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_ui_state.m_isoval_colors);
+            }
+
+            m_double_buf_lock.lock();
+            DrawingState& ds = m_ds[m_current_buf];
+            ds.update_skeleton(isovals, m_ui_state.m_num_skel_verts);
+            m_double_buf_lock.unlock();
+
+            // Add constraints at each of the skeleton joints
+            m_constraints_lock.lock();
+            double dist = m_constraints.update_bone_constraints(
+                  TV, TT, isovals, VectorXd(), m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
+            m_constraints_changed = true;
+            m_constraints_lock.unlock();
+
+            cout << "INFO: Skeleton is " << dist << " units long." << endl;
+
+            // Show the diffusion menu and draw the isovalues
+            m_ui_state.after_compute_diffusion();
+
+            m_draw_state_changed = true;
           }
-
-          m_double_buf_lock.lock();
-          DrawingState& ds = m_ds[m_current_buf];
-          ds.update_skeleton(isovals, m_ui_state.m_num_skel_verts);
-          m_double_buf_lock.unlock();
-
-          // Add constraints at each of the skeleton joints
-          m_constraints_lock.lock();
-          double dist = m_constraints.update_bone_constraints(
-                TV, TT, isovals, VectorXd(), m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
-          m_constraints_changed = true;
-          m_constraints_lock.unlock();
-
-          cout << "INFO: Skeleton is " << dist << " units long." << endl;
-
-          // Show the diffusion menu and draw the isovalues
-          m_ui_state.after_compute_diffusion();
-
-          m_draw_state_changed = true;
         }
       }
     }

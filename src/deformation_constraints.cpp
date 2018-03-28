@@ -1,10 +1,33 @@
 #include "deformation_constraints.h"
 
 #include <iostream>
+#include <unordered_set>
 
 #include <Eigen/Geometry>
 
 #include "utils.h"
+
+bool DeformationConstraints::validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components) {
+  bool success = true;
+  std::unordered_set<int> computed_components;
+
+  for (int i = 0; i < endpoints.size(); i++) {
+    const int c1 = components[endpoints[i][0]];
+    const int c2 = components[endpoints[i][0]];
+    if (c1 != c2) {
+      success = false;
+      break;
+    }
+    if (computed_components.find(c1) != computed_components.end()) {
+      success = false;
+      break;
+    } else {
+      computed_components.insert(c1);
+    }
+  }
+
+  return success;
+}
 
 std::pair<Eigen::Matrix3d, Eigen::RowVector3d> DeformationConstraints::frame_for_tet(
     const Eigen::MatrixXd& TV,

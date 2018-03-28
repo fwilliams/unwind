@@ -22,6 +22,8 @@ class DeformationConstraints {
       const Eigen::RowVector3d& start_constraint,
       double isovalue_incr);
 public:
+  static bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components);
+
   std::vector<int> m_bone_constraints_idx;
   std::vector<Eigen::RowVector3d> m_bone_constraints_pos;
   std::vector<int> m_orientation_constraints_idx;

@@ -107,19 +107,25 @@ int load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& 
 // Compute heat diffusion
 void diffusion_distances(const Eigen::MatrixXd& TV,
                          const Eigen::MatrixXi& TT,
-                         const std::array<int, 2>& endpoints,
+                         const std::vector<std::array<int, 2>>& endpoints,
                          Eigen::VectorXd& isovals) {
   using namespace std;
   using namespace Eigen;
 
   MatrixXi constraint_indices;
   MatrixXd constraint_values;
-  constraint_indices.resize(2, 1);
-  constraint_values.resize(2, 1);
-  constraint_indices(0, 0) = endpoints[1];
-  constraint_indices(1, 0) = endpoints[0];
-  constraint_values(0, 0) = 1.0;
-  constraint_values(1, 0) = 0.0;
+  constraint_indices.resize(2*endpoints.size(), 1);
+  constraint_values.resize(2*endpoints.size(), 1);
+
+  int ccount = 0;
+  for (int i = 0; i < endpoints.size(); i++) {
+    auto ep = endpoints[i];
+    constraint_indices(ccount, 0) = ep[1];
+    constraint_indices(ccount + 1, 0) = ep[0];
+    constraint_values(ccount, 0) = 1.0;
+    constraint_values(ccount+1, 0) = 0.0;
+    ccount += 1;
+  }
 
   igl::harmonic(TV, TT, constraint_indices,
                 constraint_values, 1, isovals);
@@ -131,7 +137,7 @@ void diffusion_distances(const Eigen::MatrixXd& TV,
 // Compute approximate geodesic distance
 void geodesic_distances(const Eigen::MatrixXd& TV,
                         const Eigen::MatrixXi& TT,
-                        const std::array<int, 2>& endpoints,
+                        const std::vector<std::array<int, 2>>& endpoints,
                         Eigen::VectorXd& isovals) {
   using namespace std;
   using namespace Eigen;
