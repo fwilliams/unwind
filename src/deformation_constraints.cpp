@@ -30,31 +30,25 @@ bool DeformationConstraints::validate_endpoint_pairs(const std::vector<std::arra
 }
 
 std::pair<Eigen::Matrix3d, Eigen::RowVector3d> DeformationConstraints::frame_for_tet(
-    const Eigen::MatrixXd& TV,
-    const Eigen::MatrixXi& TT,
-    const Eigen::VectorXd& isovals,
-    int idx, double angle, bool flip_x) {
+    const Eigen::MatrixXd& TV_fat,
+    const Eigen::MatrixXi& TT_fat,
+    int idx, double angle,
+    bool flip_x,
+    int n_lookahead) {
+
   using namespace Eigen;
-  Eigen::MatrixXd LV;
-  Eigen::MatrixXi LF;
 
   RowVector3d fwd_dir;
 
-  const int N_LOOKAHEAD = 4;
+  const int N_LOOKAHEAD = n_lookahead;
   if (idx < m_constrainable_tets_idx.size() - N_LOOKAHEAD) {
-    igl::marching_tets(TV, TT, isovals, m_level_set_isovalues[idx], LV, LF);
-    RowVector3d c1 = LV.colwise().sum() / LV.rows();
-
-    igl::marching_tets(TV, TT, isovals, m_level_set_isovalues[idx+N_LOOKAHEAD], LV, LF);
-    RowVector3d c2 = LV.colwise().sum() / LV.rows();
+    RowVector3d c1 = TV_fat.row(m_bone_constraints_idx[idx]);
+    RowVector3d c2 = TV_fat.row(m_bone_constraints_idx[idx+N_LOOKAHEAD]);
 
     fwd_dir = (c2 - c1).normalized();
   } else {
-    igl::marching_tets(TV, TT, isovals, m_level_set_isovalues[idx-N_LOOKAHEAD], LV, LF);
-    RowVector3d c1 = LV.colwise().sum() / LV.rows();
-
-    igl::marching_tets(TV, TT, isovals, m_level_set_isovalues[idx], LV, LF);
-    RowVector3d c2 = LV.colwise().sum() / LV.rows();
+    RowVector3d c1 = TV_fat.row(m_bone_constraints_idx[idx-N_LOOKAHEAD]);
+    RowVector3d c2 = TV_fat.row(m_bone_constraints_idx[idx]);
 
     fwd_dir = (c2 - c1).normalized();
   }
@@ -79,14 +73,14 @@ std::pair<Eigen::Matrix3d, Eigen::RowVector3d> DeformationConstraints::frame_for
 
   MatrixXd ret_frame = rot * frame;
 
-  const RowVector3d tv1 = TV.row(TT(m_constrainable_tets_idx[idx], 0));
-  const RowVector3d tv2 = TV.row(TT(m_constrainable_tets_idx[idx], 1));
-  const RowVector3d tv3 = TV.row(TT(m_constrainable_tets_idx[idx], 2));
-  const RowVector3d tv4 = TV.row(TT(m_constrainable_tets_idx[idx], 3));
+//  const RowVector3d tv1 = TV_fat.row(TT_fat(m_constrainable_tets_idx[idx], 0));
+//  const RowVector3d tv2 = TV_fat.row(TT_fat(m_constrainable_tets_idx[idx], 1));
+//  const RowVector3d tv3 = TV_fat.row(TT_fat(m_constrainable_tets_idx[idx], 2));
+//  const RowVector3d tv4 = TV_fat.row(TT_fat(m_constrainable_tets_idx[idx], 3));
 
-  RowVectorXd ret_tet_ctr = (tv1 + tv2 + tv3 + tv4) / 4.0;
+//  RowVectorXd ret_tet_ctr = (tv1 + tv2 + tv3 + tv4) / 4.0;
 
-  return std::make_pair(ret_frame, ret_tet_ctr);
+  return std::make_pair(ret_frame, TV_fat.row(m_bone_constraints_idx[idx]));
 }
 
 
@@ -124,113 +118,11 @@ void DeformationConstraints::clear_orientation_constraints() {
 
 
 double DeformationConstraints::one_pair_bone_constraints(
-    const Eigen::MatrixXd& TV,
-    const Eigen::MatrixXi& TT,
-    const Eigen::VectorXd& isovals,
-    const std::array<int, 2>& endpoints,
-    const Eigen::RowVector3d& straight_dir,
-    const Eigen::RowVector3d& straight_origin,
-    int num_verts) {
-  using namespace std;
-  using namespace Eigen;
-
-  MatrixXd LV;
-  MatrixXi LF;
-
-  unordered_set<int> vmap;
-  vmap.max_load_factor(0.5);
-  vmap.reserve(num_verts);
-
-  const int num_endpoint_pairs = endpoints.size();
-  assert(num_endpoint_pairs > 0);
-
-  RowVector3d last_ctr = TV.row(endpoints[0]);
-  m_bone_constraints_idx.push_back(endpoints[0]);
-  m_bone_constraints_pos.push_back(straight_origin);
-
-  double dist = 0.0;
-  double isovalue = isovals[endpoints[0]];
-  const double isovalue_incr = (isovals[endpoints[1]] - isovals[endpoints[0]]) / num_verts;
-
-  for(int i = 1; i < num_verts; i++) {
-    isovalue += isovalue_incr;
-    igl::marching_tets(TV, TT, isovals, isovalue, LV, LF);
-
-    if (LV.rows() == 0) {
-      cerr << "WARNING: Empty level set" << endl;
-      continue;
-    }
-
-    RowVector3d ctr = LV.colwise().sum() / LV.rows();
-    dist += (ctr - last_ctr).norm();
-    last_ctr = ctr;
-
-    const int tet = containing_tet(TV, TT, ctr);
-    if (tet < 0) {
-      cerr << "WARNING: Vertex not in tet" << endl;
-      continue;
-    }
-
-    Matrix3d v;
-    for (int k = 0; k < 4; k++) { v.row(k) = TV.row(TT(tet, k)); }
-    int nv = TT(tet, nearest_vertex(v, ctr));
-
-    if (vmap.find(nv) == vmap.end()) {
-      vmap.insert(nv);
-      m_bone_constraints_idx.push_back(nv);
-      m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
-      m_constrainable_tets_idx.push_back(tet);
-      m_level_set_distances.push_back(dist);
-      m_level_set_isovalues.push_back(isovalue);
-    }
-  }
-
-  dist += (TV.row(endpoints[1]) - last_ctr).norm();
-  m_bone_constraints_idx.push_back(endpoints[1]);
-  m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
-  return dist;
-}
-
-
-double DeformationConstraints::update_bone_constraints(
-    const Eigen::MatrixXd& TV,
-    const Eigen::MatrixXi& TT,
-    const Eigen::VectorXd& isovals,
-    const Eigen::VectorXi& components,
-    const std::vector<std::array<int, 2>>& endpoints,
-    int num_verts) {
-  using namespace std;
-  using namespace Eigen;
-
-  double dist = 0.0;
-  const int num_endpoint_pairs = endpoints.size();
-  const int num_verts_per_segment = int(ceil(double(num_verts) / num_endpoint_pairs));
-  assert(num_endpoint_pairs != 0);
-
-  vector<MatrixXi> TTcomp;
-  split_mesh_components(TT, components, TTcomp);
-  for (int i = 0; i < num_endpoint_pairs; i++) {
-    dist += one_pair_bone_constraints(TV, TTcomp[i], isovals, endpoints[i],
-                                      RowVector3d(0, 0, 1),
-                                      RowVector3d(0, 0, dist),
-                                      num_verts_per_segment);
-    if (i != num_endpoint_pairs-1) {
-      dist += (TV.row(endpoints[i+1][0]) - TV.row(endpoints[i][1])).norm();
-    }
-  }
-  return dist;
-}
-
-
-
-
-
-double DeformationConstraints::one_pair_bone_constraints(
     const Eigen::MatrixXd& TV_fat,
     const Eigen::MatrixXi& TT_fat,
     const Eigen::MatrixXd& TV_thin,
     const Eigen::MatrixXi& TT_thin,
-    const Eigen::VectorXd& isovals,
+    const Eigen::VectorXd& geodesic_distances,
     const std::array<int, 2>& endpoints,
     const Eigen::RowVector3d& straight_dir,
     const Eigen::RowVector3d& straight_origin,
@@ -252,14 +144,24 @@ double DeformationConstraints::one_pair_bone_constraints(
   RowVector3d last_ctr = TV_fat.row(ctr_idx);
   m_bone_constraints_idx.push_back(ctr_idx);
   m_bone_constraints_pos.push_back(straight_origin);
+  int tet_idx = -1;
+  for (int i = 0; i < TT_fat.rows(); i++) {
+    if (TT_fat(i, 0) == ctr_idx || TT_fat(i, 1) == ctr_idx || TT_fat(i, 2) == ctr_idx || TT_fat(i, 3) == ctr_idx) {
+      tet_idx = i;
+      break;
+    }
+  }
+  assert(tet_idx >= 0);
+  m_constrainable_tets_idx.push_back(tet_idx);
+
 
   double dist = 0.0;
-  double isovalue = isovals[endpoints[0]];
-  const double isovalue_incr = (isovals[endpoints[1]] - isovals[endpoints[0]]) / num_verts;
+  double isovalue = geodesic_distances[endpoints[0]];
+  const double isovalue_incr = (geodesic_distances[endpoints[1]] - geodesic_distances[endpoints[0]]) / num_verts;
 
   for(int i = 1; i < num_verts; i++) {
     isovalue += isovalue_incr;
-    igl::marching_tets(TV_thin, TT_thin, isovals, isovalue, LV, LF);
+    igl::marching_tets(TV_thin, TT_thin, geodesic_distances, isovalue, LV, LF);
 
     if (LV.rows() == 0) {
       cerr << "WARNING: Empty level set" << endl;
@@ -285,8 +187,6 @@ double DeformationConstraints::one_pair_bone_constraints(
       m_bone_constraints_idx.push_back(nv);
       m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
       m_constrainable_tets_idx.push_back(tet);
-      m_level_set_distances.push_back(dist);
-      m_level_set_isovalues.push_back(isovalue);
     }
   }
 
@@ -294,6 +194,15 @@ double DeformationConstraints::one_pair_bone_constraints(
   dist += (TV_fat.row(ctr_idx) - last_ctr).norm();
   m_bone_constraints_idx.push_back(ctr_idx);
   m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
+  tet_idx = -1;
+  for (int i = 0; i < TT_fat.rows(); i++) {
+    if (TT_fat(i, 0) == ctr_idx || TT_fat(i, 1) == ctr_idx || TT_fat(i, 2) == ctr_idx || TT_fat(i, 3) == ctr_idx) {
+      tet_idx = i;
+      break;
+    }
+  }
+  assert(tet_idx >= 0);
+  m_constrainable_tets_idx.push_back(tet_idx);
   return dist;
 }
 
@@ -302,7 +211,7 @@ double DeformationConstraints::update_bone_constraints(
     const Eigen::MatrixXi& TT_fat,
     const Eigen::MatrixXd& TV_thin,
     const Eigen::MatrixXi& TT_thin,
-    const Eigen::VectorXd& isovals,
+    const Eigen::VectorXd& geodesic_distances,
     const Eigen::VectorXi& components,
     const std::vector<std::array<int, 2>>& endpoints,
     int num_verts) {
@@ -317,7 +226,7 @@ double DeformationConstraints::update_bone_constraints(
   vector<MatrixXi> TTcomp;
   split_mesh_components(TT_thin, components, TTcomp);
   for (int i = 0; i < num_endpoint_pairs; i++) {
-    dist += one_pair_bone_constraints(TV_fat, TT_fat, TV_thin, TTcomp[i], isovals, endpoints[i],
+    dist += one_pair_bone_constraints(TV_fat, TT_fat, TV_thin, TTcomp[i], geodesic_distances, endpoints[i],
                                       RowVector3d(0, 0, 1),
                                       RowVector3d(0, 0, dist),
                                       num_verts_per_segment);
@@ -330,20 +239,20 @@ double DeformationConstraints::update_bone_constraints(
 
 
 void DeformationConstraints::update_orientation_constraint(
-    const Eigen::MatrixXd& TV,
-    const Eigen::MatrixXi& TT,
-    const Eigen::VectorXd& isovals,
+    const Eigen::MatrixXd& TV_fat,
+    const Eigen::MatrixXi& TT_fat,
     int idx, double angle, bool flipped_x) {
   using namespace Eigen;
+  using namespace std;
 
-  const int tt1 = TT(m_constrainable_tets_idx[idx], 0);
-  const int tt2 = TT(m_constrainable_tets_idx[idx], 1);
-  const int tt3 = TT(m_constrainable_tets_idx[idx], 2);
-  const int tt4 = TT(m_constrainable_tets_idx[idx], 3);
-  const RowVector3d tv1 = TV.row(tt1);
-  const RowVector3d tv2 = TV.row(tt2);
-  const RowVector3d tv3 = TV.row(tt3);
-  const RowVector3d tv4 = TV.row(tt4);
+  const int tt1 = TT_fat(m_constrainable_tets_idx[idx], 0);
+  const int tt2 = TT_fat(m_constrainable_tets_idx[idx], 1);
+  const int tt3 = TT_fat(m_constrainable_tets_idx[idx], 2);
+  const int tt4 = TT_fat(m_constrainable_tets_idx[idx], 3);
+  const RowVector3d tv1 = TV_fat.row(tt1);
+  const RowVector3d tv2 = TV_fat.row(tt2);
+  const RowVector3d tv3 = TV_fat.row(tt3);
+  const RowVector3d tv4 = TV_fat.row(tt4);
 
   int bc_idx = -1;
   auto it = m_tet_constraints.find(idx);
@@ -364,15 +273,14 @@ void DeformationConstraints::update_orientation_constraint(
     bc_idx = std::get<0>(it->second);
   }
 
-  auto frame_ctr = frame_for_tet(TV, TT, isovals, idx, angle, flipped_x);
+  auto frame_ctr = frame_for_tet(TV_fat, TT_fat, idx, angle, flipped_x);
   const Matrix3d frame = frame_ctr.first;
   const RowVector3d tet_ctr = frame_ctr.second;
-  const RowVector3d constrained_tet_ctr(0, 0, m_level_set_distances[idx]);
 
-  m_orientation_constraints_pos[bc_idx+0] = (tv1 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
-  m_orientation_constraints_pos[bc_idx+1] = (tv2 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
-  m_orientation_constraints_pos[bc_idx+2] = (tv3 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
-  m_orientation_constraints_pos[bc_idx+3] = (tv4 - tet_ctr) * frame.transpose() + constrained_tet_ctr;
+  m_orientation_constraints_pos[bc_idx+0] = (tv1 - tet_ctr) * frame.transpose() + tet_ctr;
+  m_orientation_constraints_pos[bc_idx+1] = (tv2 - tet_ctr) * frame.transpose() + tet_ctr;
+  m_orientation_constraints_pos[bc_idx+2] = (tv3 - tet_ctr) * frame.transpose() + tet_ctr;
+  m_orientation_constraints_pos[bc_idx+3] = (tv4 - tet_ctr) * frame.transpose() + tet_ctr;
 }
 
 
@@ -404,7 +312,7 @@ void DeformationConstraints::slim_constraints(
   }
   for (int i = 0; i < m_orientation_constraints_idx.size(); i++) {
     slim_b[c_count] = m_orientation_constraints_idx[i];
-    slim_bc.row(c_count) = scaled_bone_constraints[i];
+    slim_bc.row(c_count) = m_orientation_constraints_pos[i];
     c_count += 1;
   }
 
@@ -418,3 +326,129 @@ void DeformationConstraints::scale_bone_constraints(double amount, std::vector<E
     scaled.push_back((m_bone_constraints_pos[i] - m_bone_constraints_pos.front())*amount);
   }
 }
+
+
+
+
+
+
+//
+// Fat only overloads
+//
+double DeformationConstraints::one_pair_bone_constraints(
+    const Eigen::MatrixXd& TV,
+    const Eigen::MatrixXi& TT,
+    const Eigen::VectorXd& geodesic_distances,
+    const std::array<int, 2>& endpoints,
+    const Eigen::RowVector3d& straight_dir,
+    const Eigen::RowVector3d& straight_origin,
+    int num_verts) {
+  using namespace std;
+  using namespace Eigen;
+
+  MatrixXd LV;
+  MatrixXi LF;
+
+  unordered_set<int> vmap;
+  vmap.max_load_factor(0.5);
+  vmap.reserve(num_verts);
+
+  const int num_endpoint_pairs = endpoints.size();
+  assert(num_endpoint_pairs > 0);
+
+  RowVector3d last_ctr = TV.row(endpoints[0]);
+  m_bone_constraints_idx.push_back(endpoints[0]);
+  m_bone_constraints_pos.push_back(straight_origin);
+  int tet_idx = -1;
+  for (int i = 0; i < TT.rows(); i++) {
+    if (TT(i, 0) == endpoints[0] || TT(i, 1) == endpoints[0] || TT(i, 2) == endpoints[0] || TT(i, 3) == endpoints[0]) {
+      tet_idx = i;
+      break;
+    }
+  }
+  assert(tet_idx >= 0);
+  m_constrainable_tets_idx.push_back(tet_idx);
+
+
+  double dist = 0.0;
+  double isovalue = geodesic_distances[endpoints[0]];
+  const double isovalue_incr = (geodesic_distances[endpoints[1]] - geodesic_distances[endpoints[0]]) / num_verts;
+
+  for(int i = 1; i < num_verts; i++) {
+    isovalue += isovalue_incr;
+    igl::marching_tets(TV, TT, geodesic_distances, isovalue, LV, LF);
+
+    if (LV.rows() == 0) {
+      cerr << "WARNING: Empty level set" << endl;
+      continue;
+    }
+
+    RowVector3d ctr = LV.colwise().sum() / LV.rows();
+    dist += (ctr - last_ctr).norm();
+    last_ctr = ctr;
+
+    const int tet = containing_tet(TV, TT, ctr);
+    if (tet < 0) {
+      cerr << "WARNING: Vertex not in tet" << endl;
+      continue;
+    }
+
+    Matrix3d v;
+    for (int k = 0; k < 4; k++) { v.row(k) = TV.row(TT(tet, k)); }
+    int nv = TT(tet, nearest_vertex(v, ctr));
+
+    if (vmap.find(nv) == vmap.end()) {
+      vmap.insert(nv);
+      m_bone_constraints_idx.push_back(nv);
+      m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
+      m_constrainable_tets_idx.push_back(tet);
+    }
+  }
+
+  dist += (TV.row(endpoints[1]) - last_ctr).norm();
+  m_bone_constraints_idx.push_back(endpoints[1]);
+  m_bone_constraints_pos.push_back(straight_origin + dist*straight_dir);
+  tet_idx = -1;
+  for (int i = 0; i < TT.rows(); i++) {
+    if (TT(i, 0) == endpoints[1] || TT(i, 1) == endpoints[1] || TT(i, 2) == endpoints[1] || TT(i, 3) == endpoints[1]) {
+      tet_idx = i;
+      break;
+    }
+  }
+  assert(tet_idx >= 0);
+  m_constrainable_tets_idx.push_back(tet_idx);
+  return dist;
+}
+
+
+double DeformationConstraints::update_bone_constraints(
+    const Eigen::MatrixXd& TV,
+    const Eigen::MatrixXi& TT,
+    const Eigen::VectorXd& geodesic_distances,
+    const Eigen::VectorXi& components,
+    const std::vector<std::array<int, 2>>& endpoints,
+    int num_verts) {
+  using namespace std;
+  using namespace Eigen;
+
+  double dist = 0.0;
+  const int num_endpoint_pairs = endpoints.size();
+  const int num_verts_per_segment = int(ceil(double(num_verts) / num_endpoint_pairs));
+  assert(num_endpoint_pairs != 0);
+
+  vector<MatrixXi> TTcomp;
+  split_mesh_components(TT, components, TTcomp);
+  for (int i = 0; i < num_endpoint_pairs; i++) {
+    dist += one_pair_bone_constraints(TV, TTcomp[i], geodesic_distances, endpoints[i],
+                                      RowVector3d(0, 0, 1),
+                                      RowVector3d(0, 0, dist),
+                                      num_verts_per_segment);
+    if (i != num_endpoint_pairs-1) {
+      dist += (TV.row(endpoints[i+1][0]) - TV.row(endpoints[i][1])).norm();
+    }
+  }
+  return dist;
+}
+
+
+

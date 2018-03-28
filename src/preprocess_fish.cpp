@@ -35,18 +35,12 @@ typedef igl::opengl::glfw::Viewer Viewer;
 #endif
 
 
+// These are things that can change every frame
 struct DrawingState {
   Eigen::MatrixXd m_TV; // Tet mesh vertices
   Eigen::MatrixXi m_TT; // Tet mesh tets
   Eigen::MatrixXi m_TF; // Tet mesh faces
   Eigen::MatrixXd m_TEV1, m_TEV2; // Endoints of tet mesh edges
-
-  Eigen::MatrixXd m_isoV;         // Vertices in the current level set
-  Eigen::MatrixXi m_isoF;         // Faces in the current level set
-  Eigen::VectorXi m_isoT;         // Indices into TT of tetrahedra in the current level set
-  Eigen::RowVector3d m_isoC;      // Centroid of the current level set
-  Eigen::MatrixXd m_isoTV;        // Vertices of tetrahedra in current level set
-  Eigen::MatrixXi m_isoTT;        // Tetrahedra in current level set
 
   Eigen::MatrixXd m_joints;       // Skeleton Joints
   Eigen::MatrixXd m_bTV;          // Positions of SLIM boundary constraints
@@ -102,20 +96,6 @@ struct DrawingState {
     for (int i = 0; i < m_bV.rows(); i++) {
       m_bTV.row(i) = m_TV.row(b[i]);
       m_bV.row(i) = bc.row(i);
-    }
-  }
-
-  void update_isovalue(const Eigen::VectorXd& isovals, double isoval) {
-    igl::marching_tets(m_TV, m_TT, isovals, isoval, m_isoV, m_isoF, m_isoT);
-    m_isoTV.resize(m_isoT.rows()*4, 3);
-    m_isoTT.resize(m_isoT.rows(), 4);
-    m_isoC = m_isoV.colwise().sum() / m_isoV.rows();
-    int tvcount = 0;
-    for (int i = 0; i < m_isoT.rows(); i++) {
-      for (int v = 0; v < 4; v++) {
-        m_isoTT(i, v) = tvcount;
-        m_isoTV.row(tvcount++) = m_TV.row(m_TT(m_isoT[i], v));
-      }
     }
   }
 };
@@ -251,6 +231,9 @@ struct UIState {
 
 
 
+
+
+
 class FishPreprocessingMenu :
     public igl::opengl::glfw::imgui::ImGuiMenu {
 
@@ -262,7 +245,7 @@ class FishPreprocessingMenu :
   Eigen::MatrixXi TT_fat, TT_thin;
   Eigen::MatrixXd TEV1_fat, TEV2_fat, TEV1_thin, TEV2_thin;
 
-  Eigen::VectorXd isovals;
+  Eigen::VectorXd geodesic_distances_thin;
   Eigen::MatrixXd TC; // Texture coordinates
 
   Eigen::VectorXi components; // Component index of each vertex
@@ -357,8 +340,7 @@ class FishPreprocessingMenu :
       int buffer = (m_current_buf + 1) % 2;
       DrawingState& ds = m_ds[buffer];
       ds.update_tet_mesh(sData.V_o, TT_fat);
-      ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
-      ds.update_skeleton(TV_thin, TT_thin, isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
+      ds.update_skeleton(TV_thin, TT_thin, geodesic_distances_thin, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
       ds.update_constraint_points(sData.b, sData.bc);
 
       auto ds_update_end_time = chrono::high_resolution_clock::now();
@@ -372,15 +354,11 @@ class FishPreprocessingMenu :
   }
 
   void update_current_level_set() {
-    m_double_buf_lock.lock();
-    DrawingState& ds = m_ds[m_current_buf];
     auto it = m_constraints.m_tet_constraints.find(m_ui_state.m_current_level_set);
     if (it != m_constraints.m_tet_constraints.end()) {
       m_ui_state.m_current_angle = std::get<1>(it->second);
       m_ui_state.m_flip_x = std::get<2>(it->second);
     }
-    ds.update_isovalue(isovals, m_constraints.m_level_set_isovalues[m_ui_state.m_current_level_set]);
-    m_double_buf_lock.unlock();
     m_draw_state_changed = true;
   }
 
@@ -570,8 +548,10 @@ public:
       // Draw the level set
       select_overlay_mesh();
       if (m_ui_state.m_draw_level_set) {
-        m_viewer.data().set_mesh(ds.m_isoV, ds.m_isoF);
-        pair<Matrix3d, RowVector3d> frame_ctr = m_constraints.frame_for_tet(ds.m_TV, ds.m_TT, isovals, m_ui_state.m_current_level_set, m_ui_state.m_current_angle, m_ui_state.m_flip_x);
+        pair<Matrix3d, RowVector3d> frame_ctr = m_constraints.frame_for_tet(ds.m_TV, ds.m_TT,
+                                                                            m_ui_state.m_current_level_set,
+                                                                            m_ui_state.m_current_angle,
+                                                                            m_ui_state.m_flip_x);
         Matrix3d frame = frame_ctr.first;
         RowVector3d ctr = frame_ctr.second;
 
@@ -801,23 +781,23 @@ public:
             m_ui_state.m_error_flag = true;
             m_ui_state.m_error_message = string("Error: Cannot have more than one pair of endpoints per component.");
           } else {
-            if (isovals.rows() == 0) {
-              geodesic_distances(TV_thin, TT_thin, m_ui_state.m_selected_end_pairs, isovals);
+            if (geodesic_distances_thin.rows() == 0) {
+              geodesic_distances(TV_thin, TT_thin, m_ui_state.m_selected_end_pairs, geodesic_distances_thin);
 //              diffusion_distances(TV, TT, m_ui_state.m_selected_end_pairs, isovals);
               Eigen::VectorXd isovals_normalized;
-              scale_zero_one(isovals, isovals_normalized);
+              scale_zero_one(geodesic_distances_thin, isovals_normalized);
               igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_ui_state.m_isoval_colors);
             }
 
             m_double_buf_lock.lock();
             DrawingState& ds = m_ds[m_current_buf];
-            ds.update_skeleton(TV_thin, TT_thin, isovals, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
+            ds.update_skeleton(TV_thin, TT_thin, geodesic_distances_thin, m_ui_state.m_num_skel_verts, m_ui_state.m_selected_end_pairs, components);
             m_double_buf_lock.unlock();
 
             // Add constraints at each of the skeleton joints
             m_constraints_lock.lock();
             double dist = m_constraints.update_bone_constraints(
-                  TV_fat, TT_fat, TV_thin, TT_thin, isovals, components, m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
+                  TV_fat, TT_fat, TV_thin, TT_thin, geodesic_distances_thin, components, m_ui_state.m_selected_end_pairs, m_ui_state.m_num_skel_verts);
             m_constraints_changed = true;
             m_constraints_lock.unlock();
             cout << "INFO: Skeleton is " << dist << " units long." << endl;
@@ -849,7 +829,10 @@ public:
           m_constraints_lock.lock();
 
           DrawingState& ds = m_ds[m_current_buf];
-          m_constraints.update_orientation_constraint(ds.m_TV, ds.m_TT, isovals, m_ui_state.m_current_level_set, m_ui_state.m_current_angle, m_ui_state.m_flip_x);
+          m_constraints.update_orientation_constraint(ds.m_TV, ds.m_TT,
+                                                      m_ui_state.m_current_level_set,
+                                                      m_ui_state.m_current_angle,
+                                                      m_ui_state.m_flip_x);
           m_constraints_changed = true;
 
           m_constraints_lock.unlock();
