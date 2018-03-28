@@ -11,10 +11,15 @@
 
 bool compute_surface_mesh(DatFile& datfile,
                   Eigen::MatrixXd& V,
-                  Eigen::MatrixXi& F) {
+                  Eigen::MatrixXi& F, bool thin=false) {
   using namespace std;
 
-  string raw_filename = datfile.m_directory + string("/") + datfile.m_raw_filename;
+  string raw_filename;
+  if (thin) {
+    raw_filename = datfile.m_directory + string("/") + datfile.m_thin_raw_filename;
+  } else  {
+    raw_filename = datfile.m_directory + string("/") + datfile.m_raw_filename;
+  }
   assert(datfile.m_format == string("UINT8"));
 
   const size_t num_datfile_bytes = datfile.w * datfile.h * datfile.d;
@@ -47,7 +52,7 @@ bool compute_surface_mesh(DatFile& datfile,
             yi == (datfile.h+1) || zi == (datfile.d+1)) {
           SV[readcount] = -1.0;
         } else {
-          SV[readcount] = double(data[appendcount]);
+          SV[readcount] = double((unsigned char)(data[appendcount]));
           appendcount += 1;
         }
         GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
@@ -71,7 +76,7 @@ bool compute_surface_mesh(DatFile& datfile,
 
 void remove_garbage_components(const Eigen::MatrixXd& V,
                                const Eigen::MatrixXi& F,
-                               Eigen::MatrixXi& newF) {
+                               Eigen::MatrixXi& newF, double keep_thresh=1.0) {
   using namespace std;
 
   cout << "Computing connected components..." << endl;
@@ -89,25 +94,33 @@ void remove_garbage_components(const Eigen::MatrixXd& V,
 
   cout << "Finding component with most vertices..." << endl;
   int max_component = -1;
-  int max_component_count = 0;
+  int min_component = -1;
+  int max_component_count = std::numeric_limits<int>::min();
+  int min_component_count = std::numeric_limits<int>::max();
   for (int i = 0; i < component_count.size(); i++) {
     if (max_component_count < component_count[i]) {
       max_component = i;
       max_component_count = component_count[i];
     }
+    if (min_component_count > component_count[i]) {
+      min_component = i;
+      min_component_count = component_count[i];
+    }
   }
   cout << "Component " << max_component <<
           " has the most vertices with a count of " <<
           max_component_count << endl;
+  cout << "Component " << min_component << " has the fewest vertices with a count of " << min_component_count << endl;
 
   cout << "Deleting smaller components..." << endl;
   newF.resize(F.rows(), 3);
 
+  int keep_thresh_count = min_component_count + int(keep_thresh*(max_component_count - min_component_count));
   int fcount = 0;
   for(int i = 0; i < F.rows(); i++) {
     bool keep = true;
     for (int j = 0; j < 3; j++) {
-      if (components[F(i, j)] != max_component) {
+      if (component_count[components[F(i, j)]] < keep_thresh_count) {
         keep = false;
         break;
       }
@@ -117,7 +130,7 @@ void remove_garbage_components(const Eigen::MatrixXd& V,
     }
   }
 
-  cout << "Largest component of model has " << fcount << " faces and " <<
+  cout << "Final model has " << fcount << " faces and " <<
           newF.maxCoeff() << " vertices." << endl;
   newF.conservativeResize(fcount, 3);
 }
@@ -133,27 +146,43 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  MatrixXd V;
-  MatrixXi F, F_max_component;
+  MatrixXd Vfat, Vthin;
+  MatrixXi Ffat, Fthin, F_max_component_fat, F_max_component_thin;
   DatFile out_datfile;
   if (!out_datfile.deserialize(argv[1])) {
     return EXIT_FAILURE;
   }
   cout << endl;
 
-  if (!compute_surface_mesh(out_datfile, V, F)) {
+  if (!compute_surface_mesh(out_datfile, Vfat, Ffat, false/*thin*/)) {
     return EXIT_FAILURE;
   }
-  remove_garbage_components(V, F, F_max_component);
+  remove_garbage_components(Vfat, Ffat, F_max_component_fat, 1.0);
   cout << "Flipping triangle orientation..." << endl;
-  VectorXd V2 = V.col(2);
-  V.col(2) = V.col(1);
-  V.col(1) = V2;
+  VectorXd V2 = Vfat.col(2);
+  Vfat.col(2) = Vfat.col(1);
+  Vfat.col(1) = V2;
 
   string out_mesh_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename + string(".off");
-  cout << "Saving mesh file " << out_mesh_filename << endl;
-  igl::writeOFF(out_mesh_filename, V, F_max_component);
+  cout << "Saving fat mesh file " << out_mesh_filename << endl;
+  igl::writeOFF(out_mesh_filename, Vfat, F_max_component_fat);
   out_datfile.m_mesh_filename = out_datfile.m_basename + string(".off");
+
+  if (!out_datfile.m_thin_raw_filename.empty()) {
+    if (!compute_surface_mesh(out_datfile, Vthin, Fthin, true/*thin*/)) {
+      return EXIT_FAILURE;
+    }
+    remove_garbage_components(Vthin, Fthin, F_max_component_thin, 0.1);
+    cout << "Flipping triangle orientation..." << endl;
+    VectorXd V2 = Vthin.col(2);
+    Vthin.col(2) = Vthin.col(1);
+    Vthin.col(1) = V2;
+
+    out_mesh_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename + string(".thin.off");
+    cout << "Saving thin mesh file " << out_mesh_filename << endl;
+    igl::writeOFF(out_mesh_filename, Vthin, F_max_component_thin);
+    out_datfile.m_thin_surface_mesh = out_datfile.m_basename + string(".thin.off");
+  }
 
   string out_dat_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename;
   cout << "Saving output dat file" << endl;

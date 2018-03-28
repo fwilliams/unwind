@@ -83,9 +83,11 @@ bool DatFile::serialize(const std::string& filename) {
 
   ofstream of(filename);
   of << "RawFile: " << m_raw_filename << endl;
+  of << "ThinRawFile: " << m_thin_raw_filename << endl;
   of << "Resolution: " << w << " " << h << " " << d << endl;
   of << "Format: " << m_format << endl;
   of << "SurfaceMesh: " << m_mesh_filename << endl;
+  of << "ThinSurfaceMesh: " << m_thin_surface_mesh << endl;
   of << "TextureFile: " << m_texture_filename << endl;
   of << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
   of << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
@@ -123,6 +125,9 @@ bool DatFile::deserialize(const std::string& filename) {
       is >> m_bb_min[1];
       is >> m_bb_min[2];
       cout << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
+    } else if (token == "ThinSurfaceMesh:") {
+      is >> m_thin_surface_mesh;
+      cout << "ThinSurfaceMesh: " << m_thin_surface_mesh << endl;
     } else if (token == "BBmax:") {
       is >> m_bb_max[0];
       is >> m_bb_max[1];
@@ -131,6 +136,9 @@ bool DatFile::deserialize(const std::string& filename) {
     } else if (token == "TextureFile:") {
       is >> m_texture_filename;
       cout << "TextureFile: " << m_texture_filename << endl;
+    } else if (token == "ThinRawFile:") {
+      is >> m_thin_raw_filename;
+      cout << "ThinRawFile: " << m_thin_raw_filename << endl;
     } else {
       cerr << "ERROR: Unexpected token " << token << endl;
       return false;

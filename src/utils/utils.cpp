@@ -124,7 +124,7 @@ void diffusion_distances(const Eigen::MatrixXd& TV,
     constraint_indices(ccount + 1, 0) = ep[0];
     constraint_values(ccount, 0) = 1.0;
     constraint_values(ccount+1, 0) = 0.0;
-    ccount += 1;
+    ccount += 2;
   }
 
   igl::harmonic(TV, TT, constraint_indices,

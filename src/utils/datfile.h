@@ -23,6 +23,8 @@ public:
   std::string m_directory;
   std::string m_basename;
   std::string m_texture_filename;
+  std::string m_thin_raw_filename;
+  std::string m_thin_surface_mesh;
 
   DatFile(const std::string& filename);
 
