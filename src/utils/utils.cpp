@@ -25,8 +25,9 @@ void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& com
       const int comp = components[t1];
       assert(components[t1] == components[t2] && components[t1] == components[t3] && components[t1] == components[t4]);
       if (!(components[t1] == components[t2] && components[t1] == components[t3] && components[t1] == components[t4])) {
-        std::cerr << "FUCK" << std::endl;
-        exit(1);
+          std::cerr << "T1: " << components[t1] << " " << components[t2] << " " << components[t3] << " " << components[t4];
+          std::cerr.flush();
+        __debugbreak();
       }
       if (comp == c) {
         TTcomp.row(count) = Eigen::RowVector4i(t1, t2, t3, t4);
