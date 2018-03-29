@@ -220,7 +220,7 @@ struct UIState {
     m_draw_surface = true;
     m_draw_skeleton = false;
     m_draw_tet_wireframe = false;
-    m_draw_isovalues = true;
+    m_draw_isovalues = false;
     m_draw_level_set = true;
     m_draw_original_mesh = false;
 
@@ -857,7 +857,7 @@ public:
           m_constraints_lock.unlock();
           m_draw_state_changed = true;
         }
-        if (ImGui::DragFloat("Scale Skeleton", &m_constraints.m_scale, 0.001f, 0.9, 1.2)) {
+        if (ImGui::DragFloat("Scale Skeleton", &m_constraints.m_scale, 0.001f, 0.5, 2.0)) {
           m_constraints_lock.lock();
           m_constraints_changed = true;
           m_constraints_lock.unlock();
@@ -865,6 +865,8 @@ public:
         }
         if (ImGui::Button("Rasterize!", ImVec2(-1, 0))) {
           m_double_buf_lock.lock();
+
+          auto rasterizer_start_time =  chrono::high_resolution_clock::now();
           DrawingState& ds = m_ds[m_current_buf];
           VectorXd out_tex;
           RowVector3d bb_min = ds.m_TV.colwise().minCoeff();
@@ -872,9 +874,14 @@ public:
           RowVector3i out_tex_size = (bb_max - bb_min).cast<int>();
           rasterize_tet_mesh(ds.m_TV, ds.m_TT, TC, tex_size, out_tex_size, tex, out_tex);
           m_double_buf_lock.unlock();
+          auto rasterizer_end_time = chrono::high_resolution_clock::now();
+          cout << "INFO: Rasterized mesh in " << chrono::duration<double, milli>(rasterizer_end_time - rasterizer_start_time).count() << "ms" << endl;
 
+          auto write_start_time =  chrono::high_resolution_clock::now();
           write_texture("out.raw", out_tex);
-          cout << "INFO: Wrote output texture of size " << out_tex_size << endl;
+          auto write_end_time =  chrono::high_resolution_clock::now();
+          cout << "INFO: Wrote output texture of size " << out_tex_size << " in " <<
+                  chrono::duration<double, milli>(write_end_time - write_start_time).count() << "ms" << endl;
         }
       }
     }
