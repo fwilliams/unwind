@@ -158,10 +158,6 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   remove_garbage_components(Vfat, Ffat, F_max_component_fat, 1.0);
-  cout << "Flipping triangle orientation..." << endl;
-  VectorXd V2 = Vfat.col(2);
-  Vfat.col(2) = Vfat.col(1);
-  Vfat.col(1) = V2;
 
   string out_mesh_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename + string(".off");
   cout << "Saving fat mesh file " << out_mesh_filename << endl;
@@ -173,10 +169,6 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
     remove_garbage_components(Vthin, Fthin, F_max_component_thin, 0.1);
-    cout << "Flipping triangle orientation..." << endl;
-    VectorXd V2 = Vthin.col(2);
-    Vthin.col(2) = Vthin.col(1);
-    Vthin.col(1) = V2;
 
     out_mesh_filename = out_datfile.m_directory + string("/") + out_datfile.m_basename + string(".thin.off");
     cout << "Saving thin mesh file " << out_mesh_filename << endl;
