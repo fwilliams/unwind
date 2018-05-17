@@ -4,7 +4,3 @@ external/libigl/external/imgui/
 src/utils
 src/tests
 src
-build/glfw/src
-build/CMakeFiles/3.9.1/CompilerIdC
-build/CMakeFiles/3.9.1/CompilerIdCXX
-build/CMakeFiles

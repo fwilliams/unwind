@@ -7,6 +7,20 @@
 
 #include "utils.h"
 
+
+void bounding_cylinder(const DeformationConstraints& c, const MatrixXd& TV, const MatrixXi& TT, int num_diam_pts, double radius, Eigen::MatrixXd& CV, Eigen::MatrixXi& CF) {
+  using namespace Eigen;
+
+
+  for (int i = 0; i < c.m_bone_constraints_idx.size(); i++) {
+    Matrix3d frame = c.frame_for_tet(TV, TT, i, 0, false);
+    const double d_theta = (2*M_PI)/num_diam_pts;
+    for (double theta = 0.0; theta < 2*M_PI; theta += d_theta) {
+      Eigen::RowVector3d v(cos(theta), sin(theta), 0);
+    }
+  }
+}
+
 bool DeformationConstraints::validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components) {
   bool success = true;
   std::unordered_set<int> computed_components;
@@ -160,18 +174,34 @@ double DeformationConstraints::one_pair_bone_constraints(
   const double isovalue_incr = (geodesic_distances[endpoints[1]] - geodesic_distances[endpoints[0]]) / num_verts;
 
   for(int i = 1; i < num_verts; i++) {
-    isovalue += isovalue_incr;
-    igl::marching_tets(TV_thin, TT_thin, geodesic_distances, isovalue, LV, LF);
 
-    if (LV.rows() == 0) {
+    const double last_isovalue = isovalue;
+    isovalue += isovalue_incr;
+
+    const int N = 10;
+    bool found_non_empty = false;
+    for (int i = 0; i < N; i++) {
+      double intermediate_isoval = last_isovalue + (i+1) * (isovalue - last_isovalue) / N;
+      igl::marching_tets(TV_thin, TT_thin, geodesic_distances,  intermediate_isoval, LV, LF);
+      if (LV.rows() == 0) {
+        continue;
+      }
+      found_non_empty = true;
+      RowVector3d ctr = LV.colwise().sum() / LV.rows();
+      dist += (ctr - last_ctr).norm();
+      last_ctr = ctr;
+    }
+
+    if (!found_non_empty) {
       cerr << "WARNING: Empty level set" << endl;
       continue;
     }
 
-    RowVector3d ctr = LV.colwise().sum() / LV.rows();
-    dist += (ctr - last_ctr).norm();
-    last_ctr = ctr;
+//    RowVector3d ctr = LV.colwise().sum() / LV.rows();
+//    dist += (ctr - last_ctr).norm();
+//    last_ctr = ctr;
 
+    RowVector3d ctr = last_ctr;
     const int tet = containing_tet(TV_fat, TT_fat, ctr);
     if (tet < 0) {
       cerr << "WARNING: Vertex not in tet" << endl;
