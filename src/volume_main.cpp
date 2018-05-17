@@ -1,12 +1,12 @@
 #include <fstream>
 #include <iostream>
+#include <array>
 
 #include <igl/opengl/glfw/Viewer.h>
 
 #include <igl/opengl/load_shader.h>
 #include <igl/opengl/create_shader_program.h>
 #include <igl/colormap.h>
-
 
 using namespace igl::opengl;
 using namespace igl::opengl::glfw;
@@ -40,23 +40,32 @@ struct {
         GLint entry_texture;
         GLint exit_texture;
         GLint volume_texture;
+        GLint transfer_function;
+
         GLint volume_dimensions;
         GLint volume_dimensions_rcp;
-        GLint transfer_function;
         GLint sampling_rate;
+
+        GLint light_position;
+        GLint light_color_ambient;
+        GLint light_color_diffuse;
+        GLint light_color_specular;
+        GLint light_exponent_specular;
     } uniform_location;
 } volume_rendering;
 
 struct Volume_Rendering_Parameters {
-    GLuint volume_dimensions[3] = { 128, 128, 128 };
-    GLfloat volume_dimensions_rcp[3] = { 1.f / 128.f, 1.f / 128.f, 1.f / 128.f };
+    std::array<GLuint, 3> volume_dimensions;
+    std::array<GLfloat, 3> volume_dimensions_rcp;
+
+    std::array<float, 3> normalized_volume_dimensions;
 
     GLfloat sampling_rate = 10.0;
 } volume_rendering_parameters;
 
 bool init(igl::opengl::glfw::Viewer& viewer);
-void upload_volume_data(Eigen::RowVector3i& tex_size, Eigen::VectorXd& texture);
-void upload_transferfunction_data(const Eigen::MatrixXd& color);
+void upload_volume_data(const Eigen::RowVector3i& tex_size, const Eigen::VectorXd& texture);
+void upload_transferfunction_data(float offset, float incline);
 
 bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXd& out, bool normalize=true) {
   const size_t num_bytes = dims[0]*dims[1]*dims[2];
@@ -150,8 +159,8 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     // Shader transforming the vertices from model coordinates to clip space
     constexpr const char* VertexShader = R"(
 #version 150
-  layout (location = 0) in vec3 in_position;
-  layout (location = 0) out vec3 color;
+  in vec3 in_position;
+  out vec3 color;
 
   uniform mat4 model_matrix;
   uniform mat4 view_matrix;
@@ -166,15 +175,18 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     // Using Krueger-Westermann rendering encodes the position of the vertex as its color
     constexpr const char* EntryBoxFragmentShader = R"(
 #version 150
-  layout (location = 0) in vec3 color;
-  layout (location = 0) out vec4 out_color;
+  in vec3 color;
+  out vec4 out_color;
 
   void main() {
     out_color = vec4(color, 1.0);
   }
 )";
-    bounding_box.program = igl::opengl::create_shader_program(VertexShader,
-                                                              EntryBoxFragmentShader, {});
+    bounding_box.program = igl::opengl::create_shader_program(
+        VertexShader,
+        EntryBoxFragmentShader,
+        { { "in_position", 0 } }
+    );
 
     bounding_box.uniform_location.model_matrix = glGetUniformLocation(
         bounding_box.program, "model_matrix");
@@ -203,7 +215,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
       vec2(-1.0,  1.0)
   );
 
-  layout (location = 0) out vec2 uv;
+  out vec2 uv;
 
   void main() {
     // Clipspace \in [-1, 1]
@@ -226,7 +238,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     //    early-ray termination threshold (0.99 in this case)
     constexpr const char* VolumeRenderingFragmentShader = R"(
 #version 150
-  location (layout = 0) in vec2 uv;
+  in vec2 uv;
   out vec4 out_color;
 
   uniform sampler2D entry_texture;
@@ -289,7 +301,8 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
     if (entry == exit) {
-      discard;
+      out_color = vec4(0.0, 0.0, 0.0, 1.0);
+      return;
     }
 
     // Combined final color that the volume rendering computed
@@ -302,23 +315,22 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
       t_end,
       t_end / (sampling_rate * length(ray_direction * volume_dimensions))
     );
-    float samples = ceil(t_end / t_incr);
-    t_incr = t_end / samples;
+    t_incr = 0.01;
 
-    ray_direction = normalize(ray_direction);
+    vec3 normalized_ray_direction = normalize(ray_direction);
 
-    float t = 0.5 * t_incr;
+    float t = 0.0;
     while (t < t_end) {
-      vec3 sample_pos = entry + t * ray_direction;
-      float value = texture(volume_texture, sample_pos).a;
+      vec3 sample_pos = entry + t * normalized_ray_direction;
+      float value = texture(volume_texture, sample_pos).r;
       vec4 color = texture(transfer_function, value);
       if (color.a > 0) {
         // Gradient
         vec3 gradient = centralDifferenceGradient(sample_pos);
 
         // Lighting
-        color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
-                                samplePos, gradient, -ray_direction);
+        //color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
+                                //sample_pos, gradient, -normalized_ray_direction);
 
         // Front-to-back Compositing
         color.a = 1.0 - pow(1.0 - color.a, t_incr * REF_SAMPLING_INTERVAL);
@@ -334,6 +346,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
       }
     }
     
+    result.a = 1.0;
     out_color = result;
   }
 )";
@@ -356,6 +369,16 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
         volume_rendering.program, "transfer_function");
     volume_rendering.uniform_location.sampling_rate = glGetUniformLocation(
         volume_rendering.program, "sampling_rate");
+    volume_rendering.uniform_location.light_position = glGetUniformLocation(
+        volume_rendering.program, "light_parameters.position");
+    volume_rendering.uniform_location.light_color_ambient = glGetUniformLocation(
+        volume_rendering.program, "light_parameters.ambient_color");
+    volume_rendering.uniform_location.light_color_diffuse = glGetUniformLocation(
+        volume_rendering.program, "light_parameters.diffuse_color");
+    volume_rendering.uniform_location.light_color_specular = glGetUniformLocation(
+        volume_rendering.program, "light_parameters.specular_color");
+    volume_rendering.uniform_location.light_exponent_specular = glGetUniformLocation(
+        volume_rendering.program, "light_parameters.specular_exponent");
 
 
 
@@ -394,11 +417,47 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+
     // Transfer function texture
     glGenTextures(1, &volume_rendering.transfer_function_texture);
     glBindTexture(GL_TEXTURE_1D, volume_rendering.transfer_function_texture);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+
+    // Temporary
+    Eigen::VectorXd data;
+    constexpr const char* file = "D:/Segmentangling/2018/data/Sternopygus_arenatus-small.raw";
+    Eigen::RowVector3i dims = { 216, 256, 622 };
+    volume_rendering_parameters.volume_dimensions = { 216, 256, 622 };
+    volume_rendering_parameters.volume_dimensions_rcp = { 
+        1.f / volume_rendering_parameters.volume_dimensions[0],
+        1.f / volume_rendering_parameters.volume_dimensions[1],
+        1.f / volume_rendering_parameters.volume_dimensions[2]
+    };
+    GLuint maxDim = *std::max_element(
+        volume_rendering_parameters.volume_dimensions.begin(),
+        volume_rendering_parameters.volume_dimensions.end());
+
+    volume_rendering_parameters.normalized_volume_dimensions = {
+        volume_rendering_parameters.volume_dimensions[0] / static_cast<float>(maxDim),
+        volume_rendering_parameters.volume_dimensions[1] / static_cast<float>(maxDim),
+        volume_rendering_parameters.volume_dimensions[2] / static_cast<float>(maxDim),
+    };
+
+    load_rawfile(file, dims, data, true);
+    upload_volume_data(dims, data);
+
+    upload_transferfunction_data(-0.1f, 1.2f);
+    // Temporary end
+
+
 
     return true;
 }
@@ -406,35 +465,43 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 void upload_volume_data(const Eigen::RowVector3i& tex_size,
                         const Eigen::VectorXd& texture)
 {
-    std::vector<uint32_t> volume_data(texture.size());
+    std::vector<uint8_t> volume_data(texture.size());
     std::transform(
         texture.data(),
         texture.data() + texture.size(),
         volume_data.begin(),
         [](double d) {
-            return static_cast<uint32_t>(d * std::numeric_limits<uint32_t>::max());
-        }
-    );
-
-    glBindTexture(GL_TEXTURE_3D, volume_rendering.volume_texture);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, tex_size[0], tex_size[1], tex_size[2], 0,
-                 GL_RED, GL_UNSIGNED_INT, volume_data.data());
-    glBindTexture(GL_TEXTURE_3D, 0);
-}
-
-void upload_transferfunction_data(const Eigen::MatrixXd& color) {
-    std::vector<uint8_t> transfer_function_data(color.size());
-    std::transform(
-        color.data(),
-        color.data() + color.size(),
-        transfer_function_data.begin(),
-        [](double d) {
             return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max());
         }
     );
 
+    glBindTexture(GL_TEXTURE_3D, volume_rendering.volume_texture);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, tex_size[0], tex_size[1], tex_size[2], 0,
+                 GL_RED, GL_UNSIGNED_BYTE, volume_data.data());
+    glBindTexture(GL_TEXTURE_3D, 0);
+}
+
+void upload_transferfunction_data(float offset, float incline) {
+    constexpr const int TransferFunctionWidth = 512;
+    std::vector<std::array<uint8_t, 4>> transfer_function_data(512);
+
+    // Create greyscale ramp
+    for (int i = 0; i < TransferFunctionWidth; ++i) {
+        float v = static_cast<float>(i * incline) / (TransferFunctionWidth - 1) + offset;
+        if (v > 1.f) {
+            v = 1.f;
+        }
+        if (v < 0.f) {
+            v = 0.f;
+        }
+        const int val = v * std::numeric_limits<uint8_t>::max();
+        const uint8_t value = static_cast<uint8_t>(val);
+
+        transfer_function_data[i] = { value, value, value, value };
+    }
+
     glBindTexture(GL_TEXTURE_1D, volume_rendering.transfer_function_texture);
-    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA8UI, color.size() / 4, 0, GL_RGBA,
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, TransferFunctionWidth, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, transfer_function_data.data());
     glBindTexture(GL_TEXTURE_1D, 0);
 }
@@ -451,6 +518,7 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glClearColor(0.f, 0.f, 0.f, 0.f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
     //
@@ -458,9 +526,17 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
     //
     glBindVertexArray(bounding_box.vao);
     glUseProgram(bounding_box.program);
+    
+    Eigen::Matrix4f scaling = Eigen::Matrix4f::Zero();
+    scaling.diagonal() <<
+        volume_rendering_parameters.normalized_volume_dimensions[0],
+        volume_rendering_parameters.normalized_volume_dimensions[1],
+        volume_rendering_parameters.normalized_volume_dimensions[2],
+        1.f;
+    Eigen::Matrix4f model = viewer.core.model * scaling;
 
     glUniformMatrix4fv(bounding_box.uniform_location.model_matrix, 1, GL_FALSE,
-                       viewer.core.model.data());
+                       model.data());
 
     glUniformMatrix4fv(bounding_box.uniform_location.view_matrix, 1, GL_FALSE,
                        viewer.core.view.data());
@@ -503,16 +579,6 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
     glBindTexture(GL_TEXTURE_3D, volume_rendering.volume_texture);
     glUniform1i(volume_rendering.uniform_location.volume_texture, 2);
 
-    glUniform3i(volume_rendering.uniform_location.volume_dimensions,
-                volume_rendering_parameters.volume_dimensions[0],
-                volume_rendering_parameters.volume_dimensions[1],
-                volume_rendering_parameters.volume_dimensions[2]);
-
-    glUniform3f(volume_rendering.uniform_location.volume_dimensions_rcp,
-                volume_rendering_parameters.volume_dimensions_rcp[0],
-                volume_rendering_parameters.volume_dimensions_rcp[1],
-                volume_rendering_parameters.volume_dimensions_rcp[2]);
-
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_1D, volume_rendering.transfer_function_texture);
@@ -520,6 +586,21 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
 
     glUniform1f(volume_rendering.uniform_location.sampling_rate,
                 volume_rendering_parameters.sampling_rate);
+
+
+    // Rendering parameters
+    glUniform3uiv(volume_rendering.uniform_location.volume_dimensions, 3,
+                  volume_rendering_parameters.volume_dimensions.data());
+    glUniform3fv(volume_rendering.uniform_location.volume_dimensions_rcp, 3,
+                 volume_rendering_parameters.volume_dimensions_rcp.data());
+    glUniform3fv(volume_rendering.uniform_location.light_position, 3,
+                viewer.core.light_position.data());
+    glUniform3f(volume_rendering.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f);
+    glUniform3f(volume_rendering.uniform_location.light_color_diffuse, 0.8f, 0.8f, 0.8f);
+    glUniform3f(volume_rendering.uniform_location.light_color_specular, 1.f, 1.f, 1.f);
+    glUniform1f(volume_rendering.uniform_location.light_exponent_specular, 10.f);
+
+
 
     glDisable(GL_CULL_FACE);
     glDrawArrays(GL_TRIANGLES, 0, 6);
