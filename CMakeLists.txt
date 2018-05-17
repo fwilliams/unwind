@@ -39,13 +39,12 @@ find_package(LIBIGL REQUIRED QUIET)
 
 set(INCLUDE_DIRS src src/utils src/tests)
 
-
-
-
 file(GLOB UTILS_SRCS src/utils/*.cpp)
 list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
 
 message(STATUS "UTILS SRC FILES: ${UTILS_SRCS}")
+
+
 
 add_executable(extract_surface_bin src/extract_surface.cpp ${UTILS_SRCS})
 target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
@@ -89,11 +88,16 @@ else ()
 endif ()
 
 
-add_executable(view_tet_bin src/tests/view_tet_file.cpp ${UTILS_SRCS})
-target_include_directories(view_tet_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(view_tet_bin igl::core igl::opengl_glfw)
+add_executable(volume_test src/volume_main.cpp)
+target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
+target_link_libraries(volume_test igl::core igl::opengl_glfw)
 
 IF (BUILD_TESTS)
+  # Tet Mesh Viewer
+  add_executable(view_tet_bin src/tests/view_tet_file.cpp ${UTILS_SRCS})
+  target_include_directories(view_tet_bin PRIVATE ${INCLUDE_DIRS})
+  target_link_libraries(view_tet_bin igl::core igl::opengl_glfw)
+
   # Test and debug the rasterizer
   add_executable(debug_tex_bin src/test_rasterizer.cpp ${UTILS_SRCS})
   target_include_directories(debug_tex_bin PRIVATE ${INCLUDE_DIRS})

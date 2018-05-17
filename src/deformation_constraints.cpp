@@ -8,19 +8,6 @@
 #include "utils.h"
 
 
-void bounding_cylinder(const DeformationConstraints& c, const MatrixXd& TV, const MatrixXi& TT, int num_diam_pts, double radius, Eigen::MatrixXd& CV, Eigen::MatrixXi& CF) {
-  using namespace Eigen;
-
-
-  for (int i = 0; i < c.m_bone_constraints_idx.size(); i++) {
-    Matrix3d frame = c.frame_for_tet(TV, TT, i, 0, false);
-    const double d_theta = (2*M_PI)/num_diam_pts;
-    for (double theta = 0.0; theta < 2*M_PI; theta += d_theta) {
-      Eigen::RowVector3d v(cos(theta), sin(theta), 0);
-    }
-  }
-}
-
 bool DeformationConstraints::validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components) {
   bool success = true;
   std::unordered_set<int> computed_components;
