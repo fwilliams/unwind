@@ -4,5 +4,5 @@
 	branch = fish_deformation
 [submodule "external/Segmentangling"]
 	path = external/Segmentangling
-	url = https://github.com:ViDA-NYU/Segmentangling.git
+	url = https://github.com/ViDA-NYU/Segmentangling.git
 	branch = preprocessing
