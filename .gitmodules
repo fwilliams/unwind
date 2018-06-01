@@ -2,3 +2,7 @@
 	path = external/libigl
 	url = https://github.com/fwilliams/libigl
 	branch = fish_deformation
+[submodule "external/Segmentangling"]
+	path = external/Segmentangling
+	url = git@github.com:ViDA-NYU/Segmentangling.git
+	branch = preprocessing

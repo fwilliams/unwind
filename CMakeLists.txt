@@ -88,6 +88,19 @@ else ()
 endif ()
 
 
+find_package(Qt5Core)
+find_package(Qt5Widgets)
+
+file(GLOB CT_SRCS external/Segmentangling/ContourTree/*.cpp)
+list(REMOVE_ITEM CT_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/Segmentangling/ContourTree/main.cpp")
+message("CT_SRCS: ${CT_SRCS}")
+
+add_executable(segmentation src/segmentation_main.cpp ${CT_SRCS})
+target_compile_options(segmentation PRIVATE "-fopenmp")
+target_include_directories(segmentation PRIVATE ${INCLUDE_DIRS})
+target_include_directories(segmentation PRIVATE external/Segmentangling/ContourTree)
+target_link_libraries(segmentation igl::core igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
+
 add_executable(volume_test src/volume_main.cpp)
 target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(volume_test igl::core igl::opengl_glfw)

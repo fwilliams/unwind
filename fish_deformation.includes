@@ -2,6 +2,7 @@ external/libigl/include
 external/libigl/external/eigen/
 external/libigl/external/imgui/
 external/libigl/external/glad/include
+external/Segmentangling/ContourTree
 src/utils
 src/tests
 src
