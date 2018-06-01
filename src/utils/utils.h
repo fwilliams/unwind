@@ -10,7 +10,7 @@ void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& com
 
 void tet_mesh_faces(const Eigen::MatrixXi& TT, Eigen::MatrixXi& TF, bool flip=false);
 
-int load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT);
+void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT);
 
 
 // Compute heat diffusion
