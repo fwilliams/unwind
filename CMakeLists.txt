@@ -101,9 +101,16 @@ target_include_directories(segmentation PRIVATE ${INCLUDE_DIRS})
 target_include_directories(segmentation PRIVATE external/Segmentangling/ContourTree)
 target_link_libraries(segmentation igl::core igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
 
-add_executable(volume_test src/volume_main.cpp)
-target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(volume_test igl::core igl::opengl_glfw)
+# add_executable(volume_test src/volume_main.cpp)
+# target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
+# target_link_libraries(volume_test igl::core igl::opengl_glfw)
+
+add_executable(fish_deformation src/main.cpp ${CT_SRCS} ${UTILS_SRCS})
+target_compile_options(fish_deformation PRIVATE "-fopenmp")
+target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS})
+target_include_directories(fish_deformation PRIVATE external/Segmentangling/ContourTree)
+target_link_libraries(fish_deformation igl::core igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
+
 
 IF (BUILD_TESTS)
   # Tet Mesh Viewer

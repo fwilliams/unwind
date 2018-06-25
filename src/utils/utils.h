@@ -12,6 +12,8 @@ void tet_mesh_faces(const Eigen::MatrixXi& TT, Eigen::MatrixXi& TF, bool flip=fa
 
 void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT);
 
+bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXd& out, bool normalize = true);
+
 
 // Compute heat diffusion
 void diffusion_distances(const Eigen::MatrixXd& TV,

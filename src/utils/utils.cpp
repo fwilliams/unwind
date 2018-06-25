@@ -129,6 +129,41 @@ void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi&
   tet_mesh_faces(TT, TF, true /*flip*/);
 }
 
+bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXd& out, bool normalize) {
+    const size_t num_bytes = dims[0] * dims[1] * dims[2];
+
+    char* data = new char[num_bytes];
+    std::ifstream rawfile(rawfilename, std::ifstream::binary);
+
+    if (!rawfile.good()) {
+        std::cerr << "ERROR: RawFile '" << rawfilename << "' does not exist." << std::endl;
+        return false;
+    }
+
+    rawfile.read(data, num_bytes);
+    if (!rawfile) {
+        std::cerr << "ERROR: Only read " << rawfile.gcount() <<
+            " bytes from Raw File '" << rawfilename <<
+            "' but expected to read " << num_bytes <<
+            " bytes." << std::endl;
+        return false;
+    }
+    rawfile.close();
+
+    out.resize(num_bytes);
+    for (int i = 0; i < num_bytes; i++) {
+        out[i] = static_cast<double>(data[i]);
+        if (normalize) {
+            static_assert(sizeof(char) == sizeof(std::uint8_t), "Your system is fucked"); // This is dumb but why not
+            out[i] /= 255.0;
+        }
+    }
+
+    return true;
+}
+
+
+
 // Compute heat diffusion
 void diffusion_distances(const Eigen::MatrixXd& TV,
                          const Eigen::MatrixXi& TT,
