@@ -20,8 +20,11 @@
 // c:\ab7512\fish_deformation\external\libigl\include\igl\opengl\glfw\imgui\ImGuiMenu.cpp
 // https://www.khronos.org/opengl/wiki/Buffer_Texture
 
+#define Debugging
+
 using namespace igl::opengl;
 using namespace volumerendering;
+
 
 // need to call preprocessing using the data name
 std::string ipFolder = "D:/Fish_Deformation/Plagiotremus-tapinosoma";
@@ -80,7 +83,6 @@ struct State {
 
     struct Fish_Status {
         std::vector<uint32_t> feature_list;
-
     };
     std::vector<Fish_Status> fishes;
     size_t current_fish = 0;
@@ -90,6 +92,10 @@ struct State {
     bool selection_list_is_dirty = false;
     GLuint selection_list_ssbo;
 
+
+    Eigen::Vector4f target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
+    uint64_t frame_counter = 0;
+    const int Delta_Frame_Count_Until_Resize = 10;
 
     UI_State ui_state;
 } g_state;
@@ -220,6 +226,11 @@ public:
         if (changed) {
             g_state.ui_state.emphasize_by_selection = static_cast<UI_State::Emphasis>(selection_emphasis);
         }
+
+#ifdef Debugging
+        ImGui::Text("Frame Counter: %i", g_state.frame_counter);
+
+#endif // Debugging
 
 
         ImGui::Text("%s", "Transfer Function");
@@ -421,7 +432,6 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 
     // SSBO
     glGenBuffers(1, &g_state.contour_information_ssbo);
-
     glGenBuffers(1, &g_state.selection_list_ssbo);
     
     Eigen::RowVector3i dims = { g_state.volume_file.w, g_state.volume_file.h, g_state.volume_file.d };
@@ -495,7 +505,36 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     return false;
 }
 
+bool resize_framebuffer_textures(ViewerCore& core) {
+      // Entry point texture and frame buffer
+       glBindTexture(GL_TEXTURE_2D, g_state.volume_rendering.bounding_box.entry_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, core.viewport[2],
+        core.viewport[3], 0, GL_RGBA, GL_FLOAT, nullptr);
+    
+          // Exit point texture and frame buffer
+       glBindTexture(GL_TEXTURE_2D, g_state.volume_rendering.bounding_box.exit_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, core.viewport[2],
+        core.viewport[3], 0, GL_RGBA, GL_FLOAT, nullptr);
+    
+        return true;
+    }
+
 bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
+    if (viewer.core.viewport != g_state.target_viewport_size) {
+        resize_framebuffer_textures(viewer.core);
+        g_state.target_viewport_size = viewer.core.viewport;
+
+    }
+    //if (viewer.core.viewport != g_state.target_viewport_size) {
+    //    g_state.target_viewport_size = viewer.core.viewport;
+    //    std::cout << "Queued resize" << '\n';
+    //}
+
+    //if (viewer.core.viewport != g_state.target_viewport_size && g_state.frame_counter / g_state.Delta_Frame_Count_Until_Resize == 0) {
+    //    std::cout << "Resize" << '\n';
+    //    resize_framebuffer_textures(viewer.core);
+    //}
+
     if (g_state.ui_state.number_features_is_dirty) {
         std::vector<contourtree::Feature> features = g_state.topological_features.getFeatures(
             g_state.ui_state.number_features, 0.f);
@@ -544,6 +583,8 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
 }
 
 bool post_draw(igl::opengl::glfw::Viewer& viewer) {
+    g_state.frame_counter++;
+
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
@@ -634,6 +675,9 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
 bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned int key, int modifiers) {
     if (key == 32) { // SPACE
         g_state.should_select = true;
+    }
+    else if (key == 97) {
+        viewer.plugins.pop_back();
     }
     return false;
 }
