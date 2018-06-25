@@ -45,9 +45,9 @@ struct UI_State {
     int number_features = 10;
     bool number_features_is_dirty = true;
 
-    int selected_feature = 0;
+    int active_feature = 0;
 
-    bool color_by_id = false;
+    bool color_by_id = true;
 };
 
 struct State {
@@ -59,13 +59,22 @@ struct State {
         GLuint index_volume = 0;
         GLuint id = 0;
         GLuint color_by_identifier = 0;
-    } uniform_locations;
+    } uniform_locations_rendering;
+
+    struct {
+        GLuint index_volume = 0;
+    } uniform_locations_picking;
 
     contourtree::TopologicalFeatures topological_features;
     Contour_Information contour_information;
 
     Volume_Rendering volume_rendering;
 
+    //int selected_feature = -1;
+    bool should_select = false;
+
+    // Sorted list of selected features
+    std::vector<int> selection_list;
 
     UI_State ui_state;
 } g_state;
@@ -79,12 +88,20 @@ class Transfer_Function_Menu : public igl::opengl::glfw::imgui::ImGuiMenu {
 
 public:
     void draw_viewer_menu() override {
-        if (ImGui::SliderInt("Number of features", &g_state.ui_state.number_features, 0, 100)) {
+        if (ImGui::SliderInt("Number of features", &g_state.ui_state.number_features, 1, 100)) {
             g_state.ui_state.number_features_is_dirty = true;
         }
-        ImGui::SliderInt("Active feature", &g_state.ui_state.selected_feature, 0, g_state.ui_state.number_features);
+        ImGui::SliderInt("Active feature", &g_state.ui_state.active_feature, 0, g_state.ui_state.number_features - 1);
 
         ImGui::Checkbox("Color by feature id", &g_state.ui_state.color_by_id);
+
+
+        std::string list = std::accumulate(g_state.selection_list.begin(),
+            g_state.selection_list.end(), std::string(),
+            [](std::string s, int i) { return s + std::to_string(i) + ", "; });
+        list = list.substr(0, list.size() - 2);
+
+        ImGui::Text("Selected features: %s", list.c_str());
 
 
         constexpr const float Radius = 10.f;
@@ -106,7 +123,7 @@ public:
             canvas_pos.y + canvas_size.y), IM_COL32(255, 255, 255, 255));
         ImGui::InvisibleButton("canvas", canvas_size);
 
-
+        // First render the lines
         for (size_t i = 0; i < tf.nodes.size(); ++i) {
             volumerendering::Transfer_Function::Node& node = tf.nodes[i];
 
@@ -120,6 +137,13 @@ public:
                 const float prev_y = canvas_pos.y + canvas_size.y * (1.f - prev_node.rgba[3]);
                 draw_list->AddLine(ImVec2(prev_x, prev_y), ImVec2(x, y), IM_COL32(255, 255, 255, 255));
             }
+        }
+
+        for (size_t i = 0; i < tf.nodes.size(); ++i) {
+            volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+
+            const float x = canvas_pos.x + canvas_size.x * node.t;
+            const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
             if (i == current_interaction_index) {
                 draw_list->AddCircleFilled(ImVec2(x, y), Radius * 1.5, IM_COL32(255, 255, 255, 255));
@@ -259,14 +283,17 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     initialize(g_state.volume_rendering, viewer.core.viewport, ContourTreeFragmentShader,
         ContourTreePickingFragmentShader);
 
-    g_state.uniform_locations.index_volume = glGetUniformLocation(
+    g_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
         g_state.volume_rendering.program.program_object, "index_volume"
     );
-    g_state.uniform_locations.id = glGetUniformLocation(
+    g_state.uniform_locations_rendering.id = glGetUniformLocation(
         g_state.volume_rendering.program.program_object, "id"
     );
-    g_state.uniform_locations.color_by_identifier = glGetUniformLocation(
+    g_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
         g_state.volume_rendering.program.program_object, "color_by_identifier"
+    );
+    g_state.uniform_locations_picking.index_volume = glGetUniformLocation(
+        g_state.volume_rendering.picking_program.program_object, "index_volume"
     );
 
     // SSBO
@@ -338,6 +365,7 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
         buffer_data[0] = static_cast<uint32_t>(features.size());
         for (size_t i = 0; i < features.size(); ++i) {
             for (uint32_t j : features[i].arcs) {
+                // +1 since the first value of the vector contains the number of features
                 buffer_data[j + 1] = static_cast<uint32_t>(i);
             }
         }
@@ -377,25 +405,65 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
 
     glUseProgram(g_state.volume_rendering.program.program_object);
 
-    // The default volume renderer already uses GL_TEXTURE0 through GL_TEXTURE4
+    // The default volume renderer already uses GL_TEXTURE0 through GL_TEXTURE3
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, g_state.index_volume);
-    glUniform1i(g_state.uniform_locations.index_volume, 4);
+    glUniform1i(g_state.uniform_locations_rendering.index_volume, 4);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.contour_information.ssbo);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_state.contour_information.ssbo);
 
-    glUniform1i(g_state.uniform_locations.id, g_state.ui_state.selected_feature);
+    glUniform1i(g_state.uniform_locations_rendering.id, g_state.ui_state.active_feature);
 
-    glUniform1i(g_state.uniform_locations.color_by_identifier, g_state.ui_state.color_by_id ? 1 : 0);
+    glUniform1i(g_state.uniform_locations_rendering.color_by_identifier, g_state.ui_state.color_by_id ? 1 : 0);
 
     render_volume(g_state.volume_rendering, viewer.core.model, viewer.core.view,
         viewer.core.proj, viewer.core.light_position);
 
-    pick_volume_location(g_state.volume_rendering, viewer.core.model, viewer.core.view,
-        viewer.core.proj,
+    glUseProgram(g_state.volume_rendering.picking_program.program_object);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_3D, g_state.index_volume);
+    glUniform1i(g_state.uniform_locations_picking.index_volume, 4);
+
+    Eigen::Vector3f picking = pick_volume_location(g_state.volume_rendering,
+        viewer.core.model, viewer.core.view, viewer.core.proj,
         { viewer.current_mouse_x, viewer.core.viewport[3] - viewer.current_mouse_y });
 
+    if (g_state.should_select) {
+        assert(picking[0] == picking[1] && picking[0] == picking[2]);
+        assert(std::is_sorted(g_state.selection_list.begin(), g_state.selection_list.end()));
+
+        int selected_feature = static_cast<int>(picking[0]);
+
+        if (selected_feature != 0) {
+            auto it = std::lower_bound(g_state.selection_list.begin(), g_state.selection_list.end(), selected_feature);
+
+            if (it == g_state.selection_list.end()) {
+                // The index was not found
+                g_state.selection_list.push_back(selected_feature);
+            }
+            else if (*it == selected_feature) {
+                // We found the feature
+                g_state.selection_list.erase(it);
+            }
+            else {
+                // We did not find the feature
+                g_state.selection_list.insert(it, selected_feature);
+            }
+
+            assert(std::is_sorted(g_state.selection_list.begin(), g_state.selection_list.end()));
+        }
+
+        g_state.should_select = false;
+    }
+
+    return false;
+}
+
+bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned int key, int modifiers) {
+    if (key == 32) { // SPACE
+        g_state.should_select = true;
+    }
     return false;
 }
 
@@ -413,35 +481,8 @@ int main(int argc, char** argv) {
     viewer.callback_init = init;
     viewer.callback_pre_draw = pre_draw;
     viewer.callback_post_draw = post_draw;
+    viewer.callback_key_pressed = key_down;
     viewer.launch();
-    
-
-    // upload features as ssbo
-
-    // load .part as uint32_t into volume
-    
-    // volume render only selected voxels  with feature identifier
-
-    // from picking, get feature identifier
-
-    // 
-
-
-    
-
-
-
-
-
-
-    
-    
-    
-    
-    
-    
-    
     
     return EXIT_SUCCESS;
 }
-
