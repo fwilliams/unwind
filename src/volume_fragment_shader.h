@@ -10,6 +10,11 @@
 //    early-ray termination threshold (0.99 in this case)
 constexpr const char* ContourTreeFragmentShader = R"(
 #version 450
+  // Keep in sync with main.cpp UI_State::Emphasis
+  const int SELECTION_EMPHASIS_TYPE_NONE = 0;
+  const int SELECTION_EMPHASIS_TYPE_ONSELECTION = 1;
+  const int SELECTION_EMPHASIS_TYPE_ONNONSELECTION = 2;
+
   in vec2 uv;
   out vec4 out_color;
 
@@ -17,6 +22,11 @@ constexpr const char* ContourTreeFragmentShader = R"(
       uint nFeatures;
       uint values[];
   } contour;
+
+  layout (std430, binding = 1) buffer SelectionList {
+      uint nFeatures;
+      uint features[];
+  } selection;
 
   uniform sampler2D entry_texture;
   uniform sampler2D exit_texture;
@@ -30,6 +40,9 @@ constexpr const char* ContourTreeFragmentShader = R"(
   uniform ivec3 volume_dimensions;
   uniform vec3 volume_dimensions_rcp;
   uniform float sampling_rate;
+
+  uniform int selection_emphasis_type;
+  uniform float highlight_factor;
 
   struct Light_Parameters {
     vec3 position; 
@@ -48,7 +61,6 @@ constexpr const char* ContourTreeFragmentShader = R"(
 
   // Code from https://raw.githubusercontent.com/kbinani/glsl-colormap/master/shaders/transform_rainbow.frag
   // Under MIT license
-
   vec4 colormap(float x) {
     float r = 0.0, g = 0.0, b = 0.0;
 
@@ -120,6 +132,41 @@ constexpr const char* ContourTreeFragmentShader = R"(
     return ambient + diffuse + specular;
   }
 
+  bool is_feature_selected(uint feature) {
+    for (int i = 0; i < selection.nFeatures; ++i) {
+      if (selection.features[i] == feature) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  float selection_factor(bool is_selected) {
+    if (selection.nFeatures == 0) {
+      return 1.f;
+    }
+
+    if (selection_emphasis_type == SELECTION_EMPHASIS_TYPE_NONE) {
+      return 1.f;
+    }
+    else if (selection_emphasis_type == SELECTION_EMPHASIS_TYPE_ONSELECTION) {
+      if (is_selected) {
+        return 1.f;
+      }
+      else {
+        return highlight_factor;
+      }
+    }
+    else if (selection_emphasis_type == SELECTION_EMPHASIS_TYPE_ONNONSELECTION) {
+      if (is_selected) {
+        return highlight_factor;
+      }
+      else {
+        return 1.f;
+      }
+    }
+  }
+
   void main() {
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
@@ -147,19 +194,19 @@ constexpr const char* ContourTreeFragmentShader = R"(
       vec3 sample_pos = entry + t * normalized_ray_direction;
 
       const uint segVoxel = texture(index_volume, sample_pos).r;
-      const uint feature = contour.values[segVoxel];
+      const uint feature = contour.values[segVoxel] + 1;
 
-      if (feature != -1) {
-      //if (feature == id) {
+      if (feature != 0) {
         float value = texture(volume_texture, sample_pos).r;
         vec4 color;
         if (color_by_identifier == 1) {
-            const float normFeature = float(feature + 1) / float(contour.nFeatures);
+            const float normFeature = float(feature) / float(contour.nFeatures);
             color.rgb = colormap(normFeature).rgb;
-            color.a = 1.0;
+            color.a = selection_factor(is_feature_selected(feature));
         }
         else {
           color = texture(transfer_function, value);
+          color.a *= selection_factor(is_feature_selected(feature));
         }
         if (color.a > 0) {
           // Gradient

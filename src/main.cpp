@@ -20,8 +20,6 @@
 // c:\ab7512\fish_deformation\external\libigl\include\igl\opengl\glfw\imgui\ImGuiMenu.cpp
 // https://www.khronos.org/opengl/wiki/Buffer_Texture
 
-
-
 using namespace igl::opengl;
 using namespace volumerendering;
 
@@ -37,17 +35,21 @@ std::string opPrefix = "Plaagiotremus_tapinosoma";
 int downsampleFactor = 4;
 bool writeOriginal = true;
 
-struct Contour_Information {
-    GLuint ssbo = 0;
-};
-
 struct UI_State {
     int number_features = 10;
     bool number_features_is_dirty = true;
 
-    int active_feature = 0;
-
     bool color_by_id = true;
+
+    // Keep in sync with volume_fragment_shader.h and Combobox code generation
+    enum class Emphasis {
+        None = 0,
+        OnSelection = 1,
+        OnNonSelection = 2
+    };
+    Emphasis emphasize_by_selection = Emphasis::OnSelection;
+
+    float highlight_factor = 0.05f;
 };
 
 struct State {
@@ -57,8 +59,9 @@ struct State {
     GLuint index_volume = 0;
     struct {
         GLuint index_volume = 0;
-        GLuint id = 0;
         GLuint color_by_identifier = 0;
+        GLuint selection_emphasis_type = 0;
+        GLuint highlight_factor = 0;
     } uniform_locations_rendering;
 
     struct {
@@ -66,21 +69,61 @@ struct State {
     } uniform_locations_picking;
 
     contourtree::TopologicalFeatures topological_features;
-    Contour_Information contour_information;
+    GLuint contour_information_ssbo;
 
+    Eigen::VectorXd volume_data;
+    std::vector<unsigned int> index_volume_data;
     Volume_Rendering volume_rendering;
 
-    //int selected_feature = -1;
+
     bool should_select = false;
 
+    struct Fish_Status {
+        std::vector<uint32_t> feature_list;
+
+    };
+    std::vector<Fish_Status> fishes;
+    size_t current_fish = 0;
+
     // Sorted list of selected features
-    std::vector<int> selection_list;
+    std::vector<uint32_t> total_selection_list;
+    bool selection_list_is_dirty = false;
+    GLuint selection_list_ssbo;
+
 
     UI_State ui_state;
 } g_state;
 
 
-class Transfer_Function_Menu : public igl::opengl::glfw::imgui::ImGuiMenu {
+Eigen::VectorXd export_selected_volume(const std::vector<uint32_t>& feature_list) {
+    Eigen::VectorXd data = g_state.volume_data;
+
+    std::vector<contourtree::Feature> features = g_state.topological_features.getFeatures(
+        g_state.ui_state.number_features, 0.f);
+
+    std::vector<uint32_t> good_arcs;
+    for (uint32_t f : feature_list) {
+        good_arcs.insert(good_arcs.end(), features[f].arcs.begin(), features[f].arcs.end());
+    }
+    std::sort(good_arcs.begin(), good_arcs.end());
+
+    for (int i = 0; i < data.size(); ++i) {
+        double& value = data[i];
+        unsigned int idx = g_state.index_volume_data[i];
+
+        auto it = std::lower_bound(good_arcs.begin(), good_arcs.end(), idx);
+        if (!(*it == idx)) {
+            value = 0.0;
+        }
+        else {
+            value = 1.0;
+        }
+    }
+
+    return data;
+}
+
+class Selection_Menu : public igl::opengl::glfw::imgui::ImGuiMenu {
     float clicked_mouse_position[2] = { 0.f, 0.f };
     bool is_currently_interacting = false;
     int current_interaction_index = -1;
@@ -91,18 +134,95 @@ public:
         if (ImGui::SliderInt("Number of features", &g_state.ui_state.number_features, 1, 100)) {
             g_state.ui_state.number_features_is_dirty = true;
         }
-        ImGui::SliderInt("Active feature", &g_state.ui_state.active_feature, 0, g_state.ui_state.number_features - 1);
 
-        ImGui::Checkbox("Color by feature id", &g_state.ui_state.color_by_id);
+        ImGui::Separator();
+        ImGui::Separator();
 
+        ImGui::Text("Current fish: %i / %i", g_state.current_fish + 1, g_state.fishes.size());
+        bool pressed_prev = ImGui::Button("Prev");
+        ImGui::SameLine();
+        bool pressed_next = ImGui::Button("Next");
 
-        std::string list = std::accumulate(g_state.selection_list.begin(),
-            g_state.selection_list.end(), std::string(),
+        bool pressed_delete = ImGui::Button("Delete Fish");
+
+        if (pressed_prev) {
+            bool is_current_fish_empty = g_state.fishes[g_state.current_fish].feature_list.empty();
+            bool is_in_last_fish = g_state.current_fish == g_state.fishes.size() - 1;
+            if (is_current_fish_empty && is_in_last_fish) {
+                pressed_delete = true;
+            }
+            else {
+                g_state.current_fish = std::max<int>(0, g_state.current_fish - 1);
+            }
+            g_state.selection_list_is_dirty = true;
+        }
+        if (pressed_next) {
+            g_state.current_fish++;
+            // We reached the end
+            if (g_state.current_fish == g_state.fishes.size()) {
+                g_state.fishes.push_back({});
+            }
+
+            g_state.selection_list_is_dirty = true;
+        }
+
+        // We don't want to delete the last fish
+        if (pressed_delete && g_state.fishes.size() > 1) {
+            g_state.fishes.erase(g_state.fishes.begin() + g_state.current_fish);
+            g_state.current_fish = std::max<int>(0, g_state.current_fish - 1);
+
+            g_state.selection_list_is_dirty = true;
+        }
+
+        ImGui::Separator();
+        ImGui::Separator();
+
+        bool clear_selections = ImGui::Button("Clear Selections");
+        if (clear_selections) {
+            g_state.total_selection_list.clear();
+        }
+
+        std::string list = std::accumulate(g_state.fishes[g_state.current_fish].feature_list.begin(),
+            g_state.fishes[g_state.current_fish].feature_list.end(), std::string(),
             [](std::string s, int i) { return s + std::to_string(i) + ", "; });
+        // Remove the last ", "
         list = list.substr(0, list.size() - 2);
 
         ImGui::Text("Selected features: %s", list.c_str());
 
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 150.f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 50.f);
+
+        bool pressed_next_step = ImGui::Button("Next");
+        if (pressed_next_step) {
+            // Implement me
+        }
+
+
+        ImGui::Separator();
+        ImGui::Separator();
+
+        ImGui::Text("%s", "Rendering parameters");
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
+
+
+        ImGui::Checkbox("Color by feature id", &g_state.ui_state.color_by_id);
+        ImGui::SliderFloat("Highlight Factor", &g_state.ui_state.highlight_factor, 0.f, 1.f);
+
+        int selection_emphasis = static_cast<int>(g_state.ui_state.emphasize_by_selection);
+        const char* const items[] = {
+            "None",
+            "Highlight Selected",
+            "Highlight Deselected"
+        };
+
+        bool changed = ImGui::Combo("Selection", &selection_emphasis, items, 3);
+        if (changed) {
+            g_state.ui_state.emphasize_by_selection = static_cast<UI_State::Emphasis>(selection_emphasis);
+        }
+
+
+        ImGui::Text("%s", "Transfer Function");
 
         constexpr const float Radius = 10.f;
 
@@ -275,10 +395,10 @@ public:
     }
 };
 
-Transfer_Function_Menu transfer_function_menu;
+Selection_Menu selection_menu;
 
 bool init(igl::opengl::glfw::Viewer& viewer) {
-    viewer.plugins.push_back(&transfer_function_menu);
+    viewer.plugins.push_back(&selection_menu);
 
     initialize(g_state.volume_rendering, viewer.core.viewport, ContourTreeFragmentShader,
         ContourTreePickingFragmentShader);
@@ -286,20 +406,24 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     g_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
         g_state.volume_rendering.program.program_object, "index_volume"
     );
-    g_state.uniform_locations_rendering.id = glGetUniformLocation(
-        g_state.volume_rendering.program.program_object, "id"
-    );
     g_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
         g_state.volume_rendering.program.program_object, "color_by_identifier"
+    );
+    g_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
+        g_state.volume_rendering.program.program_object, "selection_emphasis_type"
+    );
+    g_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
+        g_state.volume_rendering.program.program_object, "highlight_factor"
     );
     g_state.uniform_locations_picking.index_volume = glGetUniformLocation(
         g_state.volume_rendering.picking_program.program_object, "index_volume"
     );
 
     // SSBO
-    glGenBuffers(1, &g_state.contour_information.ssbo);
+    glGenBuffers(1, &g_state.contour_information_ssbo);
+
+    glGenBuffers(1, &g_state.selection_list_ssbo);
     
-    Eigen::VectorXd volume_data;
     Eigen::RowVector3i dims = { g_state.volume_file.w, g_state.volume_file.h, g_state.volume_file.d };
     g_state.volume_rendering.parameters.volume_dimensions = {
         GLuint(g_state.volume_file.w),
@@ -321,8 +445,8 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
         g_state.volume_rendering.parameters.volume_dimensions[2] / static_cast<float>(maxDim),
     };
 
-    load_rawfile(g_state.volume_base_name + ".raw", dims, volume_data, true);
-    upload_volume_data(g_state.volume_rendering.volume_texture, dims, volume_data);
+    load_rawfile(g_state.volume_base_name + ".raw", dims, g_state.volume_data, true);
+    upload_volume_data(g_state.volume_rendering.volume_texture, dims, g_state.volume_data);
 
 
 
@@ -348,6 +472,26 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
         g_state.volume_file.d, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, data.data());
     glBindTexture(GL_TEXTURE_3D, 0);
 
+    assert(num_bytes / 4 == 0);
+    g_state.index_volume_data.resize(num_bytes / 4);
+    for (int i = 0; i < num_bytes / 4; i += 4) {
+        union {
+            std::array<char, 4> data;
+            unsigned int value;
+        } transfer;
+
+        transfer.data[0] = data[i];
+        transfer.data[1] = data[i + 1];
+        transfer.data[2] = data[i + 2];
+        transfer.data[3] = data[i + 3];
+
+        // Technically UB, but it works
+        g_state.index_volume_data[i / 4] = transfer.value;
+    }
+
+    g_state.fishes.resize(1);
+    g_state.current_fish = 0;
+
     return false;
 }
 
@@ -370,15 +514,30 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
             }
         }
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.contour_information.ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.contour_information_ssbo);
         glBufferData(
             GL_SHADER_STORAGE_BUFFER,
             sizeof(uint32_t) * buffer_data.size(),
             buffer_data.data(),
-            GL_DYNAMIC_COPY
+            GL_DYNAMIC_READ
         );
 
         g_state.ui_state.number_features_is_dirty = false;
+    }
+
+    if (g_state.selection_list_is_dirty) {
+        std::vector<uint32_t> selected = g_state.fishes[g_state.current_fish].feature_list;
+        selected.insert(selected.begin(), static_cast<int>(selected.size()));
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.selection_list_ssbo);
+        glBufferData(
+            GL_SHADER_STORAGE_BUFFER,
+            sizeof(uint32_t) * selected.size(),
+            selected.data(),
+            GL_DYNAMIC_READ
+        );
+
+        g_state.selection_list_is_dirty = false;
     }
 
     return false;
@@ -410,12 +569,18 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
     glBindTexture(GL_TEXTURE_3D, g_state.index_volume);
     glUniform1i(g_state.uniform_locations_rendering.index_volume, 4);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.contour_information.ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_state.contour_information.ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.contour_information_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_state.contour_information_ssbo);
 
-    glUniform1i(g_state.uniform_locations_rendering.id, g_state.ui_state.active_feature);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_state.selection_list_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, g_state.selection_list_ssbo);
 
     glUniform1i(g_state.uniform_locations_rendering.color_by_identifier, g_state.ui_state.color_by_id ? 1 : 0);
+
+    glUniform1i(g_state.uniform_locations_rendering.selection_emphasis_type,
+        static_cast<int>(g_state.ui_state.emphasize_by_selection));
+
+    glUniform1f(g_state.uniform_locations_rendering.highlight_factor, g_state.ui_state.highlight_factor);
 
     render_volume(g_state.volume_rendering, viewer.core.model, viewer.core.view,
         viewer.core.proj, viewer.core.light_position);
@@ -431,27 +596,33 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
 
     if (g_state.should_select) {
         assert(picking[0] == picking[1] && picking[0] == picking[2]);
-        assert(std::is_sorted(g_state.selection_list.begin(), g_state.selection_list.end()));
 
         int selected_feature = static_cast<int>(picking[0]);
 
         if (selected_feature != 0) {
-            auto it = std::lower_bound(g_state.selection_list.begin(), g_state.selection_list.end(), selected_feature);
+            auto modify_selection = [selected_feature](std::vector<uint32_t>& indices) {
+                assert(std::is_sorted(indices.begin(), indices.end()));
+                auto it = std::lower_bound(indices.begin(), indices.end(), selected_feature);
 
-            if (it == g_state.selection_list.end()) {
-                // The index was not found
-                g_state.selection_list.push_back(selected_feature);
-            }
-            else if (*it == selected_feature) {
-                // We found the feature
-                g_state.selection_list.erase(it);
-            }
-            else {
-                // We did not find the feature
-                g_state.selection_list.insert(it, selected_feature);
-            }
+                if (it == indices.end()) {
+                    // The index was not found
+                    indices.push_back(selected_feature);
+                }
+                else if (*it == selected_feature) {
+                    // We found the feature
+                    indices.erase(it);
+                }
+                else {
+                    // We did not find the feature
+                    indices.insert(it, selected_feature);
+                }
+                assert(std::is_sorted(indices.begin(), indices.end()));
+            };
 
-            assert(std::is_sorted(g_state.selection_list.begin(), g_state.selection_list.end()));
+            modify_selection(g_state.total_selection_list);
+            modify_selection(g_state.fishes[g_state.current_fish].feature_list);
+
+            g_state.selection_list_is_dirty = true;
         }
 
         g_state.should_select = false;
