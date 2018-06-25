@@ -42,6 +42,8 @@ set(INCLUDE_DIRS src src/utils src/tests)
 file(GLOB UTILS_SRCS src/utils/*.cpp)
 list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
 
+file(GLOB UI_SRCS src/ui/*.cpp)
+
 message(STATUS "UTILS SRC FILES: ${UTILS_SRCS}")
 
 
@@ -105,7 +107,7 @@ target_link_libraries(segmentation igl::core igl::opengl_glfw igl::opengl_glfw_i
 # target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
 # target_link_libraries(volume_test igl::core igl::opengl_glfw)
 
-add_executable(fish_deformation src/main.cpp ${CT_SRCS} ${UTILS_SRCS})
+add_executable(fish_deformation src/main.cpp ${CT_SRCS} ${UTILS_SRCS} ${UI_SRCS})
 target_compile_options(fish_deformation PRIVATE "-fopenmp")
 target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS})
 target_include_directories(fish_deformation PRIVATE external/Segmentangling/ContourTree)
