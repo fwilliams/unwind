@@ -59,10 +59,5 @@ int containing_tet(const Eigen::MatrixXd& TV,
 int nearest_vertex(const Eigen::MatrixXd& TV, const Eigen::RowVector3d& p);
 
 
-template <typename T>
-T clamp(T val, T vmin, T vmax) {
-  return std::min(vmax, std::max(val, vmin));
-}
-
 
 #endif // UTILS_H

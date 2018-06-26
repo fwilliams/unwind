@@ -69,6 +69,9 @@ struct State {
     struct ExtractedSurface {
       Eigen::MatrixXd V;
       Eigen::MatrixXi F;
+
+      Eigen::MatrixXd TV;
+      Eigen::MatrixXi TT;
     } extracted_surface;
 };
 

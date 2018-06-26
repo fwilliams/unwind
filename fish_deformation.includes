@@ -1,9 +1,10 @@
 external/libigl/include
+external/libigl/include/igl/opengl
 external/libigl/external/eigen/
 external/libigl/external/imgui/
 external/libigl/external/glad/include
 external/Segmentangling/ContourTree
+external/quartet/src
 src/utils
 src/tests
 src
-external/libigl/include/igl/opengl

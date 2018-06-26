@@ -39,40 +39,57 @@ find_package(LIBIGL REQUIRED QUIET)
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 
+
 # Include directories for the project
 set(INCLUDE_DIRS src src/utils src/tests)
 
-# Utils source files
+
+# Quartet static library
+set(QUARTET_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src")
+file(GLOB QUARTET_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/*.cpp")
+file(GLOB QUARTET_INCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/*.h")
+list(REMOVE_ITEM QUARTET_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/main.cpp")
+list(REMOVE_ITEM QUARTET_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/gluvi.cpp")
+list(REMOVE_ITEM QUARTET_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/view_tet.cpp")
+add_library(quartet STATIC ${QUARTET_SRCS})
+target_include_directories(quartet PRIVATE ${QUARTET_INCLUDE_DIRS})
+
+
+# ContourTree static library
+file(GLOB CT_SRCS external/Segmentangling/ContourTree/*.cpp)
+set(CT_INCLUDE_DIRS external/Segmentangling/ContourTree)
+list(REMOVE_ITEM CT_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/Segmentangling/ContourTree/main.cpp")
+add_library(contourtree STATIC ${CT_SRCS})
+target_compile_options(contourtree PRIVATE "-fopenmp")
+target_link_libraries(contourtree Qt5::Core Qt5::Widgets -fopenmp)
+target_include_directories(contourtree PRIVATE ${CT_INCLUDE_DIRS})
+
+
+# Utils static library
 file(GLOB UTILS_SRCS src/utils/*.cpp )
 list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
+add_library(utils STATIC ${UTILS_SRCS})
+target_link_libraries(utils igl::core igl::opengl)
+target_include_directories(utils PRIVATE ${INCLUDE_DIRS})
 
-# UI source files
+
+# Main application binary
 file(GLOB UI_SRCS src/ui/*.cpp)
-
-# Contour tree source files
-file(GLOB CT_SRCS external/Segmentangling/ContourTree/*.cpp)
-list(REMOVE_ITEM CT_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/Segmentangling/ContourTree/main.cpp")
-
-
-#message(STATUS "UI_SRCS: ${UI_SRCS}")
-#message(STATUS "CT_SRCS: ${CT_SRCS}")
-#message(STATUS "UTILS SRC FILES: ${UTILS_SRCS}")
+add_executable(fish_deformation src/main.cpp ${UI_SRCS})
+target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS} ${QUARTET_INCLUDE_DIRS} ${CT_INCLUDE_DIRS})
+target_link_libraries(fish_deformation quartet contourtree igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui utils)
 
 
-add_executable(fish_deformation src/main.cpp ${UI_SRCS} ${UTILS_SRCS} ${CT_SRCS})
-target_compile_options(fish_deformation PRIVATE "-fopenmp")
-target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS} external/Segmentangling/ContourTree)
-target_link_libraries(fish_deformation igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
-
-
-add_executable(extract_surface_bin src/extract_surface.cpp ${UTILS_SRCS})
+# Binary to extract a surface mesh from a volume datfile (Deprecated, remove soon)
+add_executable(extract_surface_bin src/extract_surface.cpp)
 target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(extract_surface_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(extract_surface_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui utils)
 
 
-add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/deformation_constraints.cpp ${UTILS_SRCS})
+# Fish straightening prototype (Deprecated, remove soon)
+add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/deformation_constraints.cpp)
 target_include_directories(preprocess_fish_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(preprocess_fish_bin igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(preprocess_fish_bin igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui utils)
 if (WIN32)
   target_link_libraries(preprocess_fish_bin
     "C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/lib/libopenblas.dll.a"

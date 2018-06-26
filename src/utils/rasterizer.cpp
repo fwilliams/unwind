@@ -10,6 +10,10 @@
 #include "datfile.h"
 #include "utils.h"
 
+template <typename T>
+static T clamp(T val, T vmin, T vmax) {
+  return std::min(vmax, std::max(val, vmin));
+}
 
 void sample_volume_texture(const Eigen::RowVector3i tex_size,
                            const Eigen::VectorXd& texture,
