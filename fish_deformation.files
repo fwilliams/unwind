@@ -26,6 +26,8 @@ external/Segmentangling/ContourTree/TriMesh.cpp
 external/Segmentangling/ContourTree/TriMesh.hpp
 external/Segmentangling/ContourTree/constants.h
 external/Segmentangling/ContourTree/main.cpp
+external/Segmentangling/ContourTree/preprocessing.cpp
+external/Segmentangling/ContourTree/preprocessing.hpp
 external/Segmentangling/ContourTree/stb_image.h
 external/Segmentangling/ContourTree/test.hpp
 external/Segmentangling/README.md
@@ -3810,7 +3812,6 @@ external/libigl/include/igl/opengl/uniform_type_to_string.cpp
 external/libigl/include/igl/opengl/uniform_type_to_string.h
 external/libigl/include/igl/opengl/vertex_array.cpp
 external/libigl/include/igl/opengl/vertex_array.h
-external/libigl/include/igl/opengl/volumedata.h
 external/libigl/include/igl/opengl2/MouseController.h
 external/libigl/include/igl/opengl2/RotateWidget.h
 external/libigl/include/igl/opengl2/TranslateWidget.h
@@ -4669,6 +4670,8 @@ external/libigl/tutorial/tutorial_shared_path.h
 src/deformation_constraints.cpp
 src/deformation_constraints.h
 src/extract_surface.cpp
+src/main.cpp
+src/picking_fragment_shader.h
 src/preprocess_fish.cpp
 src/segmentation_main.cpp
 src/tests/test_cgal_tet_meshing.cpp
@@ -4677,6 +4680,21 @@ src/tests/test_marching_tets_basic.cpp
 src/tests/test_meshing_harish_data.cpp
 src/tests/test_rasterizer.cpp
 src/tests/view_tet_file.cpp
+src/ui/bounding_polygon_state.cpp
+src/ui/bounding_polygon_state.h
+src/ui/endpoint_selection_state.cpp
+src/ui/endpoint_selection_state.h
+src/ui/initial_file_selection_state.cpp
+src/ui/initial_file_selection_state.h
+src/ui/meshing_state.cpp
+src/ui/meshing_state.h
+src/ui/rasterization_state.cpp
+src/ui/rasterization_state.h
+src/ui/selection_plugin.cpp
+src/ui/selection_plugin.h
+src/ui/state.h
+src/ui/straightening_state.cpp
+src/ui/straightening_state.h
 src/utils/auto.h
 src/utils/cgal_tetmesh.h
 src/utils/cgal_tetrahedralize.cpp
@@ -4688,6 +4706,9 @@ src/utils/rasterizer.cpp
 src/utils/rasterizer.h
 src/utils/utils.cpp
 src/utils/utils.h
+src/utils/volume_rendering.cpp
+src/utils/volume_rendering.h
 src/utils/yixin_loader.cpp
 src/utils/yixin_loader.h
+src/volume_fragment_shader.h
 src/volume_main.cpp
