@@ -6,3 +6,4 @@ external/Segmentangling/ContourTree
 src/utils
 src/tests
 src
+external/libigl/include/igl/opengl

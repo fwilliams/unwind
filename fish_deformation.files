@@ -3810,6 +3810,7 @@ external/libigl/include/igl/opengl/uniform_type_to_string.cpp
 external/libigl/include/igl/opengl/uniform_type_to_string.h
 external/libigl/include/igl/opengl/vertex_array.cpp
 external/libigl/include/igl/opengl/vertex_array.h
+external/libigl/include/igl/opengl/volumedata.h
 external/libigl/include/igl/opengl2/MouseController.h
 external/libigl/include/igl/opengl2/RotateWidget.h
 external/libigl/include/igl/opengl2/TranslateWidget.h
