@@ -1,21 +1,20 @@
-#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
-
+#include "fish_ui_viewer_plugin.h"
 #include "state.h"
 
 #ifndef __FISH_DEFORMATION_SELECTION_MENU__
 #define __FISH_DEFORMATION_SELECTION_MENU__
 
 
-class Selection_Menu : public igl::opengl::glfw::imgui::ImGuiMenu {
+class Selection_Menu : public FishUIViewerPlugin {
 public:
     Selection_Menu(State& state);
 
     void initialize();
     void draw_setup();
     void draw();
-    void key_down(unsigned int key, int modifiers);
 
-    void draw_viewer_menu() override;
+    void key_down(unsigned int key, int modifiers);
+    bool post_draw() override;
 
 private:
     Eigen::VectorXd export_selected_volume(const std::vector<uint32_t>& feature_list);

@@ -1,14 +1,14 @@
 #ifndef __FISH_DEFORMATION_INITIAL_FILE_SELECTION_STATE__
 #define __FISH_DEFORMATION_INITIAL_FILE_SELECTION_STATE__
 
-#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
+#include "fish_ui_viewer_plugin.h"
 #include "state.h"
 
-class Initial_File_Selection_Menu : public igl::opengl::glfw::imgui::ImGuiMenu {
+class Initial_File_Selection_Menu : public FishUIViewerPlugin {
 public:
     Initial_File_Selection_Menu(State& state);
 
-    void draw_viewer_menu() override;
+    bool post_draw() override;
 
 private:
     State& _state;

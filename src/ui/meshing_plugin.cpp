@@ -1,4 +1,4 @@
-#include "meshing_state.h"
+#include "meshing_plugin.h"
 
 #include <igl/copyleft/marching_cubes.h>
 
@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 
 #include <vector>
+#include <thread>
 
 #include "make_tet_mesh.h"
 #include "make_signed_distance.h"
@@ -18,13 +19,47 @@ Meshing_Menu::Meshing_Menu(State& state)
 {}
 
 
-void Meshing_Menu::draw_viewer_menu() {
-  ImGui::Text("%s", "Please wait...");
-
-
-  if (!_is_meshing) {
-
+bool Meshing_Menu::post_draw() {
+  if(_is_meshing) {
+    bool _is_active = true;
+    ImGui::Begin("Segmentation Settings", &_is_active,
+                 ImGuiWindowFlags_NoSavedSettings |
+                 ImGuiWindowFlags_AlwaysAutoResize |
+                 ImGuiWindowFlags_Modal);
+    ImGui::Text("%s", "Please wait...");
+    ImGui::End();
+    ImGui::Render();
   }
+}
+
+bool Meshing_Menu::pre_draw() {
+  bool ret = FishUIViewerPlugin::pre_draw();
+
+  if (_done_meshing) {
+    viewer->data().set_mesh(_state.extracted_surface.V, _state.extracted_surface.F);
+    viewer->core.align_camera_center(_state.extracted_surface.V, _state.extracted_surface.F);
+    _done_meshing = false;
+  }
+  return ret;
+}
+
+void Meshing_Menu::initialize() {
+  _done_meshing = false;
+
+  auto thread_fun = [&]() {
+    _is_meshing = true;
+    extract_surface_mesh();
+    if (_state.extracted_surface.V.rows() == 0) {
+      std::cerr << "Empty mesh wtf!!!" << std::endl;
+      abort();
+    }
+    tetrahedralize_surface_mesh();
+    _is_meshing = false;
+    _done_meshing = true;
+  };
+
+  bg_thread = std::thread(thread_fun);
+  bg_thread.detach();
 }
 
 void Meshing_Menu::extract_surface_mesh() {
@@ -45,7 +80,7 @@ void Meshing_Menu::extract_surface_mesh() {
             xi == (w+1) || yi == (h+1) || zi == (d+1)) {
           SV[readcount] = -1.0;
         } else {
-          SV[readcount] = _state.volume_data[appendcount];
+          SV[readcount] = _state.skeleton_masking_volume[appendcount];
           appendcount += 1;
         }
         GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);

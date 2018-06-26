@@ -4721,10 +4721,12 @@ src/ui/bounding_polygon_state.cpp
 src/ui/bounding_polygon_state.h
 src/ui/endpoint_selection_state.cpp
 src/ui/endpoint_selection_state.h
+src/ui/fish_ui_viewer_plugin.cpp
+src/ui/fish_ui_viewer_plugin.h
 src/ui/initial_file_selection_state.cpp
 src/ui/initial_file_selection_state.h
-src/ui/meshing_state.cpp
-src/ui/meshing_state.h
+src/ui/meshing_plugin.cpp
+src/ui/meshing_plugin.h
 src/ui/rasterization_state.cpp
 src/ui/rasterization_state.h
 src/ui/selection_plugin.cpp
