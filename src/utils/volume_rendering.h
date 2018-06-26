@@ -30,8 +30,7 @@ struct Bounding_Box {
 
 struct Transfer_Function {
     struct Node {
-        float t = 0.f;
-
+        float t;
         float rgba[4];
     };
 

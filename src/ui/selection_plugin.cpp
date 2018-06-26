@@ -8,6 +8,7 @@
 #include "volume_fragment_shader.h"
 #include "picking_fragment_shader.h"
 
+
 // https://www.khronos.org/opengl/wiki/Buffer_Texture
 
 
@@ -272,7 +273,7 @@ void Selection_Menu::draw_viewer_menu() {
     ImGui::Separator();
     ImGui::Separator();
 
-    ImGui::Text("Current fish: %i / %i", _state.current_fish + 1, _state.fishes.size());
+    ImGui::Text("Current fish: %ld / %ld", _state.current_fish + 1, _state.fishes.size());
     bool pressed_prev = ImGui::Button("Prev");
     ImGui::SameLine();
     bool pressed_next = ImGui::Button("Next");

@@ -7,7 +7,7 @@ if (WIN32)
   include_directories("C:/ab7512/SuiteSparse/include")
   include_directories("C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/include")
 else ()
-  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DNDEBUG -O3 -g -DCHOLMOD")
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++14 -DNDEBUG -O3 -g -DCHOLMOD")
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()
 option(BUILD_TESTS "Build test binaries" OFF)
@@ -29,32 +29,50 @@ option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)
 option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use ImGui"          ON)
 option(LIBIGL_WITH_OPENGL_GLFW       "Use GLFW"           ON)
 option(LIBIGL_WITH_PNG               "Use PNG"            OFF)
-option(LIBIGL_WITH_PYTHON            "Use Python"         ON)
+option(LIBIGL_WITH_PYTHON            "Use Python"         OFF)
 option(LIBIGL_WITH_TETGEN            "Use Tetgen"         ${BUILD_TESTS})
 option(LIBIGL_WITH_TRIANGLE          "Use Triangle"       OFF)
 option(LIBIGL_WITH_VIEWER            "Use OpenGL viewer"  ON)
 option(LIBIGL_WITH_XML               "Use XML"            OFF)
 
 find_package(LIBIGL REQUIRED QUIET)
+find_package(Qt5Core REQUIRED)
+find_package(Qt5Widgets REQUIRED)
 
+# Include directories for the project
 set(INCLUDE_DIRS src src/utils src/tests)
 
-file(GLOB UTILS_SRCS src/utils/*.cpp)
+# Utils source files
+file(GLOB UTILS_SRCS src/utils/*.cpp )
 list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
 
+# UI source files
 file(GLOB UI_SRCS src/ui/*.cpp)
 
-message(STATUS "UTILS SRC FILES: ${UTILS_SRCS}")
+# Contour tree source files
+file(GLOB CT_SRCS external/Segmentangling/ContourTree/*.cpp)
+list(REMOVE_ITEM CT_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/Segmentangling/ContourTree/main.cpp")
 
+
+#message(STATUS "UI_SRCS: ${UI_SRCS}")
+#message(STATUS "CT_SRCS: ${CT_SRCS}")
+#message(STATUS "UTILS SRC FILES: ${UTILS_SRCS}")
+
+
+add_executable(fish_deformation src/main.cpp ${UI_SRCS} ${UTILS_SRCS} ${CT_SRCS})
+target_compile_options(fish_deformation PRIVATE "-fopenmp")
+target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS} external/Segmentangling/ContourTree)
+target_link_libraries(fish_deformation igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
 
 
 add_executable(extract_surface_bin src/extract_surface.cpp ${UTILS_SRCS})
 target_include_directories(extract_surface_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(extract_surface_bin igl::core)
+target_link_libraries(extract_surface_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+
 
 add_executable(preprocess_fish_bin src/preprocess_fish.cpp src/deformation_constraints.cpp ${UTILS_SRCS})
 target_include_directories(preprocess_fish_bin PRIVATE ${INCLUDE_DIRS})
-target_link_libraries(preprocess_fish_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(preprocess_fish_bin igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui)
 if (WIN32)
   target_link_libraries(preprocess_fish_bin
     "C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/lib/libopenblas.dll.a"
@@ -90,31 +108,20 @@ else ()
 endif ()
 
 
-find_package(Qt5Core)
-find_package(Qt5Widgets)
-
-file(GLOB CT_SRCS external/Segmentangling/ContourTree/*.cpp)
-list(REMOVE_ITEM CT_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/Segmentangling/ContourTree/main.cpp")
-message("CT_SRCS: ${CT_SRCS}")
-
-add_executable(segmentation src/segmentation_main.cpp ${CT_SRCS})
-target_compile_options(segmentation PRIVATE "-fopenmp")
-target_include_directories(segmentation PRIVATE ${INCLUDE_DIRS})
-target_include_directories(segmentation PRIVATE external/Segmentangling/ContourTree)
-target_link_libraries(segmentation igl::core igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
-
-# add_executable(volume_test src/volume_main.cpp)
-# target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
-# target_link_libraries(volume_test igl::core igl::opengl_glfw)
-
-add_executable(fish_deformation src/main.cpp ${CT_SRCS} ${UTILS_SRCS} ${UI_SRCS})
-target_compile_options(fish_deformation PRIVATE "-fopenmp")
-target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS})
-target_include_directories(fish_deformation PRIVATE external/Segmentangling/ContourTree)
-target_link_libraries(fish_deformation igl::core igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
 
 
 IF (BUILD_TESTS)
+  # Test volume rendering
+  add_executable(volume_test src/volume_main.cpp)
+  target_include_directories(volume_test PRIVATE ${INCLUDE_DIRS})
+  target_link_libraries(volume_test igl::core igl::opengl igl::opengl_glfw)
+
+  # Test Harish's segmentation code
+  add_executable(segmentation src/segmentation_main.cpp ${CT_SRCS})
+  target_compile_options(segmentation PRIVATE "-fopenmp")
+  target_include_directories(segmentation PRIVATE ${INCLUDE_DIRS} external/Segmentangling/ContourTree)
+  target_link_libraries(segmentation igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui Qt5::Core Qt5::Widgets -fopenmp)
+
   # Tet Mesh Viewer
   add_executable(view_tet_bin src/tests/view_tet_file.cpp ${UTILS_SRCS})
   target_include_directories(view_tet_bin PRIVATE ${INCLUDE_DIRS})
@@ -123,12 +130,12 @@ IF (BUILD_TESTS)
   # Test and debug the rasterizer
   add_executable(debug_tex_bin src/test_rasterizer.cpp ${UTILS_SRCS})
   target_include_directories(debug_tex_bin PRIVATE ${INCLUDE_DIRS})
-  target_link_libraries(debug_tex_bin igl::core igl::opengl_glfw)
+  target_link_libraries(debug_tex_bin igl::core igl::opengl igl::opengl_glfw)
 
   # Test loading Harish's dat files
   add_executable(test_meshing_harish_data_bin src/tests/test_meshing_harish_data.cpp src/utils/yixin_loader.cpp)
   target_include_directories(test_meshing_harish_data_bin PRIVATE ${INCLUDE_DIRS})
-  target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+  target_link_libraries(test_meshing_harish_data_bin igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui)
 
   # Test the basic cases for marching tets
   add_executable(test_marching_tets_cases_bin src/tests/test_marching_tets_basic.cpp)

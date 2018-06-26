@@ -6,8 +6,6 @@
 #include "utils/utils.h"
 #include "preprocessing.hpp"
 
-#include <gl/GL.h>
-
 #include <igl/opengl/glfw/Viewer.h>
 
 enum class Application_State {

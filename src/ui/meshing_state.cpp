@@ -15,8 +15,4 @@ void Meshing_Menu::draw_viewer_menu() {
     if (!_is_meshing) {
 
     }
-
-    if (_is_finished_meshing) {
-        _state.application_state = Application_State::EndPointSelection;
-    }
 }

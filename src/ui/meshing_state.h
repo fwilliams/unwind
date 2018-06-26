@@ -15,7 +15,6 @@ private:
     State& _state;
 
     bool _is_meshing = false;
-    std::atomic_bool _is_finished_meshing = false;
 };
 
 #endif // __FISH_DEFORMATION_MESHING_STATE__
