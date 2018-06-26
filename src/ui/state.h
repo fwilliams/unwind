@@ -60,10 +60,16 @@ struct State {
 
     Eigen::VectorXd skeleton_masking_volume;
 
-
     Eigen::Vector4f target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
     uint64_t frame_counter = 0;
     const int Delta_Frame_Count_Until_Resize = 10;
+
+
+    // Surface extraction output
+    struct ExtractedSurface {
+      Eigen::MatrixXd V;
+      Eigen::MatrixXi F;
+    } extracted_surface;
 };
 
 #endif // __FISH_DEFORMATION_STATE__

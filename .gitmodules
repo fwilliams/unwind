@@ -6,3 +6,6 @@
 	path = external/Segmentangling
 	url = https://github.com/ViDA-NYU/Segmentangling.git
 	branch = preprocessing
+[submodule "external/quartet"]
+	path = external/quartet
+	url = https://github.com/fwilliams/quartet.git

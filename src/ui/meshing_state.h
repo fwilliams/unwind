@@ -13,8 +13,10 @@ public:
 
 private:
     State& _state;
-
     bool _is_meshing = false;
+
+    void extract_surface_mesh();
+    void tetrahedralize_surface_mesh();
 };
 
 #endif // __FISH_DEFORMATION_MESHING_STATE__
