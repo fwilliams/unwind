@@ -91,19 +91,8 @@ void Selection_Menu::initialize() {
 
   assert(num_bytes % 4 == 0);
   _state.index_volume_data.resize(num_bytes / 4);
-  for (int i = 0; i < num_bytes / 4; i += 4) {
-    union {
-      std::array<char, 4> data;
-      unsigned int value;
-    } transfer;
-
-    transfer.data[0] = data[i];
-    transfer.data[1] = data[i + 1];
-    transfer.data[2] = data[i + 2];
-    transfer.data[3] = data[i + 3];
-
-    // Technically UB, but it works
-    _state.index_volume_data[i / 4] = transfer.value;
+  for (int i = 0; i < num_bytes / 4; ++i) {
+      _state.index_volume_data[i] = reinterpret_cast<uint32_t*>(data.data())[i];
   }
 
   _state.fishes.resize(1);

@@ -30,6 +30,8 @@ bool Meshing_Menu::post_draw() {
     ImGui::End();
     ImGui::Render();
   }
+
+  return true;
 }
 
 bool Meshing_Menu::pre_draw() {
