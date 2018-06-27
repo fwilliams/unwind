@@ -452,8 +452,8 @@ void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_siz
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
     // Create the initial nodes
-    Transfer_Function::Node first = { .t=0.f, .rgba={ 0.f, 0.f, 0.f, 0.f } };
-    Transfer_Function::Node last = { .t=1.f, .rgba={ 1.f, 1.f, 1.f, 1.f } };
+    Transfer_Function::Node first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
+    Transfer_Function::Node last = { 1.f, { 1.f, 1.f, 1.f, 1.f } };
     volume_rendering.transfer_function.nodes.push_back(std::move(first));
     volume_rendering.transfer_function.nodes.push_back(std::move(last));
     volume_rendering.transfer_function.is_dirty = true;
