@@ -214,27 +214,29 @@ void Selection_Menu::draw() {
                                                  viewer->core.model, viewer->core.view, viewer->core.proj,
   { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y });
 
+  // Picking returns a RGB color, but all values should be the same, since the value is
+  // fetched from a grayscale volume
+  assert(picking[0] == picking[1] && picking[0] == picking[2]);
+  current_selected_feature = static_cast<int>(picking[0]);
+
+
   if (_state.should_select) {
-    assert(picking[0] == picking[1] && picking[0] == picking[2]);
-
-    int selected_feature = static_cast<int>(picking[0]);
-
-    if (selected_feature != 0) {
-      auto modify_selection = [selected_feature](std::vector<uint32_t>& indices) {
+    if (current_selected_feature != 0) {
+      auto modify_selection = [f = current_selected_feature](std::vector<uint32_t>& indices) {
         assert(std::is_sorted(indices.begin(), indices.end()));
-        auto it = std::lower_bound(indices.begin(), indices.end(), selected_feature);
+        auto it = std::lower_bound(indices.begin(), indices.end(), f);
 
         if (it == indices.end()) {
           // The index was not found
-          indices.push_back(selected_feature);
+          indices.push_back(f);
         }
-        else if (*it == selected_feature) {
+        else if (*it == f) {
           // We found the feature
           indices.erase(it);
         }
         else {
           // We did not find the feature
-          indices.insert(it, selected_feature);
+          indices.insert(it, f);
         }
         assert(std::is_sorted(indices.begin(), indices.end()));
       };
@@ -334,7 +336,12 @@ bool Selection_Menu::post_draw() {
 
   bool pressed_next_step = ImGui::Button("Extract Mesh");
   if (pressed_next_step) {
-    _state.skeleton_masking_volume = export_selected_volume(_state.fishes[_state.current_fish].feature_list);
+    std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
+    // The feature list used in export_selected_volume uses a zero-based indexing, we use
+    // 0 for the non-feature, so we have to convert into the zero-based indexing here
+    std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(), [](uint32_t v) { return v - 1; });
+
+    _state.skeleton_masking_volume = export_selected_volume(feature_list);
     _state.application_state = Application_State::Meshing;
   }
 
@@ -343,9 +350,10 @@ bool Selection_Menu::post_draw() {
 
   ImGui::Text("%s", "Rendering parameters");
   ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
-
-
   ImGui::Checkbox("Color by feature id", &color_by_id);
+
+  ImGui::Text("%s", "Highlight Factor: ");
+  ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
   ImGui::SliderFloat("Highlight Factor", &highlight_factor, 0.f, 1.f);
 
   int selection_emphasis = static_cast<int>(emphasize_by_selection);
@@ -361,10 +369,17 @@ bool Selection_Menu::post_draw() {
   }
 
 #ifdef Debugging
+  ImGui::Text("%s", "Debugging Status");
+
+  if (current_selected_feature == 0) {
+      ImGui::Text("Current highlighted id: %s", "none");
+  }
+  else {
+      ImGui::Text("Current highlighted id: %i", current_selected_feature);
+  }
+
   ImGui::Text("Frame Counter: %i", g_state.frame_counter);
-
 #endif // Debugging
-
 
   ImGui::Text("%s", "Transfer Function");
 

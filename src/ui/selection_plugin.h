@@ -30,6 +30,8 @@ private:
     int number_features = 10;
     bool number_features_is_dirty = true;
 
+    int current_selected_feature = -1;
+
     bool color_by_id = true;
 
     // Keep in sync with volume_fragment_shader.h and Combobox code generation
