@@ -24,6 +24,7 @@ private:
 
   void extract_surface_mesh();
   void tetrahedralize_surface_mesh();
+  void dilate_volume();
 };
 
 #endif // __FISH_DEFORMATION_MESHING_STATE__

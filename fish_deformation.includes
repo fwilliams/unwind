@@ -5,6 +5,11 @@ external/libigl/external/imgui/
 external/libigl/external/glad/include
 external/Segmentangling/ContourTree
 external/quartet/src
+external/voroffset/src
+external/voroffset/3rdparty/cli11
+external/voroffset/3rdparty/json
+external/voroffset/3rdparty/nanosvg
+external/voroffset/3rdparty/geogram/src/lib
 src/utils
 src/tests
 src

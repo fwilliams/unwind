@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.1)
 project(fish_deformation)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/voroffset/cmake)
+
 if (WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOLMOD")
   include_directories("C:/ab7512/SuiteSparse/include")
@@ -43,9 +45,11 @@ find_package(LIBIGL REQUIRED QUIET)
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 
-
 # Include directories for the project
 set(INCLUDE_DIRS src src/utils src/tests)
+
+# Directory of the voroffset projecct
+set(VOROFFSET_DIR external/voroffset)
 
 
 # Quartet static library
@@ -77,12 +81,46 @@ target_link_libraries(utils igl::core igl::opengl)
 target_include_directories(utils PRIVATE ${INCLUDE_DIRS})
 
 
+# Json library
+add_library(json INTERFACE)
+target_include_directories(json SYSTEM INTERFACE ${VOROFFSET_DIR}/3rdparty/json)
+
+# Nanosvg library
+add_subdirectory(${VOROFFSET_DIR}/3rdparty/nanosvg)
+
+# Geogram library
+set(THIRD_PARTY_DIR ${VOROFFSET_DIR}/3rdparty)
+include(geogram)
+
+# Eigen library
+add_library(eigen INTERFACE)
+target_include_directories(eigen SYSTEM INTERFACE ${THIRD_PARTY_DIR}/eigen)
+
+# Vor3d library
+add_subdirectory(${VOROFFSET_DIR}/src/vor3d)
+
+# CLI11 library
+add_library(cli11 INTERFACE)
+target_include_directories(cli11 SYSTEM INTERFACE ${THIRD_PARTY_DIR}/cli11)
+
+
 # Main application binary
 file(GLOB UI_SRCS src/ui/*.cpp)
 add_executable(fish_deformation src/main.cpp ${UI_SRCS})
+set_target_properties(fish_deformation PROPERTIES CXX_STANDARD 14)
+set_target_properties(fish_deformation PROPERTIES CXX_STANDARD_REQUIRED ON)
 target_include_directories(fish_deformation PRIVATE ${INCLUDE_DIRS} ${QUARTET_INCLUDE_DIRS} ${CT_INCLUDE_DIRS})
-target_link_libraries(fish_deformation quartet contourtree igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui utils)
+target_link_libraries(fish_deformation quartet contourtree
+  igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui utils)
 
+
+# Binary to dilate a volume
+add_executable(offset3d ${VOROFFSET_DIR}/app/cli3d/offset3d.cpp)
+target_link_libraries(offset3d PRIVATE vor3d cli11 json)
+set_target_properties(offset3d
+  PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
 
 # Binary to extract a surface mesh from a volume datfile (Deprecated, remove soon)
 add_executable(extract_surface_bin src/extract_surface.cpp)
@@ -122,8 +160,7 @@ if (WIN32)
     optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libklu.lib"
     optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libldl.lib"
     optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libspqr.lib"
-    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libumfpack.lib"
-  )
+    optimized "C:/ab7512/SuiteSparse/lib/Release/x64/libumfpack.lib")
 else ()
   target_link_libraries(preprocess_fish_bin cholmod)
 endif ()

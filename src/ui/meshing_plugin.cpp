@@ -1,6 +1,9 @@
 #include "meshing_plugin.h"
 
 #include <igl/copyleft/marching_cubes.h>
+#include <igl/writeOBJ.h>
+#include <igl/readOBJ.h>
+#include <igl/boundary_facets.h>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -9,10 +12,18 @@
 
 #include <vector>
 #include <thread>
+#include <type_traits>
+#include <cstdlib>
+
+#ifndef WIN32
+// dirname()
+#include <libgen.h>
+#endif
 
 #include "make_tet_mesh.h"
 #include "make_signed_distance.h"
 #include "trimesh.h"
+
 
 Meshing_Menu::Meshing_Menu(State& state)
   : _state(state)
@@ -38,9 +49,16 @@ bool Meshing_Menu::pre_draw() {
   bool ret = FishUIViewerPlugin::pre_draw();
 
   if (_done_meshing) {
-    viewer->data().set_mesh(_state.extracted_surface.V, _state.extracted_surface.F);
-    viewer->core.align_camera_center(_state.extracted_surface.V, _state.extracted_surface.F);
+    viewer->data().set_mesh(_state.dilated_surface.V, _state.dilated_surface.F);
+    viewer->core.align_camera_center(_state.dilated_surface.V, _state.dilated_surface.F);
     _done_meshing = false;
+
+    std::cout << "extracted bb " << std::endl;
+    std::cout << _state.extracted_surface.V.colwise().maxCoeff() << std::endl;
+    std::cout << _state.extracted_surface.V.colwise().minCoeff() << std::endl;
+    std::cout << "dilated bb " << std::endl;
+    std::cout << _state.dilated_surface.V.colwise().maxCoeff() << std::endl;
+    std::cout << _state.dilated_surface.V.colwise().minCoeff() << std::endl;
   }
   return ret;
 }
@@ -55,13 +73,74 @@ void Meshing_Menu::initialize() {
       std::cerr << "Empty mesh wtf!!!" << std::endl;
       abort();
     }
+    dilate_volume();
     tetrahedralize_surface_mesh();
+
+
     _is_meshing = false;
     _done_meshing = true;
+
   };
 
   bg_thread = std::thread(thread_fun);
   bg_thread.detach();
+}
+
+static std::string do_readlink(std::string const& path) {
+    char buff[PATH_MAX];
+    ssize_t len = ::readlink(path.c_str(), buff, sizeof(buff)-1);
+    if (len != -1) {
+      buff[len] = '\0';
+      return std::string(buff);
+    }
+    /* handle error condition */
+}
+
+void Meshing_Menu::dilate_volume() {
+  // TODO Alex: The steaming pile of shit below is shelling out in a UNIX (probably only Linux though) dependent way.
+  //            Please add more shit to the pile to make it work on Windows.
+  unsigned int num_voxels = *std::max_element(_state.volume_rendering.parameters.volume_dimensions.begin(),
+                                    _state.volume_rendering.parameters.volume_dimensions.end());
+  assert(num_voxels != 0);
+
+  int dilation_radius = 3;
+  std::string in_filename = std::tmpnam(nullptr) + std::string(".obj");
+  std::string out_filename = std::tmpnam(nullptr) + std::string(".obj");
+  igl::writeOBJ(in_filename, _state.extracted_surface.V, _state.extracted_surface.F);
+
+  auto get_exe_path = [](const std::string& path) -> std::string {
+      char buf[PATH_MAX];
+      ssize_t len = ::readlink(path.c_str(), buf, sizeof(buf)-1);
+      if (len != -1) {
+        buf[len] = '\0';
+        return std::string(buf);
+      }
+      std::cerr << "get_exe_path failed!" << std::endl;
+      abort();
+  };
+
+  auto get_basename = [](const std::string& path) -> std::string {
+    char* buf = (char*) malloc(path.size()*sizeof(char)+1);
+    memcpy(buf, path.c_str(), path.size()*sizeof(char));
+    buf[path.size()] = '\0';
+    char* dirname = ::dirname(buf);
+    std::string ret = std::string(dirname);
+    free(buf);
+    return ret;
+  };
+  std::string bin_path = get_basename(get_exe_path("/proc/self/exe")) + "/offset3d";
+  std::cout << "Calling dilation exe: " << bin_path << std::endl;
+  std::string cmd = bin_path + " -i " +
+      in_filename + " -o " + out_filename + " -f -n " + std::to_string(num_voxels) +
+      " -p " + std::to_string(2*dilation_radius) + " -r " + std::to_string(dilation_radius);
+  std::cout << "cmd: " << cmd << std::endl;
+  int retcode = std::system(cmd.c_str());
+
+  if (retcode != 0) {
+    std::cerr << "Dilation failed!" << std::endl;
+    abort();
+  }
+  igl::readOBJ(out_filename, _state.dilated_surface.V, _state.dilated_surface.F);
 }
 
 void Meshing_Menu::extract_surface_mesh() {
@@ -95,7 +174,6 @@ void Meshing_Menu::extract_surface_mesh() {
                                 _state.extracted_surface.V,
                                 _state.extracted_surface.F);
 
-  // TODO: Dilate and handle small components
 
   if (_state.extracted_surface.V.rows() < 4 || _state.extracted_surface.F.rows() < 4) {
     // TODO: Raise an error
@@ -106,8 +184,8 @@ void Meshing_Menu::extract_surface_mesh() {
 void Meshing_Menu::tetrahedralize_surface_mesh() {
   using namespace std;
 
-  const Eigen::MatrixXd& V = _state.extracted_surface.V;
-  const Eigen::MatrixXi& F = _state.extracted_surface.F;
+  const Eigen::MatrixXd& V = _state.dilated_surface.V;
+  const Eigen::MatrixXi& F = _state.dilated_surface.F;
 
   std::vector<Vec3i> surf_tri;
   std::vector<Vec3f> surf_x;
@@ -155,14 +233,14 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
   // Make tet mesh without features
   make_tet_mesh(mesh, sdf, false /* optimize */, false /* intermediate */, false /* unsafe */);
 
-  _state.extracted_surface.TV.resize(mesh.verts().size(), 3);
+  _state.dilated_surface.TV.resize(mesh.verts().size(), 3);
   for (int i = 0; i < mesh.verts().size(); i++) {
-    _state.extracted_surface.TV.row(i) =
+    _state.dilated_surface.TV.row(i) =
         Eigen::Vector3d(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
   }
-  _state.extracted_surface.TV.resize(mesh.tets().size(), 4);
+  _state.dilated_surface.TV.resize(mesh.tets().size(), 4);
   for (int i = 0; i < mesh.tets().size(); i++) {
-    _state.extracted_surface.TT.row(i) =
+    _state.dilated_surface.TT.row(i) =
         Eigen::Vector4i(mesh.tets()[i][0], mesh.tets()[i][1], mesh.tets()[i][2], mesh.tets()[i][3]);
   }
 }

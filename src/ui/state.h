@@ -64,14 +64,19 @@ struct State {
     uint64_t frame_counter = 0;
     const int Delta_Frame_Count_Until_Resize = 10;
 
-
-    // Surface extraction output
-    struct ExtractedSurface {
+    // Dilation and tetrahedralization output
+    struct DilatedSurface {
       Eigen::MatrixXd V;
       Eigen::MatrixXi F;
 
       Eigen::MatrixXd TV;
       Eigen::MatrixXi TT;
+    } dilated_surface;
+
+    // Surface extraction output
+    struct ExtractedSurface {
+      Eigen::MatrixXd V;
+      Eigen::MatrixXi F;
     } extracted_surface;
 };
 
