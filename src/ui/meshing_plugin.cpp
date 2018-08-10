@@ -20,6 +20,9 @@
 #include <libgen.h>
 #endif
 
+#include <vor3d/CompressedVolume.h>
+#include <vor3d/VoronoiVorPower.h>
+
 #include "make_tet_mesh.h"
 #include "make_signed_distance.h"
 #include "trimesh.h"
@@ -70,12 +73,11 @@ void Meshing_Menu::initialize() {
     _is_meshing = true;
     extract_surface_mesh();
     if (_state.extracted_surface.V.rows() == 0) {
-      std::cerr << "Empty mesh wtf!!!" << std::endl;
+      std::cerr << "Empty mesh!" << std::endl;
       abort();
     }
     dilate_volume();
     tetrahedralize_surface_mesh();
-
 
     _is_meshing = false;
     _done_meshing = true;
@@ -96,51 +98,111 @@ static std::string do_readlink(std::string const& path) {
     /* handle error condition */
 }
 
-void Meshing_Menu::dilate_volume() {
-  // TODO Alex: The steaming pile of shit below is shelling out in a UNIX (probably only Linux though) dependent way.
-  //            Please add more shit to the pile to make it work on Windows.
-  unsigned int num_voxels = *std::max_element(_state.volume_rendering.parameters.volume_dimensions.begin(),
-                                    _state.volume_rendering.parameters.volume_dimensions.end());
-  assert(num_voxels != 0);
 
-  int dilation_radius = 3;
-  std::string in_filename = std::tmpnam(nullptr) + std::string(".obj");
-  std::string out_filename = std::tmpnam(nullptr) + std::string(".obj");
-  igl::writeOBJ(in_filename, _state.extracted_surface.V, _state.extracted_surface.F);
+void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d, vor3d::CompressedVolume& dexels) {
+  dexels = vor3d::CompressedVolume(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(d, h, w), 1.0, 0.0);
 
-  auto get_exe_path = [](const std::string& path) -> std::string {
-      char buf[PATH_MAX];
-      ssize_t len = ::readlink(path.c_str(), buf, sizeof(buf)-1);
-      if (len != -1) {
-        buf[len] = '\0';
-        return std::string(buf);
+  int start_idx = 0;
+  for (int z = 0; z < d; z++) {
+    for (int y = 0; y < h; y++) {
+      bool outside = true;
+      int seg_entry = 0;
+      for (int x = 0; x < w; x++) {
+        if (outside && scalars[start_idx] > 0.0) {
+          seg_entry = x;
+          outside = false;
+        } else if (!outside && scalars[start_idx] <= 0.0) {
+          dexels.appendSegment(z, y, seg_entry, x, -1);
+          outside = true;
+        }
+        start_idx += 1;
       }
-      std::cerr << "get_exe_path failed!" << std::endl;
-      abort();
-  };
-
-  auto get_basename = [](const std::string& path) -> std::string {
-    char* buf = (char*) malloc(path.size()*sizeof(char)+1);
-    memcpy(buf, path.c_str(), path.size()*sizeof(char));
-    buf[path.size()] = '\0';
-    char* dirname = ::dirname(buf);
-    std::string ret = std::string(dirname);
-    free(buf);
-    return ret;
-  };
-  std::string bin_path = get_basename(get_exe_path("/proc/self/exe")) + "/offset3d";
-  std::cout << "Calling dilation exe: " << bin_path << std::endl;
-  std::string cmd = bin_path + " -i " +
-      in_filename + " -o " + out_filename + " -f -n " + std::to_string(num_voxels) +
-      " -p " + std::to_string(2*dilation_radius) + " -r " + std::to_string(dilation_radius);
-  std::cout << "cmd: " << cmd << std::endl;
-  int retcode = std::system(cmd.c_str());
-
-  if (retcode != 0) {
-    std::cerr << "Dilation failed!" << std::endl;
-    abort();
+    }
   }
-  igl::readOBJ(out_filename, _state.dilated_surface.V, _state.dilated_surface.F);
+
+}
+
+void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
+                    Eigen::MatrixXd& V, Eigen::MatrixXi& F)
+{
+  std::vector<Eigen::Vector3d> grid_pts;
+  std::vector<double> grid_vals;
+
+  double min_z = std::numeric_limits<double_t>::max();
+  for (int x = 0; x < dexels.gridSize()[0]; x++) {
+    for (int y = 0; y < dexels.gridSize()[1]; y++) {
+      if (min_z > dexels.at(x, y)[0]) {
+        min_z = dexels.at(x, y)[0];
+      }
+    }
+  }
+
+  for (int z = -1; z < n_samples+1; ++z) {
+    for (int y = -1; y < dexels.gridSize()[1]+1; ++y) {
+      for (int x = -1; x < dexels.gridSize()[0]+1; ++x) {
+        if (x == -1 || y == -1 || z == -1 || x == dexels.gridSize()[0] || y == dexels.gridSize()[1] || z == n_samples) {
+          Eigen::Vector3d grid_ctr;
+          grid_ctr[0] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
+          grid_ctr[1] = dexels.origin()[1] + (y+0.5) * (dexels.extent()[1]/dexels.gridSize()[1]);
+          grid_ctr[2] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
+          grid_pts.push_back(grid_ctr);
+          grid_vals.push_back(1);
+          continue;
+        }
+        Eigen::Vector3d grid_ctr;
+        grid_ctr[0] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
+        grid_ctr[1] = dexels.origin()[1] + (y+0.5) * (dexels.extent()[1]/dexels.gridSize()[1]);
+        grid_ctr[2] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
+
+        grid_pts.push_back(grid_ctr);
+
+        const std::vector<vor3d::Scalar>& d = dexels.at(x, y);
+        int idx = -1;
+        for (int i = 0; i < d.size(); i++) {
+          if (grid_ctr[2] < d[i]) {
+            idx = i-1;
+            break;
+          }
+        }
+
+        if (idx < 0) {
+          grid_vals.push_back(1);
+          continue;
+        }
+
+        if (idx % 2 == 0) {
+          grid_vals.push_back(-1);
+        } else {
+          grid_vals.push_back(1);
+        }
+      }
+    }
+  }
+
+  Eigen::MatrixXd pts(grid_vals.size(), 3);
+  Eigen::VectorXd vals(grid_vals.size());
+  for (int i = 0; i < grid_vals.size(); i++) {
+    pts.row(i) = grid_pts[i];
+    vals[i] = grid_vals[i];
+  }
+
+  igl::copyleft::marching_cubes(vals, pts, dexels.gridSize()[0]+2, dexels.gridSize()[1]+2, n_samples+2, V, F);
+}
+
+void Meshing_Menu::dilate_volume() {
+  vor3d::CompressedVolume input;
+  volume_to_dexels(_state.skeleton_masking_volume, _state.volume_file.w, _state.volume_file.h, _state.volume_file.d, input);
+
+  vor3d::CompressedVolume output;
+
+  vor3d::VoronoiMorphoVorPower op = vor3d::VoronoiMorphoVorPower();
+  double time_1, time_2;
+  op.dilation(input, output, 3, time_1, time_2);
+
+  dexels_to_mesh(2*_state.volume_file.w, output, _state.dilated_surface.V, _state.dilated_surface.F);
+
+  igl::writeOBJ("fat.obj", _state.dilated_surface.V, _state.dilated_surface.F);
+  igl::writeOBJ("thin.obj", _state.extracted_surface.V, _state.extracted_surface.F);
 }
 
 void Meshing_Menu::extract_surface_mesh() {
