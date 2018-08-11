@@ -55,13 +55,6 @@ bool Meshing_Menu::pre_draw() {
     viewer->data().set_mesh(_state.dilated_surface.V, _state.dilated_surface.F);
     viewer->core.align_camera_center(_state.dilated_surface.V, _state.dilated_surface.F);
     _done_meshing = false;
-
-    std::cout << "extracted bb " << std::endl;
-    std::cout << _state.extracted_surface.V.colwise().maxCoeff() << std::endl;
-    std::cout << _state.extracted_surface.V.colwise().minCoeff() << std::endl;
-    std::cout << "dilated bb " << std::endl;
-    std::cout << _state.dilated_surface.V.colwise().maxCoeff() << std::endl;
-    std::cout << _state.dilated_surface.V.colwise().minCoeff() << std::endl;
   }
   return ret;
 }
@@ -127,15 +120,6 @@ void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
 {
   std::vector<Eigen::Vector3d> grid_pts;
   std::vector<double> grid_vals;
-
-  double min_z = std::numeric_limits<double_t>::max();
-  for (int x = 0; x < dexels.gridSize()[0]; x++) {
-    for (int y = 0; y < dexels.gridSize()[1]; y++) {
-      if (min_z > dexels.at(x, y)[0]) {
-        min_z = dexels.at(x, y)[0];
-      }
-    }
-  }
 
   for (int z = -1; z < n_samples+1; ++z) {
     for (int y = -1; y < dexels.gridSize()[1]+1; ++y) {

@@ -6,6 +6,8 @@
 #include <imgui/imgui_internal.h>
 #include <GLFW/glfw3.h>
 
+#include <utils/volume_rendering.h>
+
 #include "volume_fragment_shader.h"
 #include "picking_fragment_shader.h"
 

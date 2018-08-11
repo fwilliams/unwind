@@ -4,24 +4,23 @@ project(fish_deformation)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/voroffset/cmake)
 
+# Find Suitesparse
 if (WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOLMOD")
   include_directories("C:/ab7512/SuiteSparse/include")
   include_directories("C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/include")
 else ()
-  if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3")
-  endif ()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -g -DCHOLMOD")
-  message("cmake cxx flags: ${CMAKE_CXX_FLAGS}")
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()
 
+message("Release flags ${CMAKE_CXX_FLAGS_RELEASE}")
 
-option(BUILD_TESTS "Build test binaries" OFF)
+# Fish deformation options
+option(BUILD_TESTS                   "Build test binaries" OFF)
+option(RELEASE_WITH_SYMBOLS          "Build in release mode but with debug symbols")
 
-# libigl
-option(LIBIGL_USE_STATIC_LIBRARY "Use libigl as static library" ON)
+# libigl options
+option(LIBIGL_USE_STATIC_LIBRARY     "Use libigl as static library" ON)
 option(LIBIGL_WITH_ANTTWEAKBAR       "Use AntTweakBar"    OFF)
 option(LIBIGL_WITH_CGAL              "Use CGAL"           ${BUILD_TESTS})
 option(LIBIGL_WITH_COMISO            "Use CoMiso"         OFF)
@@ -45,6 +44,9 @@ find_package(LIBIGL REQUIRED QUIET)
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 
+if (RELEASE_WITH_SYMBOLS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCHOLMOD")
+endif()
 
 
 ######################
@@ -100,3 +102,7 @@ target_link_libraries(vor3d PUBLIC eigen)
 
 
 add_subdirectory("src")
+
+IF (BUILD_TESTS)
+  add_subdirectory("tests")
+ENDIF()

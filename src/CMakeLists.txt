@@ -1,6 +1,5 @@
-#############################
-## Main application binary ##
-#############################
+
+# Main application binary
 file(GLOB UI_SRCS ui/*.cpp)
 add_executable(fish_deformation main.cpp ${UI_SRCS})
 set_target_properties(fish_deformation PROPERTIES CXX_STANDARD 14)
@@ -50,7 +49,3 @@ else ()
   target_link_libraries(preprocess_fish_bin cholmod)
 endif ()
 
-
-IF (BUILD_TESTS)
-  add_subdirectory("tests")
-ENDIF()
