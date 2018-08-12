@@ -498,7 +498,7 @@ public:
         m_viewer.data().show_faces = true;
       }
 
-      // Draw endpoints pairss
+      // Draw endpoints pairs
       select_overlay_mesh();
       if (m_ui_state.m_show_point_selection_mode) {
         for (int i = 0; i < m_ui_state.m_current_endpoint_idx; i++) {

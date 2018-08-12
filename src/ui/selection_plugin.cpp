@@ -218,7 +218,9 @@ void Selection_Menu::draw() {
 
   // Picking returns a RGB color, but all values should be the same, since the value is
   // fetched from a grayscale volume
+#ifdef WIN32
   assert(picking[0] == picking[1] && picking[0] == picking[2]);
+#endif
   current_selected_feature = static_cast<int>(picking[0]);
 
 

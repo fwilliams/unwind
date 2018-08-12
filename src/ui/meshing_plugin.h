@@ -17,14 +17,22 @@ public:
   void initialize();
 private:
 
+  // Intermediate state of the extracted surface
+  struct ExtractedSurface {
+    Eigen::MatrixXd V_thin;
+    Eigen::MatrixXi F_thin;
+    Eigen::MatrixXd V_fat;
+    Eigen::MatrixXi F_fat;
+  } extracted_surface;
+
   std::thread bg_thread;
   std::atomic_bool _is_meshing;
   std::atomic_bool _done_meshing;
   State& _state;
 
-  void extract_surface_mesh();
   void tetrahedralize_surface_mesh();
   void dilate_volume();
+  void extract_surface_mesh();
 };
 
 #endif // __FISH_DEFORMATION_MESHING_STATE__

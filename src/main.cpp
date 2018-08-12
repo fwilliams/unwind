@@ -5,7 +5,7 @@
 #include "ui/initial_file_selection_state.h"
 #include "ui/selection_plugin.h"
 #include "ui/meshing_plugin.h"
-#include "ui/endpoint_selection_state.h"
+#include "ui/endpoint_selection_plugin.h"
 #include "ui/bounding_polygon_state.h"
 #include "ui/straightening_state.h"
 #include "ui/rasterization_state.h"
@@ -16,7 +16,7 @@ Application_State previous_state;
 
 
 
-#define Debugging
+//#define Debugging
 
 Initial_File_Selection_Menu initial_file_selection(_state);
 Selection_Menu selection_menu(_state);
@@ -34,13 +34,13 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
   initial_file_selection.init(&viewer);
   selection_menu.init(&viewer);
   meshing_menu.init(&viewer);
-//  endpoint_selection_menu.init(&viewer);
-//  bounding_polygon_menu.init(&viewer);
-//  straightening_menu.init(&viewer);
-//  rasterization_menu.init(&viewer);
+  endpoint_selection_menu.init(&viewer);
+
+  //  bounding_polygon_menu.init(&viewer);
+  //  straightening_menu.init(&viewer);
+  //  rasterization_menu.init(&viewer);
 
   viewer.plugins.push_back(&initial_file_selection);
-  //viewer.plugins.push_back(&selection_menu);
 
   return false;
 }
@@ -62,6 +62,7 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
       viewer.plugins.push_back(&meshing_menu);
       break;
     case Application_State::EndPointSelection:
+      endpoint_selection_menu.initialize();
       viewer.plugins.push_back(&endpoint_selection_menu);
       break;
     case Application_State::BoundingPolygon:

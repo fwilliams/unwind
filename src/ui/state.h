@@ -6,6 +6,9 @@
 #include "utils/utils.h"
 #include "preprocessing.hpp"
 
+#include <vector>
+#include <array>
+
 #include <igl/opengl/glfw/Viewer.h>
 
 enum class Application_State {
@@ -64,20 +67,15 @@ struct State {
     uint64_t frame_counter = 0;
     const int Delta_Frame_Count_Until_Resize = 10;
 
-    // Dilation and tetrahedralization output
+    // Output of the dilation and tetrahedralization
     struct DilatedSurface {
-      Eigen::MatrixXd V;
-      Eigen::MatrixXi F;
-
       Eigen::MatrixXd TV;
       Eigen::MatrixXi TT;
-    } dilated_surface;
+      Eigen::MatrixXi TF;
+    } extracted_volume;
 
-    // Surface extraction output
-    struct ExtractedSurface {
-      Eigen::MatrixXd V;
-      Eigen::MatrixXi F;
-    } extracted_surface;
+   // The indexes of selected endpoints used to construct the skeleton
+   std::vector<std::array<int, 2>> selected_end_pairs;
 };
 
 #endif // __FISH_DEFORMATION_STATE__

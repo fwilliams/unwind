@@ -15,10 +15,7 @@
 #include <type_traits>
 #include <cstdlib>
 
-#ifndef WIN32
-// dirname()
-#include <libgen.h>
-#endif
+#include <GLFW/glfw3.h>
 
 #include <vor3d/CompressedVolume.h>
 #include <vor3d/VoronoiVorPower.h>
@@ -28,71 +25,7 @@
 #include "trimesh.h"
 
 
-Meshing_Menu::Meshing_Menu(State& state)
-  : _state(state)
-{}
-
-
-bool Meshing_Menu::post_draw() {
-  if(_is_meshing) {
-    bool _is_active = true;
-    ImGui::Begin("Segmentation Settings", &_is_active,
-                 ImGuiWindowFlags_NoSavedSettings |
-                 ImGuiWindowFlags_AlwaysAutoResize |
-                 ImGuiWindowFlags_Modal);
-    ImGui::Text("%s", "Please wait...");
-    ImGui::End();
-    ImGui::Render();
-  }
-
-  return true;
-}
-
-bool Meshing_Menu::pre_draw() {
-  bool ret = FishUIViewerPlugin::pre_draw();
-
-  if (_done_meshing) {
-    viewer->data().set_mesh(_state.dilated_surface.V, _state.dilated_surface.F);
-    viewer->core.align_camera_center(_state.dilated_surface.V, _state.dilated_surface.F);
-    _done_meshing = false;
-  }
-  return ret;
-}
-
-void Meshing_Menu::initialize() {
-  _done_meshing = false;
-
-  auto thread_fun = [&]() {
-    _is_meshing = true;
-    extract_surface_mesh();
-    if (_state.extracted_surface.V.rows() == 0) {
-      std::cerr << "Empty mesh!" << std::endl;
-      abort();
-    }
-    dilate_volume();
-    tetrahedralize_surface_mesh();
-
-    _is_meshing = false;
-    _done_meshing = true;
-
-  };
-
-  bg_thread = std::thread(thread_fun);
-  bg_thread.detach();
-}
-
-static std::string do_readlink(std::string const& path) {
-    char buff[PATH_MAX];
-    ssize_t len = ::readlink(path.c_str(), buff, sizeof(buff)-1);
-    if (len != -1) {
-      buff[len] = '\0';
-      return std::string(buff);
-    }
-    /* handle error condition */
-}
-
-
-void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d, vor3d::CompressedVolume& dexels) {
+static void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d, vor3d::CompressedVolume& dexels) {
   dexels = vor3d::CompressedVolume(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(d, h, w), 1.0, 0.0);
 
   int start_idx = 0;
@@ -115,7 +48,7 @@ void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d, vor3d
 
 }
 
-void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
+static void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
                     Eigen::MatrixXd& V, Eigen::MatrixXi& F)
 {
   std::vector<Eigen::Vector3d> grid_pts;
@@ -173,6 +106,85 @@ void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
   igl::copyleft::marching_cubes(vals, pts, dexels.gridSize()[0]+2, dexels.gridSize()[1]+2, n_samples+2, V, F);
 }
 
+
+Meshing_Menu::Meshing_Menu(State& state)
+  : _state(state)
+{}
+
+
+void Meshing_Menu::initialize() {
+  _done_meshing = false;
+
+  auto thread_fun = [&]() {
+    _is_meshing = true;
+
+    dilate_volume();
+    if (extracted_surface.V_fat.rows() == 0) {
+      std::cerr << "Empty mesh!" << std::endl;
+      abort();
+    }
+    tetrahedralize_surface_mesh();
+
+    _is_meshing = false;
+    _done_meshing = true;
+
+  };
+
+  extracted_surface.V_thin.resize(0, 0);
+  extracted_surface.F_thin.resize(0, 0);
+  extracted_surface.V_fat.resize(0, 0);
+  extracted_surface.F_fat.resize(0, 0);
+
+  bg_thread = std::thread(thread_fun);
+  bg_thread.detach();
+}
+
+
+bool Meshing_Menu::pre_draw() {
+  bool ret = FishUIViewerPlugin::pre_draw();
+
+  return ret;
+}
+
+
+bool Meshing_Menu::post_draw() {
+  bool ret = FishUIViewerPlugin::post_draw();
+
+  if(_is_meshing) {
+    int width;
+    int height;
+    glfwGetWindowSize(viewer->window, &width, &height);
+    ImGui::SetNextWindowPos(ImVec2(.0f, .0f), ImGuiSetCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiSetCond_Always);
+    bool _menu_visible = true;
+    ImGui::Begin("", &_menu_visible,
+                 ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove |
+                 ImGuiWindowFlags_NoCollapse |
+                 ImGuiWindowFlags_NoTitleBar);
+
+    ImGui::OpenPopup("Processing Fish Segments");
+    ImGui::BeginPopupModal("Processing Fish Segments");
+    ImGui::Text("Processing Fish Segments. Please wait as this can take a few minutes.");
+    ImGui::NewLine();
+    ImGui::Separator();
+    if (ImGui::Button("Cancel")) {
+      // TODO: Cancel button
+    }
+    ImGui::EndPopup();
+    ImGui::End();
+  }
+
+  if (_done_meshing) {
+    _state.application_state = Application_State::EndPointSelection;
+    _done_meshing = false;
+  }
+
+  ImGui::Render();
+  return ret;
+}
+
+
 void Meshing_Menu::dilate_volume() {
   vor3d::CompressedVolume input;
   volume_to_dexels(_state.skeleton_masking_volume, _state.volume_file.w, _state.volume_file.h, _state.volume_file.d, input);
@@ -183,55 +195,18 @@ void Meshing_Menu::dilate_volume() {
   double time_1, time_2;
   op.dilation(input, output, 3, time_1, time_2);
 
-  dexels_to_mesh(2*_state.volume_file.w, output, _state.dilated_surface.V, _state.dilated_surface.F);
+  dexels_to_mesh(2*_state.volume_file.w, output, extracted_surface.V_fat, extracted_surface.F_fat);
 
-  igl::writeOBJ("fat.obj", _state.dilated_surface.V, _state.dilated_surface.F);
-  igl::writeOBJ("thin.obj", _state.extracted_surface.V, _state.extracted_surface.F);
-}
-
-void Meshing_Menu::extract_surface_mesh() {
-  const int w = _state.volume_file.w;
-  const int h = _state.volume_file.h;
-  const int d = _state.volume_file.d;
-
-  // Grid positions and scalar values
-  Eigen::MatrixXd GP((w+2)*(h+2)*(d+2), 3);
-  Eigen::VectorXd SV(GP.rows());
-
-  int readcount = 0;
-  int appendcount = 0;
-  for (int zi = 0; zi < d+2; zi++) {
-    for (int yi = 0; yi < h+2; yi++) {
-      for (int xi = 0; xi < w+2; xi++) {
-        if (xi == 0 || yi == 0 || zi == 0 ||
-            xi == (w+1) || yi == (h+1) || zi == (d+1)) {
-          SV[readcount] = -1.0;
-        } else {
-          SV[readcount] = _state.skeleton_masking_volume[appendcount];
-          appendcount += 1;
-        }
-        GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
-        readcount += 1;
-      }
-    }
-  }
-
-  igl::copyleft::marching_cubes(SV, GP, w+2, h+2, d+2,
-                                _state.extracted_surface.V,
-                                _state.extracted_surface.F);
-
-
-  if (_state.extracted_surface.V.rows() < 4 || _state.extracted_surface.F.rows() < 4) {
-    // TODO: Raise an error
-  }
+//  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
+//  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
 }
 
 
 void Meshing_Menu::tetrahedralize_surface_mesh() {
   using namespace std;
 
-  const Eigen::MatrixXd& V = _state.dilated_surface.V;
-  const Eigen::MatrixXi& F = _state.dilated_surface.F;
+  const Eigen::MatrixXd& V = extracted_surface.V_fat;
+  const Eigen::MatrixXi& F = extracted_surface.F_fat;
 
   std::vector<Vec3i> surf_tri;
   std::vector<Vec3f> surf_x;
@@ -279,14 +254,57 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
   // Make tet mesh without features
   make_tet_mesh(mesh, sdf, false /* optimize */, false /* intermediate */, false /* unsafe */);
 
-  _state.dilated_surface.TV.resize(mesh.verts().size(), 3);
+  _state.extracted_volume.TV.resize(mesh.verts().size(), 3);
   for (int i = 0; i < mesh.verts().size(); i++) {
-    _state.dilated_surface.TV.row(i) =
+    _state.extracted_volume.TV.row(i) =
         Eigen::Vector3d(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
   }
-  _state.dilated_surface.TV.resize(mesh.tets().size(), 4);
+  _state.extracted_volume.TT.resize(mesh.tets().size(), 4);
   for (int i = 0; i < mesh.tets().size(); i++) {
-    _state.dilated_surface.TT.row(i) =
-        Eigen::Vector4i(mesh.tets()[i][0], mesh.tets()[i][1], mesh.tets()[i][2], mesh.tets()[i][3]);
+    _state.extracted_volume.TT.row(i) =
+        Eigen::Vector4i(mesh.tets()[i][0], mesh.tets()[i][2], mesh.tets()[i][1], mesh.tets()[i][3]);
   }
+
+  igl::boundary_facets(_state.extracted_volume.TT, _state.extracted_volume.TF);
+}
+
+
+
+void Meshing_Menu::extract_surface_mesh() {
+  const int w = _state.volume_file.w;
+  const int h = _state.volume_file.h;
+  const int d = _state.volume_file.d;
+
+  // Grid positions and scalar values
+  Eigen::MatrixXd GP((w+2)*(h+2)*(d+2), 3);
+  Eigen::VectorXd SV(GP.rows());
+
+  int readcount = 0;
+  int appendcount = 0;
+  for (int zi = 0; zi < d+2; zi++) {
+    for (int yi = 0; yi < h+2; yi++) {
+      for (int xi = 0; xi < w+2; xi++) {
+        if (xi == 0 || yi == 0 || zi == 0 ||
+            xi == (w+1) || yi == (h+1) || zi == (d+1)) {
+          SV[readcount] = -1.0;
+        } else {
+          SV[readcount] = _state.skeleton_masking_volume[appendcount];
+          appendcount += 1;
+        }
+        GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
+        readcount += 1;
+      }
+    }
+  }
+
+  igl::copyleft::marching_cubes(SV, GP, w+2, h+2, d+2,
+                                extracted_surface.V_thin,
+                                extracted_surface.F_thin);
+
+
+  if (extracted_surface.V_thin.rows() < 4 || extracted_surface.F_thin.rows() < 4) {
+    // TODO: Raise an error
+  }
+  //  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
+  //  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
 }
