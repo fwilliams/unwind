@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <array>
-
-#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
+#include <atomic>
+#include <thread>
 
 #include "state.h"
 #include "fish_ui_viewer_plugin.h"
@@ -19,8 +19,17 @@ public:
     void initialize();
 
 private:
+
     bool selecting_endpoints;
     State& state;
+
+    std::atomic_bool extracting_skeleton;
+    std::atomic_bool done_extracting_skeleton;
+    std::thread extract_skeleton_thread;
+
+
+    bool bad_selection = false; // Flag set to true if user selects invalid endpoint pair
+    std::string bad_selection_error_message = "";
 
     unsigned current_endpoint_idx = 0;
     std::array<int, 2> current_endpoints = { -1, -1 };
@@ -28,6 +37,8 @@ private:
 
     int mesh_overlay_id;
     int points_overlay_id;
+
+    void extract_skeleton();
 };
 
 #endif // __FISH_DEFORMATION_ENDPOINT_SELECTION_STATE__

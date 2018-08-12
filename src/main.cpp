@@ -6,7 +6,7 @@
 #include "ui/selection_plugin.h"
 #include "ui/meshing_plugin.h"
 #include "ui/endpoint_selection_plugin.h"
-#include "ui/bounding_polygon_state.h"
+#include "ui/bounding_polygon_plugin.h"
 #include "ui/straightening_state.h"
 #include "ui/rasterization_state.h"
 #include "ui/state.h"

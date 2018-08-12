@@ -4,6 +4,7 @@
 #include <igl/writeOBJ.h>
 #include <igl/readOBJ.h>
 #include <igl/boundary_facets.h>
+#include <igl/components.h>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -124,6 +125,7 @@ void Meshing_Menu::initialize() {
       abort();
     }
     tetrahedralize_surface_mesh();
+    igl::components(_state.extracted_volume.TT, _state.extracted_volume.connected_components);
 
     _is_meshing = false;
     _done_meshing = true;

@@ -9882,8 +9882,8 @@ src/extract_surface.cpp
 src/main.cpp
 src/picking_fragment_shader.h
 src/preprocess_fish.cpp
-src/ui/bounding_polygon_state.cpp
-src/ui/bounding_polygon_state.h
+src/ui/bounding_polygon_plugin.cpp
+src/ui/bounding_polygon_plugin.h
 src/ui/endpoint_selection_plugin.cpp
 src/ui/endpoint_selection_plugin.h
 src/ui/fish_ui_viewer_plugin.cpp

@@ -1,15 +1,16 @@
 #ifndef __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__
 #define __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__
 
-#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include "state.h"
+#include "fish_ui_viewer_plugin.h"
 
-class Bounding_Polygon_Menu : public igl::opengl::glfw::imgui::ImGuiMenu {
+class Bounding_Polygon_Menu : public FishUIViewerPlugin {
 public:
     Bounding_Polygon_Menu(State& state);
 
-    void draw_viewer_menu() override;
-
+    virtual bool post_draw() override;
+    virtual bool pre_draw() override;
+    void initialize();
 private:
     State& _state;
 };

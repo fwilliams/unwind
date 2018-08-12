@@ -1,5 +1,6 @@
 #include "endpoint_selection_plugin.h"
 
+#include <unordered_set>
 #include <cmath>
 
 #include <igl/unproject_onto_mesh.h>
@@ -10,6 +11,39 @@
 #include <GLFW/glfw3.h>
 
 #include <utils/colors.h>
+#include <utils/utils.h>
+
+
+static bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components) {
+  bool success = true;
+  std::unordered_set<int> computed_components;
+
+  for (int i = 0; i < endpoints.size(); i++) {
+    const int c1 = components[endpoints[i][0]];
+    const int c2 = components[endpoints[i][0]];
+    if (c1 != c2) {
+      success = false;
+      break;
+    }
+    if (computed_components.find(c1) != computed_components.end()) {
+      success = false;
+      break;
+    } else {
+      computed_components.insert(c1);
+    }
+  }
+
+  return success;
+}
+
+
+static void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXd& TT,
+                             const Eigen::VectorXd normalized_distances,
+                             const std::vector<std::array<int, 2>>& endpoint_pairs,
+                             const Eigen::VectorXi& connected_components,
+                             Eigen::MatrixXd& skeleton_vertices) {
+}
+
 
 EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state)
   : state(state)
@@ -31,7 +65,13 @@ void EndPoint_Selection_Menu::initialize() {
   points_overlay_id = viewer->selected_data_index;
 
   viewer->selected_data_index = mesh_overlay_id;
+
+  current_endpoints = { -1, -1 };
+  selecting_endpoints = false;
+  extracting_skeleton = false;
+  done_extracting_skeleton = false;
 }
+
 
 bool EndPoint_Selection_Menu::pre_draw() {
   bool ret = FishUIViewerPlugin::pre_draw();
@@ -64,12 +104,37 @@ bool EndPoint_Selection_Menu::post_draw() {
 
   int width;
   int height;
+
   glfwGetWindowSize(viewer->window, &width, &height);
   ImGui::SetNextWindowPos(ImVec2(.0f, .0f), ImGuiSetCond_Always);
   ImGui::SetNextWindowSize(ImVec2(int(width*0.2), height), ImGuiSetCond_Always);
   ImGui::Begin("", &_menu_visible,
                ImGuiWindowFlags_NoSavedSettings |
                ImGuiWindowFlags_AlwaysAutoResize);
+
+  if (done_extracting_skeleton) {
+    state.application_state = Application_State::BoundingPolygon;
+  }
+
+  if (extracting_skeleton) {
+    ImGui::OpenPopup("Extracting Skeleton");
+    ImGui::BeginPopupModal("Extracting Skeleton");
+    ImGui::Text("Extracting Fish Skeleton. Please wait, this may take a few seconds.");
+    ImGui::NewLine();
+    ImGui::EndPopup();
+  }
+
+  if (bad_selection) {
+    ImGui::OpenPopup("Invalid Endpoint Selection");
+    ImGui::BeginPopupModal("Invalid Endpoint Selection");
+    ImGui::Text("%s", bad_selection_error_message.c_str());
+    ImGui::NewLine();
+    ImGui::Separator();
+    if (ImGui::Button("OK")) {
+      bad_selection = false;
+    }
+    ImGui::EndPopup();
+  }
 
   std::string button_text("New Endpoint Pair");
   if (selecting_endpoints) {
@@ -134,13 +199,12 @@ bool EndPoint_Selection_Menu::post_draw() {
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
   }
   if (ImGui::Button("Next")) {
-    // TODO: Next Button
+    extract_skeleton();
   }
   if (endpoint_pairs.size() == 0) {
     ImGui::PopItemFlag();
     ImGui::PopStyleVar();
   }
-
   ImGui::End();
 
   ImGui::Render();
@@ -172,6 +236,17 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
 
     if (current_endpoint_idx >= 2) { // We've selected 2 endpoints
       endpoint_pairs.push_back(current_endpoints);
+
+      if (current_endpoints[0] == current_endpoints[1]) {
+        bad_selection = true;
+        bad_selection_error_message = "Invalid Endpoints: Selected endpoints are the same.";
+        endpoint_pairs.pop_back();
+      } else if (!validate_endpoint_pairs(endpoint_pairs, state.extracted_volume.connected_components)) {
+        bad_selection = true;
+        bad_selection_error_message = "Invalid Endpoints: You can only have one endpoint pair per connected component.";
+        endpoint_pairs.pop_back();
+      }
+
       current_endpoints = { -1, -1 };
       current_endpoint_idx = 0;
       selecting_endpoints = false;
@@ -179,4 +254,21 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
   }
 
   return ret;
+}
+
+
+void EndPoint_Selection_Menu::extract_skeleton() {
+  auto thread_fun = [&]() {
+    extracting_skeleton = true;
+    const Eigen::MatrixXd& TV = state.extracted_volume.TV;
+    const Eigen::MatrixXi& TT = state.extracted_volume.TT;
+    Eigen::VectorXd gdists;
+
+    geodesic_distances(TV, TT, endpoint_pairs, gdists);
+    scale_zero_one(gdists, state.geodesic_dists);
+    extracting_skeleton = false;
+  };
+
+  extract_skeleton_thread = std::thread(thread_fun);
+  extract_skeleton_thread.detach();
 }
