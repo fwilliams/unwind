@@ -47,6 +47,23 @@ bool Initial_File_Selection_Menu::post_draw() {
                ImGuiWindowFlags_NoCollapse |
                ImGuiWindowFlags_NoTitleBar);
 
+  if (is_loading) {
+    ImGui::OpenPopup("Loading CT Scan");
+    ImGui::BeginPopupModal("Loading CT Scan");
+    ImGui::Text("Loading CT Scan. Please wait as this can take a few seconds.");
+    ImGui::NewLine();
+    ImGui::Separator();
+    if (ImGui::Button("Cancel")) {
+      // TODO: Cancel button
+    }
+    ImGui::EndPopup();
+
+    if (done_loading) {
+      is_loading = false;
+      done_loading = false;
+      _state.application_state = Application_State::Segmentation;
+    }
+  }
   ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
   ImGui::InputText("Folder Name", folder_name, Buffer_Size);
   ImGui::InputText("File Prefix", file_prefix, Buffer_Size);
@@ -62,16 +79,23 @@ bool Initial_File_Selection_Menu::post_draw() {
   bool pressed = ImGui::Button("Next");
 
   if (pressed) {
-    SamplingOutput op = ImageData::writeOutput(folder_name, file_prefix, start_index, end_index, extension,
-                                               output_folder, output_prefix, downsample_factor, write_original);
-    preProcessing(op.fileName, op.x, op.y, op.z);
 
-    _state.volume_base_name = std::string(output_folder) + '/' + output_prefix + "-sample";
-    _state.volume_file = DatFile(_state.volume_base_name + ".dat"); // low res version
+    auto thread_fun = [&]() {
+      SamplingOutput op = ImageData::writeOutput(folder_name, file_prefix, start_index, end_index, extension,
+                                                 output_folder, output_prefix, downsample_factor, write_original);
+      preProcessing(op.fileName, op.x, op.y, op.z);
 
-    _state.topological_features.loadData(_state.volume_base_name);
+      _state.volume_base_name = std::string(output_folder) + '/' + output_prefix + "-sample";
+      _state.volume_file = DatFile(_state.volume_base_name + ".dat"); // low res version
 
-    _state.application_state = Application_State::Segmentation;
+      _state.topological_features.loadData(_state.volume_base_name);
+      done_loading = true;
+    };
+
+    is_loading = true;
+    done_loading = false;
+    loading_thread = std::thread(thread_fun);
+    loading_thread.detach();
   }
 
   ImGui::End();

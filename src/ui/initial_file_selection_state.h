@@ -4,6 +4,10 @@
 #include "fish_ui_viewer_plugin.h"
 #include "state.h"
 
+#include <atomic>
+#include <thread>
+
+
 class Initial_File_Selection_Menu : public FishUIViewerPlugin {
 public:
     Initial_File_Selection_Menu(State& state);
@@ -24,6 +28,10 @@ private:
     char output_prefix[Buffer_Size] = {};
     int downsample_factor = 4;
     bool write_original = true;
+
+    std::atomic_bool done_loading;
+    std::atomic_bool is_loading;
+    std::thread loading_thread;
 };
 
 #endif // __FISH_DEFORMATION_INITIAL_FILE_SELECTION_STATE__
