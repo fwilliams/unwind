@@ -27,7 +27,7 @@ protected:
 public:
   IGL_INLINE virtual void init(igl::opengl::glfw::Viewer *_viewer) override;
 
-  IGL_INLINE virtual void reload_font(int font_size = 13);
+  IGL_INLINE virtual void reload_font(int font_size = 14);
 
   IGL_INLINE virtual void shutdown() override;
 
