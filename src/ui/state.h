@@ -75,6 +75,12 @@ struct State {
     Eigen::VectorXi connected_components;
   } extracted_volume;
 
+  // Selected pairs of endpoints
+  std::vector<std::array<int, 2>> endpoint_pairs;
+
+  // Extracted skeleton vertices
+  Eigen::MatrixXd skeleton_vertices;
+
   // Geodesic distances
   Eigen::VectorXd geodesic_dists;
 };

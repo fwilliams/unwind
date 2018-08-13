@@ -33,14 +33,11 @@ private:
 
     unsigned current_endpoint_idx = 0;
     std::array<int, 2> current_endpoints = { -1, -1 };
-    std::vector<std::array<int, 2>> endpoint_pairs;
 
     int mesh_overlay_id;
     int points_overlay_id;
 
     void extract_skeleton();
-
-    Eigen::MatrixXd skeleton_vertices;
 };
 
 #endif // __FISH_DEFORMATION_ENDPOINT_SELECTION_STATE__

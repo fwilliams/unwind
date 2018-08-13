@@ -12,7 +12,12 @@ public:
     virtual bool pre_draw() override;
     void initialize();
 private:
-    State& _state;
+    State& state;
+
+    int mesh_overlay_id;
+    int points_overlay_id;
+
+    int current_vertex_id = 0;
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__

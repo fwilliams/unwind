@@ -35,8 +35,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
   selection_menu.init(&viewer);
   meshing_menu.init(&viewer);
   endpoint_selection_menu.init(&viewer);
-
-  //  bounding_polygon_menu.init(&viewer);
+  bounding_polygon_menu.init(&viewer);
   //  straightening_menu.init(&viewer);
   //  rasterization_menu.init(&viewer);
 
@@ -66,6 +65,7 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
       viewer.plugins.push_back(&endpoint_selection_menu);
       break;
     case Application_State::BoundingPolygon:
+      bounding_polygon_menu.initialize();
       viewer.plugins.push_back(&bounding_polygon_menu);
       break;
     case Application_State::Straightening:

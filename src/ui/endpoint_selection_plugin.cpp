@@ -6,7 +6,6 @@
 #include <igl/unproject_onto_mesh.h>
 #include <igl/boundary_facets.h>
 #include <igl/marching_tets.h>
-#include <igl/edges.h>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -89,7 +88,7 @@ EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state)
 
 
 void EndPoint_Selection_Menu::initialize() {
-  for (int i = viewer->data_list.size()-1; i > 0; i++) {
+  for (int i = viewer->data_list.size()-1; i > 0; i--) {
     viewer->erase_mesh(i);
   }
   mesh_overlay_id = 0;
@@ -127,33 +126,12 @@ bool EndPoint_Selection_Menu::pre_draw() {
     }
   }
 
-  for (int i = 0; i < endpoint_pairs.size(); i++) {
-    std::array<int, 2> ep = endpoint_pairs[i];
+  for (int i = 0; i < state.endpoint_pairs.size(); i++) {
+    std::array<int, 2> ep = state.endpoint_pairs[i];
     viewer->data().add_points(TV.row(ep[0]), ColorRGB::GREEN);
     viewer->data().add_points(TV.row(ep[1]), ColorRGB::RED);
   }
 
-  viewer->selected_data_index = push_mesh_id;
-
-  // HACK: This is just to show the extracted skeleton
-  push_mesh_id = viewer->selected_data_index;
-  if (done_extracting_skeleton) {
-    viewer->selected_data_index = mesh_overlay_id;
-    viewer->data().clear();
-    Eigen::MatrixXi E;
-    igl::edges(state.extracted_volume.TF, E);
-    viewer->data().set_edges(state.extracted_volume.TV, E, Eigen::RowVector3d(0.75, 0.75, 0.75));
-
-    Eigen::MatrixXd P1(skeleton_vertices.rows()-1, 3), P2(skeleton_vertices.rows()-1, 3);
-    for (int i = 0; i < skeleton_vertices.rows()-1; i++) {
-      P1.row(i) = skeleton_vertices.row(i);
-      P2.row(i) = skeleton_vertices.row(i+1);
-    }
-    viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
-    viewer->data().point_size = 10.0;
-    viewer->data().add_points(skeleton_vertices, ColorRGB::GREEN);
-    done_extracting_skeleton = false;
-  }
   viewer->selected_data_index = push_mesh_id;
 
   return ret;
@@ -173,9 +151,9 @@ bool EndPoint_Selection_Menu::post_draw() {
                ImGuiWindowFlags_NoSavedSettings |
                ImGuiWindowFlags_AlwaysAutoResize);
 
-//  if (done_extracting_skeleton) {
-//    state.application_state = Application_State::BoundingPolygon;
-//  }
+  if (done_extracting_skeleton) {
+    state.application_state = Application_State::BoundingPolygon;
+  }
 
   if (extracting_skeleton) {
     ImGui::OpenPopup("Extracting Skeleton");
@@ -211,10 +189,10 @@ bool EndPoint_Selection_Menu::post_draw() {
     }
   }
 
-  int num_digits_ep = endpoint_pairs.size() > 0 ? (int) log10 ((double) endpoint_pairs.size()) + 1 : 1;
-  if (endpoint_pairs.size() > 0) {
+  int num_digits_ep = state.endpoint_pairs.size() > 0 ? (int) log10 ((double) state.endpoint_pairs.size()) + 1 : 1;
+  if (state.endpoint_pairs.size() > 0) {
     ImGui::Text("Endpoint Pairs:");
-    for (int i = 0; i < endpoint_pairs.size(); i++) {
+    for (int i = 0; i < state.endpoint_pairs.size(); i++) {
       int num_digits_i = (i+1) > 0 ? (int) log10 ((double) (i+1)) + 1 : 1;
       std::string label_text = "Endpoint ";
       for (int zi = 0; zi < num_digits_ep-num_digits_i; zi++) {
@@ -226,8 +204,8 @@ bool EndPoint_Selection_Menu::post_draw() {
       ImGui::BulletText("%s", label_text.c_str());
       ImGui::SameLine();
       if (ImGui::Button(rm_button_text.c_str(), ImVec2(-1, 0))) {
-        assert(i < endpoint_pairs.size());
-        endpoint_pairs.erase(endpoint_pairs.begin() + i);
+        assert(i < state.endpoint_pairs.size());
+        state.endpoint_pairs.erase(state.endpoint_pairs.begin() + i);
       }
     }
     ImGui::NewLine();
@@ -245,6 +223,8 @@ bool EndPoint_Selection_Menu::post_draw() {
     ImGui::PopStyleVar();
 
     if (ImGui::Button("Cancel", ImVec2(-1,0))) {
+      current_endpoint_idx = 0;
+      current_endpoints = { -1, -1 };
       selecting_endpoints = false;
     }
   }
@@ -254,14 +234,14 @@ bool EndPoint_Selection_Menu::post_draw() {
     state.application_state = Application_State::Segmentation;
   }
   ImGui::SameLine();
-  if (endpoint_pairs.size() == 0) {
+  if (state.endpoint_pairs.size() == 0) {
     ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
   }
   if (ImGui::Button("Next")) {
     extract_skeleton();
   }
-  if (endpoint_pairs.size() == 0) {
+  if (state.endpoint_pairs.size() == 0) {
     ImGui::PopItemFlag();
     ImGui::PopStyleVar();
   }
@@ -295,16 +275,16 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
     current_endpoint_idx += 1;
 
     if (current_endpoint_idx >= 2) { // We've selected 2 endpoints
-      endpoint_pairs.push_back(current_endpoints);
+      state.endpoint_pairs.push_back(current_endpoints);
 
       if (current_endpoints[0] == current_endpoints[1]) {
         bad_selection = true;
         bad_selection_error_message = "Invalid Endpoints: Selected endpoints are the same.";
-        endpoint_pairs.pop_back();
-      } else if (!validate_endpoint_pairs(endpoint_pairs, state.extracted_volume.connected_components)) {
+        state.endpoint_pairs.pop_back();
+      } else if (!validate_endpoint_pairs(state.endpoint_pairs, state.extracted_volume.connected_components)) {
         bad_selection = true;
         bad_selection_error_message = "Invalid Endpoints: You can only have one endpoint pair per connected component.";
-        endpoint_pairs.pop_back();
+        state.endpoint_pairs.pop_back();
       }
 
       current_endpoints = { -1, -1 };
@@ -324,11 +304,11 @@ void EndPoint_Selection_Menu::extract_skeleton() {
     const Eigen::MatrixXi& TT = state.extracted_volume.TT;
     Eigen::VectorXd gdists;
 
-    geodesic_distances(TV, TT, endpoint_pairs, gdists);
+    geodesic_distances(TV, TT, state.endpoint_pairs, gdists);
     scale_zero_one(gdists, state.geodesic_dists);
     compute_skeleton(TV, TT, state.geodesic_dists,
-                     endpoint_pairs, state.extracted_volume.connected_components,
-                     100, skeleton_vertices);
+                     state.endpoint_pairs, state.extracted_volume.connected_components,
+                     100, state.skeleton_vertices);
     extracting_skeleton = false;
     done_extracting_skeleton = true;
   };
