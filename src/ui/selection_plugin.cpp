@@ -19,6 +19,7 @@ Selection_Menu::Selection_Menu(State& state)
   : _state(state)
 {}
 
+
 void Selection_Menu::initialize() {
   volumerendering::initialize(_state.volume_rendering, viewer->core.viewport, ContourTreeFragmentShader,
                               ContourTreePickingFragmentShader);
@@ -67,8 +68,6 @@ void Selection_Menu::initialize() {
   load_rawfile(_state.volume_base_name + ".raw", dims, _state.volume_data, true);
   volumerendering::upload_volume_data(_state.volume_rendering.volume_texture, dims, _state.volume_data);
 
-
-
   // Index volume
   glGenTextures(1, &_state.index_volume);
   glBindTexture(GL_TEXTURE_3D, _state.index_volume);
@@ -94,7 +93,7 @@ void Selection_Menu::initialize() {
   assert(num_bytes % 4 == 0);
   _state.index_volume_data.resize(num_bytes / 4);
   for (int i = 0; i < num_bytes / 4; ++i) {
-      _state.index_volume_data[i] = reinterpret_cast<uint32_t*>(data.data())[i];
+    _state.index_volume_data[i] = reinterpret_cast<uint32_t*>(data.data())[i];
   }
 
   _state.fishes.resize(1);
@@ -117,7 +116,6 @@ void Selection_Menu::draw_setup() {
   if (viewer->core.viewport != _state.target_viewport_size) {
     resize_framebuffer_textures(viewer->core);
     _state.target_viewport_size = viewer->core.viewport;
-
   }
 
   if (number_features_is_dirty) {
@@ -263,31 +261,57 @@ void Selection_Menu::key_down(unsigned int key, int modifiers) {
 
 bool Selection_Menu::post_draw() {
   bool ret = FishUIViewerPlugin::post_draw();
-  bool _menu_visible = true;
 
   int width;
   int height;
   glfwGetWindowSize(viewer->window, &width, &height);
+  ImGui::SetNextWindowBgAlpha(0.5);
   ImGui::SetNextWindowPos(ImVec2(.0f, .0f), ImGuiSetCond_Always);
   ImGui::SetNextWindowSize(ImVec2(int(width*0.2), height), ImGuiSetCond_Always);
-  ImGui::Begin("Segmentation Settings", &_menu_visible,
+  ImGui::Begin("Select Segments", NULL,
                ImGuiWindowFlags_NoSavedSettings |
                ImGuiWindowFlags_AlwaysAutoResize);
 
+  if (show_error_popup) {
+    ImGui::OpenPopup(error_title.c_str());
+    ImGui::BeginPopupModal(error_title.c_str());
+    ImGui::Text("%s", error_message.c_str());
+    ImGui::NewLine();
+    ImGui::Separator();
+    if (ImGui::Button("OK")) {
+      show_error_popup = false;
+    }
+    ImGui::EndPopup();
+  }
+
+  ImGui::Text("Number of features:");
   ImGui::PushItemWidth(-1);
   if (ImGui::SliderInt("Number of features", &number_features, 1, 100)) {
     number_features_is_dirty = true;
   }
+  ImGui::NewLine();
+  ImGui::Separator();
+
+  std::string list = std::accumulate(_state.fishes[_state.current_fish].feature_list.begin(),
+      _state.fishes[_state.current_fish].feature_list.end(), std::string(),
+      [](std::string s, int i) { return s + std::to_string(i) + ", "; });
+  // Remove the last ", "
+  list = list.substr(0, list.size() - 2);
+
+  ImGui::Text("Selected features: %s", list.c_str());
+
+  if (ImGui::Button("Clear Selected Features", ImVec2(-1,0))) {
+    _state.total_selection_list.clear();
+  }
+  ImGui::NewLine();
 
   ImGui::Separator();
-  ImGui::Separator();
-
   ImGui::PushItemWidth(-1);
   ImGui::Text("Current fish: %ld / %ld", _state.current_fish + 1, _state.fishes.size());
-  bool pressed_prev = ImGui::Button("Prev");
+  bool pressed_prev = ImGui::Button("< Prev Fish");
   ImGui::SameLine();
-  bool pressed_next = ImGui::Button("Next");
-
+  bool pressed_next = ImGui::Button("Next Fish >");
+  ImGui::SameLine();
   bool pressed_delete = ImGui::Button("Delete Fish");
 
   if (pressed_prev) {
@@ -319,27 +343,19 @@ bool Selection_Menu::post_draw() {
     _state.selection_list_is_dirty = true;
   }
 
-  ImGui::Separator();
+  ImGui::NewLine();
   ImGui::Separator();
 
-  bool clear_selections = ImGui::Button("Clear Selections");
-  if (clear_selections) {
-    _state.total_selection_list.clear();
+  ImGui::NewLine();
+  if (ImGui::Button("Back")) {
+    // TODO: Back button
   }
-
-  std::string list = std::accumulate(_state.fishes[_state.current_fish].feature_list.begin(),
-      _state.fishes[_state.current_fish].feature_list.end(), std::string(),
-      [](std::string s, int i) { return s + std::to_string(i) + ", "; });
-  // Remove the last ", "
-  list = list.substr(0, list.size() - 2);
-
-  ImGui::Text("Selected features: %s", list.c_str());
-
-  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 150.f);
-  ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 50.f);
-
-  bool pressed_next_step = ImGui::Button("Extract Mesh");
-  if (pressed_next_step) {
+  ImGui::SameLine();
+  if (list.size() == 0) {
+    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+  }
+  if (ImGui::Button("Next")) {
     std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
     // The feature list used in export_selected_volume uses a zero-based indexing, we use
     // 0 for the non-feature, so we have to convert into the zero-based indexing here
@@ -348,219 +364,221 @@ bool Selection_Menu::post_draw() {
     _state.skeleton_masking_volume = export_selected_volume(feature_list);
     _state.application_state = Application_State::Meshing;
   }
+  if (list.size() == 0) {
+    ImGui::PopItemFlag();
+    ImGui::PopStyleVar();
+  }
 
   ImGui::Separator();
-  ImGui::Separator();
+  if(ImGui::CollapsingHeader("Advanced", NULL, 0)) {
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
+    ImGui::Checkbox("Color by feature id", &color_by_id);
 
-  ImGui::Text("%s", "Rendering parameters");
-  ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
-  ImGui::Checkbox("Color by feature id", &color_by_id);
+    ImGui::Text("%s", "Highlight Factor: ");
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
+    ImGui::SliderFloat("Highlight Factor", &highlight_factor, 0.f, 1.f);
 
-  ImGui::Text("%s", "Highlight Factor: ");
-  ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
-  ImGui::SliderFloat("Highlight Factor", &highlight_factor, 0.f, 1.f);
+    int selection_emphasis = static_cast<int>(emphasize_by_selection);
+    const char* const items[] = {
+      "None",
+      "Highlight Selected",
+      "Highlight Deselected"
+    };
 
-  int selection_emphasis = static_cast<int>(emphasize_by_selection);
-  const char* const items[] = {
-    "None",
-    "Highlight Selected",
-    "Highlight Deselected"
-  };
-
-  bool changed = ImGui::Combo("Selection", &selection_emphasis, items, 3);
-  if (changed) {
-    emphasize_by_selection = static_cast<Emphasis>(selection_emphasis);
-  }
-
-#ifdef Debugging
-  ImGui::Text("%s", "Debugging Status");
-
-  if (current_selected_feature == 0) {
-      ImGui::Text("Current highlighted id: %s", "none");
-  }
-  else {
-      ImGui::Text("Current highlighted id: %i", current_selected_feature);
-  }
-
-  ImGui::Text("Frame Counter: %i", g_state.frame_counter);
-#endif // Debugging
-
-  ImGui::Text("%s", "Transfer Function");
-
-  constexpr const float Radius = 10.f;
-
-  volumerendering::Transfer_Function& tf = _state.volume_rendering.transfer_function;
-
-  ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
-
-  ImDrawList* draw_list = ImGui::GetWindowDrawList();
-  ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
-  //ImVec2 canvas_size = { 640.f, 150.f };
-
-  float aspect_ratio = 150.0/200.0; // height / width
-  float canvas_width = 0.9*ImGui::GetContentRegionAvailWidth();
-  float canvas_height = aspect_ratio * canvas_width;
-  ImVec2 canvas_size = { canvas_width, canvas_height };
-
-  draw_list->AddRectFilledMultiColor(canvas_pos,
-                                     ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
-                                     IM_COL32(50, 50, 50, 255), IM_COL32(50, 50, 60, 255),
-                                     IM_COL32(60, 60, 70, 255), IM_COL32(50, 50, 60, 255));
-  draw_list->AddRect(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x,
-                                        canvas_pos.y + canvas_size.y), IM_COL32(255, 255, 255, 255));
-  ImGui::InvisibleButton("canvas", canvas_size);
-
-  // First render the lines
-  for (size_t i = 0; i < tf.nodes.size(); ++i) {
-    volumerendering::Transfer_Function::Node& node = tf.nodes[i];
-
-    const float x = canvas_pos.x + canvas_size.x * node.t;
-    const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
-
-    if (i > 0) {
-      volumerendering::Transfer_Function::Node& prev_node = tf.nodes[i - 1];
-
-      const float prev_x = canvas_pos.x + canvas_size.x * prev_node.t;
-      const float prev_y = canvas_pos.y + canvas_size.y * (1.f - prev_node.rgba[3]);
-      draw_list->AddLine(ImVec2(prev_x, prev_y), ImVec2(x, y), IM_COL32(255, 255, 255, 255));
+    bool changed = ImGui::Combo("Selection", &selection_emphasis, items, 3);
+    if (changed) {
+      emphasize_by_selection = static_cast<Emphasis>(selection_emphasis);
     }
-  }
 
-  for (size_t i = 0; i < tf.nodes.size(); ++i) {
-    volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+  #ifdef Debugging
+    ImGui::Text("%s", "Debugging Status");
 
-    const float x = canvas_pos.x + canvas_size.x * node.t;
-    const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
-
-    if (i == current_interaction_index) {
-      draw_list->AddCircleFilled(ImVec2(x, y), Radius * 1.5, IM_COL32(255, 255, 255, 255));
+    if (current_selected_feature == 0) {
+      ImGui::Text("Current highlighted id: %s", "none");
     }
     else {
-      draw_list->AddCircleFilled(ImVec2(x, y), Radius, IM_COL32(255, 255, 255, 255));
+      ImGui::Text("Current highlighted id: %i", current_selected_feature);
     }
 
-    draw_list->AddCircleFilled(ImVec2(x, y), Radius,
-                               IM_COL32(node.rgba[0] * 255, node.rgba[1] * 255, node.rgba[2] * 255, 255));
-  }
+    ImGui::Text("Frame Counter: %i", g_state.frame_counter);
+  #endif // Debugging
 
-  // If the mouse button is pressed, we either have to add a new node or move an
-  // existing one
-  const bool mouse_in_tf_editor = ImGui::GetIO().MousePos.x >= canvas_pos.x &&
-      ImGui::GetIO().MousePos.x <= (canvas_pos.x + canvas_size.x) &&
-      ImGui::GetIO().MousePos.y >= canvas_pos.y &&
-      ImGui::GetIO().MousePos.y <= (canvas_pos.y + canvas_size.y);
+    ImGui::Text("%s", "Transfer Function");
 
-  if (mouse_in_tf_editor) {
-    if (ImGui::IsMouseDown(0)) {
-      for (size_t i = 0; i < tf.nodes.size(); ++i) {
-        volumerendering::Transfer_Function::Node& node = tf.nodes[i];
-        const float x = canvas_pos.x + canvas_size.x * node.t;
-        const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
+    constexpr const float Radius = 10.f;
 
-        const float dx = ImGui::GetIO().MousePos.x - x;
-        const float dy = ImGui::GetIO().MousePos.y - y;
+    volumerendering::Transfer_Function& tf = _state.volume_rendering.transfer_function;
 
-        const float r = sqrt(dx * dx + dy * dy);
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
 
-        if (r <= Radius * 2.5) {
-          clicked_mouse_position[0] = ImGui::GetIO().MousePos.x;
-          clicked_mouse_position[1] = ImGui::GetIO().MousePos.y;
-          is_currently_interacting = true;
-          current_interaction_index = i;
-          break;
-        }
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+    //ImVec2 canvas_size = { 640.f, 150.f };
+
+    float aspect_ratio = 150.0/200.0; // height / width
+    float canvas_width = 0.9*ImGui::GetContentRegionAvailWidth();
+    float canvas_height = aspect_ratio * canvas_width;
+    ImVec2 canvas_size = { canvas_width, canvas_height };
+
+    draw_list->AddRectFilledMultiColor(canvas_pos,
+                                       ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
+                                       IM_COL32(50, 50, 50, 255), IM_COL32(50, 50, 60, 255),
+                                       IM_COL32(60, 60, 70, 255), IM_COL32(50, 50, 60, 255));
+    draw_list->AddRect(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x,
+                                          canvas_pos.y + canvas_size.y), IM_COL32(255, 255, 255, 255));
+    ImGui::InvisibleButton("canvas", canvas_size);
+
+    // First render the lines
+    for (size_t i = 0; i < tf.nodes.size(); ++i) {
+      volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+
+      const float x = canvas_pos.x + canvas_size.x * node.t;
+      const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
+
+      if (i > 0) {
+        volumerendering::Transfer_Function::Node& prev_node = tf.nodes[i - 1];
+
+        const float prev_x = canvas_pos.x + canvas_size.x * prev_node.t;
+        const float prev_y = canvas_pos.y + canvas_size.y * (1.f - prev_node.rgba[3]);
+        draw_list->AddLine(ImVec2(prev_x, prev_y), ImVec2(x, y), IM_COL32(255, 255, 255, 255));
       }
+    }
 
-      if (is_currently_interacting) {
-        const float dx = ImGui::GetIO().MousePos.x - clicked_mouse_position[0];
-        const float dy = ImGui::GetIO().MousePos.y - clicked_mouse_position[1];
+    for (size_t i = 0; i < tf.nodes.size(); ++i) {
+      volumerendering::Transfer_Function::Node& node = tf.nodes[i];
 
-        const float r = sqrt(dx * dx + dy * dy);
+      const float x = canvas_pos.x + canvas_size.x * node.t;
+      const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
-        float new_t = (ImGui::GetIO().MousePos.x - canvas_pos.x) / canvas_size.x;
-        if (new_t < 0.f) {
-          new_t = 0.f;
-        }
-        if (new_t > 1.f) {
-          new_t = 1.f;
-        }
-
-        float new_a = 1.f - (ImGui::GetIO().MousePos.y - canvas_pos.y) / canvas_size.y;
-        if (new_a < 0.f) {
-          new_a = 0.f;
-        }
-        if (new_a > 1.f) {
-          new_a = 1.f;
-        }
-        // We don't want to move the first or last value
-        if ((current_interaction_index != 0) && (current_interaction_index != tf.nodes.size() - 1)) {
-          tf.nodes[current_interaction_index].t = new_t;
-        }
-        tf.nodes[current_interaction_index].rgba[3] = new_a;
-
-        using N = volumerendering::Transfer_Function::Node;
-        std::sort(tf.nodes.begin(), tf.nodes.end(),
-                  [](const N& lhs, const N& rhs) { return lhs.t < rhs.t; });
-        tf.is_dirty = true;
+      if (i == current_interaction_index) {
+        draw_list->AddCircleFilled(ImVec2(x, y), Radius * 1.5, IM_COL32(255, 255, 255, 255));
       }
       else {
-        current_interaction_index = -1;
-        // We want to only add one node per mouse click
-        if (!has_added_node_since_initial_click) {
-          // Didn't hit an existing node
-          const float t = (ImGui::GetIO().MousePos.x - canvas_pos.x) / canvas_size.x;
-          const float a = 1.f - ((ImGui::GetIO().MousePos.y - canvas_pos.y) / canvas_size.y);
+        draw_list->AddCircleFilled(ImVec2(x, y), Radius, IM_COL32(255, 255, 255, 255));
+      }
 
-          for (size_t i = 0; i < tf.nodes.size(); ++i) {
-            volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+      draw_list->AddCircleFilled(ImVec2(x, y), Radius,
+                                 IM_COL32(node.rgba[0] * 255, node.rgba[1] * 255, node.rgba[2] * 255, 255));
+    }
 
-            if (node.t > t) {
-              volumerendering::Transfer_Function::Node& prev = tf.nodes[i - 1];
+    // If the mouse button is pressed, we either have to add a new node or move an
+    // existing one
+    const bool mouse_in_tf_editor = ImGui::GetIO().MousePos.x >= canvas_pos.x &&
+        ImGui::GetIO().MousePos.x <= (canvas_pos.x + canvas_size.x) &&
+        ImGui::GetIO().MousePos.y >= canvas_pos.y &&
+        ImGui::GetIO().MousePos.y <= (canvas_pos.y + canvas_size.y);
 
-              const float t_prime = (t - prev.t) / (node.t - prev.t);
+    if (mouse_in_tf_editor) {
+      if (ImGui::IsMouseDown(0)) {
+        for (size_t i = 0; i < tf.nodes.size(); ++i) {
+          volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+          const float x = canvas_pos.x + canvas_size.x * node.t;
+          const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
-              const float r = prev.rgba[0] * (1.f - t_prime) + node.rgba[0] * t_prime;
-              const float g = prev.rgba[1] * (1.f - t_prime) + node.rgba[1] * t_prime;
-              const float b = prev.rgba[2] * (1.f - t_prime) + node.rgba[2] * t_prime;
-              const float a = prev.rgba[3] * (1.f - t_prime) + node.rgba[3] * t_prime;
+          const float dx = ImGui::GetIO().MousePos.x - x;
+          const float dy = ImGui::GetIO().MousePos.y - y;
 
-              tf.nodes.insert(tf.nodes.begin() + i, { t,{ r, g, b, a } });
-              has_added_node_since_initial_click = true;
-              tf.is_dirty = true;
-              break;
+          const float r = sqrt(dx * dx + dy * dy);
+
+          if (r <= Radius * 2.5) {
+            clicked_mouse_position[0] = ImGui::GetIO().MousePos.x;
+            clicked_mouse_position[1] = ImGui::GetIO().MousePos.y;
+            is_currently_interacting = true;
+            current_interaction_index = i;
+            break;
+          }
+        }
+
+        if (is_currently_interacting) {
+          const float dx = ImGui::GetIO().MousePos.x - clicked_mouse_position[0];
+          const float dy = ImGui::GetIO().MousePos.y - clicked_mouse_position[1];
+
+          const float r = sqrt(dx * dx + dy * dy);
+
+          float new_t = (ImGui::GetIO().MousePos.x - canvas_pos.x) / canvas_size.x;
+          if (new_t < 0.f) {
+            new_t = 0.f;
+          }
+          if (new_t > 1.f) {
+            new_t = 1.f;
+          }
+
+          float new_a = 1.f - (ImGui::GetIO().MousePos.y - canvas_pos.y) / canvas_size.y;
+          if (new_a < 0.f) {
+            new_a = 0.f;
+          }
+          if (new_a > 1.f) {
+            new_a = 1.f;
+          }
+          // We don't want to move the first or last value
+          if ((current_interaction_index != 0) && (current_interaction_index != tf.nodes.size() - 1)) {
+            tf.nodes[current_interaction_index].t = new_t;
+          }
+          tf.nodes[current_interaction_index].rgba[3] = new_a;
+
+          using N = volumerendering::Transfer_Function::Node;
+          std::sort(tf.nodes.begin(), tf.nodes.end(),
+                    [](const N& lhs, const N& rhs) { return lhs.t < rhs.t; });
+          tf.is_dirty = true;
+        }
+        else {
+          current_interaction_index = -1;
+          // We want to only add one node per mouse click
+          if (!has_added_node_since_initial_click) {
+            // Didn't hit an existing node
+            const float t = (ImGui::GetIO().MousePos.x - canvas_pos.x) / canvas_size.x;
+            const float a = 1.f - ((ImGui::GetIO().MousePos.y - canvas_pos.y) / canvas_size.y);
+
+            for (size_t i = 0; i < tf.nodes.size(); ++i) {
+              volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+
+              if (node.t > t) {
+                volumerendering::Transfer_Function::Node& prev = tf.nodes[i - 1];
+
+                const float t_prime = (t - prev.t) / (node.t - prev.t);
+
+                const float r = prev.rgba[0] * (1.f - t_prime) + node.rgba[0] * t_prime;
+                const float g = prev.rgba[1] * (1.f - t_prime) + node.rgba[1] * t_prime;
+                const float b = prev.rgba[2] * (1.f - t_prime) + node.rgba[2] * t_prime;
+                const float a = prev.rgba[3] * (1.f - t_prime) + node.rgba[3] * t_prime;
+
+                tf.nodes.insert(tf.nodes.begin() + i, { t,{ r, g, b, a } });
+                has_added_node_since_initial_click = true;
+                tf.is_dirty = true;
+                break;
+              }
             }
           }
         }
       }
+      else {
+        clicked_mouse_position[0] = 0.f;
+        clicked_mouse_position[1] = 0.f;
+        is_currently_interacting = false;
+
+        has_added_node_since_initial_click = false;
+      }
+    }
+
+    if (ImGui::Button("Remove node")) {
+      if (current_interaction_index != 0 && current_interaction_index != tf.nodes.size() - 1) {
+        tf.nodes.erase(tf.nodes.begin() + current_interaction_index);
+        current_interaction_index = -1;
+        tf.is_dirty = true;
+      }
+    }
+
+    ImGui::PushItemWidth(-1);
+    if (current_interaction_index >= 1 && current_interaction_index <= tf.nodes.size() - 1) {
+      if (ImGui::ColorPicker4("Change Color", tf.nodes[current_interaction_index].rgba)) {
+        tf.is_dirty = true;
+      }
     }
     else {
-      clicked_mouse_position[0] = 0.f;
-      clicked_mouse_position[1] = 0.f;
-      is_currently_interacting = false;
-
-      has_added_node_since_initial_click = false;
+      float rgba[4];
+      ImGui::ColorPicker4("Change Color", rgba);
     }
   }
-
-  if (ImGui::Button("Remove node")) {
-    if (current_interaction_index != 0 && current_interaction_index != tf.nodes.size() - 1) {
-      tf.nodes.erase(tf.nodes.begin() + current_interaction_index);
-      current_interaction_index = -1;
-      tf.is_dirty = true;
-    }
-  }
-
-  ImGui::PushItemWidth(-1);
-  if (current_interaction_index >= 1 && current_interaction_index <= tf.nodes.size() - 1) {
-    if (ImGui::ColorPicker4("Change Color", tf.nodes[current_interaction_index].rgba)) {
-      tf.is_dirty = true;
-    }
-  }
-  else {
-    float rgba[4];
-    ImGui::ColorPicker4("Change Color", rgba);
-  }
-
   ImGui::End();
   ImGui::Render();
   return ret;

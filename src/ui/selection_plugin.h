@@ -43,6 +43,10 @@ private:
     Emphasis emphasize_by_selection = Emphasis::OnSelection;
 
     float highlight_factor = 0.05f;
+
+    bool show_error_popup = false;
+    std::string error_title = "";
+    std::string error_message = "";
 };
 
 

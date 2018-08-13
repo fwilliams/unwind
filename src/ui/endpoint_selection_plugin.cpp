@@ -5,6 +5,8 @@
 
 #include <igl/unproject_onto_mesh.h>
 #include <igl/boundary_facets.h>
+#include <igl/marching_tets.h>
+#include <igl/edges.h>
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -37,17 +39,54 @@ static bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpo
 }
 
 
-static void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXd& TT,
+static void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
                              const Eigen::VectorXd normalized_distances,
                              const std::vector<std::array<int, 2>>& endpoint_pairs,
                              const Eigen::VectorXi& connected_components,
+                             int num_skeleton_vertices,
                              Eigen::MatrixXd& skeleton_vertices) {
+  std::vector<Eigen::MatrixXi> TT_comps;
+  split_mesh_components(TT, connected_components, TT_comps);
+
+  Eigen::MatrixXd LV;
+  Eigen::MatrixXi LF;
+
+  int vertex_count = 0;
+  skeleton_vertices.resize(num_skeleton_vertices, 3);
+
+  for (int ep_i = 0; ep_i < endpoint_pairs.size(); ep_i++) {
+    const int component = connected_components[endpoint_pairs[ep_i][0]];
+    skeleton_vertices.row(vertex_count) = TV.row(endpoint_pairs[ep_i][0]);
+    vertex_count += 1;
+
+    const double isoval_incr =
+        (normalized_distances[endpoint_pairs[ep_i][1]] - normalized_distances[endpoint_pairs[ep_i][0]]) / num_skeleton_vertices;
+
+    double isovalue = normalized_distances[endpoint_pairs[ep_i][0]] + isoval_incr;
+    for (int i = 0; i < num_skeleton_vertices-2; i++) {
+      igl::marching_tets(TV, TT_comps[component], normalized_distances, isovalue, LV, LF);
+      if (LV.rows() == 0) {
+        isovalue += isoval_incr;
+        continue;
+      }
+      Eigen::RowVector3d c = LV.colwise().sum() / LV.rows();
+      skeleton_vertices.row(vertex_count) = c;
+      vertex_count += 1;
+      isovalue += isoval_incr;
+    }
+
+    skeleton_vertices.row(vertex_count) = TV.row(endpoint_pairs[ep_i][1]);
+    vertex_count += 1;
+  }
+
+  skeleton_vertices.conservativeResize(vertex_count, 3);
 }
 
 
 EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state)
   : state(state)
 {}
+
 
 void EndPoint_Selection_Menu::initialize() {
   for (int i = viewer->data_list.size()-1; i > 0; i++) {
@@ -95,26 +134,48 @@ bool EndPoint_Selection_Menu::pre_draw() {
   }
 
   viewer->selected_data_index = push_mesh_id;
+
+  // HACK: This is just to show the extracted skeleton
+  push_mesh_id = viewer->selected_data_index;
+  if (done_extracting_skeleton) {
+    viewer->selected_data_index = mesh_overlay_id;
+    viewer->data().clear();
+    Eigen::MatrixXi E;
+    igl::edges(state.extracted_volume.TF, E);
+    viewer->data().set_edges(state.extracted_volume.TV, E, Eigen::RowVector3d(0.75, 0.75, 0.75));
+
+    Eigen::MatrixXd P1(skeleton_vertices.rows()-1, 3), P2(skeleton_vertices.rows()-1, 3);
+    for (int i = 0; i < skeleton_vertices.rows()-1; i++) {
+      P1.row(i) = skeleton_vertices.row(i);
+      P2.row(i) = skeleton_vertices.row(i+1);
+    }
+    viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
+    viewer->data().point_size = 10.0;
+    viewer->data().add_points(skeleton_vertices, ColorRGB::GREEN);
+    done_extracting_skeleton = false;
+  }
+  viewer->selected_data_index = push_mesh_id;
+
   return ret;
 }
 
 bool EndPoint_Selection_Menu::post_draw() {
   bool ret = FishUIViewerPlugin::post_draw();
-  bool _menu_visible = true;
 
   int width;
   int height;
 
   glfwGetWindowSize(viewer->window, &width, &height);
+  ImGui::SetNextWindowBgAlpha(0.5);
   ImGui::SetNextWindowPos(ImVec2(.0f, .0f), ImGuiSetCond_Always);
   ImGui::SetNextWindowSize(ImVec2(int(width*0.2), height), ImGuiSetCond_Always);
-  ImGui::Begin("", &_menu_visible,
+  ImGui::Begin("Select Endpoints", NULL,
                ImGuiWindowFlags_NoSavedSettings |
                ImGuiWindowFlags_AlwaysAutoResize);
 
-  if (done_extracting_skeleton) {
-    state.application_state = Application_State::BoundingPolygon;
-  }
+//  if (done_extracting_skeleton) {
+//    state.application_state = Application_State::BoundingPolygon;
+//  }
 
   if (extracting_skeleton) {
     ImGui::OpenPopup("Extracting Skeleton");
@@ -153,7 +214,6 @@ bool EndPoint_Selection_Menu::post_draw() {
   int num_digits_ep = endpoint_pairs.size() > 0 ? (int) log10 ((double) endpoint_pairs.size()) + 1 : 1;
   if (endpoint_pairs.size() > 0) {
     ImGui::Text("Endpoint Pairs:");
-    ImGui::Separator();
     for (int i = 0; i < endpoint_pairs.size(); i++) {
       int num_digits_i = (i+1) > 0 ? (int) log10 ((double) (i+1)) + 1 : 1;
       std::string label_text = "Endpoint ";
@@ -191,7 +251,7 @@ bool EndPoint_Selection_Menu::post_draw() {
   ImGui::NewLine();
   ImGui::Separator();
   if (ImGui::Button("Back")) {
-    // TODO: Back button
+    state.application_state = Application_State::Segmentation;
   }
   ImGui::SameLine();
   if (endpoint_pairs.size() == 0) {
@@ -266,7 +326,11 @@ void EndPoint_Selection_Menu::extract_skeleton() {
 
     geodesic_distances(TV, TT, endpoint_pairs, gdists);
     scale_zero_one(gdists, state.geodesic_dists);
+    compute_skeleton(TV, TT, state.geodesic_dists,
+                     endpoint_pairs, state.extracted_volume.connected_components,
+                     100, skeleton_vertices);
     extracting_skeleton = false;
+    done_extracting_skeleton = true;
   };
 
   extract_skeleton_thread = std::thread(thread_fun);

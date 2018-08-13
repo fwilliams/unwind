@@ -39,6 +39,8 @@ private:
     int points_overlay_id;
 
     void extract_skeleton();
+
+    Eigen::MatrixXd skeleton_vertices;
 };
 
 #endif // __FISH_DEFORMATION_ENDPOINT_SELECTION_STATE__
