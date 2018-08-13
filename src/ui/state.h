@@ -81,6 +81,9 @@ struct State {
   // Extracted skeleton vertices
   Eigen::MatrixXd skeleton_vertices;
 
+  // Extracted skeleton vertices
+  Eigen::MatrixXd smooth_skeleton_vertices;
+
   // Geodesic distances
   Eigen::VectorXd geodesic_dists;
 };

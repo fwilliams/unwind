@@ -71,6 +71,14 @@ void Bounding_Polygon_Menu::initialize() {
   viewer->data().point_size = 10.0;
   viewer->data().add_points(state.skeleton_vertices, ColorRGB::GREEN);
 
+  for (int i = 0; i < state.smooth_skeleton_vertices.rows()-1; i++) {
+    P1.row(i) = state.smooth_skeleton_vertices.row(i);
+    P2.row(i) = state.smooth_skeleton_vertices.row(i+1);
+  }
+  viewer->data().add_edges(P1, P2, ColorRGB::RED);
+  viewer->data().point_size = 10.0;
+  viewer->data().add_points(state.smooth_skeleton_vertices, ColorRGB::RED);
+
   viewer->selected_data_index = push_mesh_id;
 }
 
@@ -114,7 +122,8 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
   glDisable(GL_CULL_FACE);
   Eigen::RowVector3d n =
-      state.skeleton_vertices.row(current_vertex_id+1) - state.skeleton_vertices.row(current_vertex_id);
+      state.smooth_skeleton_vertices.row(current_vertex_id+1) -
+      state.smooth_skeleton_vertices.row(current_vertex_id);
   n.normalize();
 
   Eigen::RowVector3d right(1, 0, 0);
@@ -124,7 +133,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
   Eigen::MatrixXd PV;
   Eigen::MatrixXi PF;
-  make_plane(n, up, state.skeleton_vertices.row(current_vertex_id), 40.0, PV, PF);
+  make_plane(n, up, state.smooth_skeleton_vertices.row(current_vertex_id), 40.0, PV, PF);
 
   int push_overlay_id = viewer->selected_data_index;
   viewer->selected_data_index = points_overlay_id;

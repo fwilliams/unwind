@@ -82,6 +82,15 @@ static void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& T
 }
 
 
+static void smooth_skeleton(const Eigen::MatrixXd& skeleton_vertices, Eigen::MatrixXd& smoothed_vertices) {
+  smoothed_vertices.resize(skeleton_vertices.rows(), 3);
+  smoothed_vertices.row(0) = skeleton_vertices.row(0);
+  for (int i = 1; i < skeleton_vertices.rows()-1; i++) {
+    smoothed_vertices.row(i) = 0.5 * (skeleton_vertices.row(i-1) + skeleton_vertices.row(i+1));
+  }
+  smoothed_vertices.row(skeleton_vertices.rows()-1) = skeleton_vertices.row(skeleton_vertices.rows()-1);
+}
+
 EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state)
   : state(state)
 {}
@@ -309,6 +318,14 @@ void EndPoint_Selection_Menu::extract_skeleton() {
     compute_skeleton(TV, TT, state.geodesic_dists,
                      state.endpoint_pairs, state.extracted_volume.connected_components,
                      100, state.skeleton_vertices);
+    Eigen::MatrixXd smooth = state.skeleton_vertices;
+    Eigen::MatrixXd smooth_next;
+    for (int i = 0; i < 50; i++) {
+      smooth_skeleton(smooth, smooth_next);
+      smooth = smooth_next;
+    }
+    state.smooth_skeleton_vertices = smooth_next;
+
     extracting_skeleton = false;
     done_extracting_skeleton = true;
   };
