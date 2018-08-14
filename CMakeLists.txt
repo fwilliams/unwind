@@ -7,8 +7,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/
 # Find Suitesparse
 if (WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOLMOD")
-  include_directories("C:/ab7512/SuiteSparse/include")
-  include_directories("C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/include")
+  include_directories("C:/Development/SuiteSparse/include")
+  include_directories("C:/Development/SuiteSparse/CHOLMOD/include/include")
+  include_directories("C:/Development/OpenBLAS-v0.2.19-Win64-int32/include")
 else ()
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()
