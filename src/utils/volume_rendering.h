@@ -55,8 +55,6 @@ struct Volume_Rendering {
     Transfer_Function transfer_function;
     Parameters parameters;
 
-    GLuint screenspace_vao = 0;
-    GLuint screenspace_vbo = 0;
     struct {
         GLuint program_object = 0;
         struct {

@@ -193,8 +193,8 @@ constexpr const char* ContourTreeFragmentShader = R"(
     while (t < t_end) {
       vec3 sample_pos = entry + t * normalized_ray_direction;
 
-      const uint segVoxel = texture(index_volume, sample_pos).r;
-      const uint feature = contour.values[segVoxel] + 1;
+      uint segVoxel = texture(index_volume, sample_pos).r;
+      uint feature = contour.values[segVoxel] + 1;
 
       if (feature != 0) {
         float value = texture(volume_texture, sample_pos).r;

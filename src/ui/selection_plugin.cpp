@@ -21,8 +21,8 @@ Selection_Menu::Selection_Menu(State& state)
 
 
 void Selection_Menu::initialize() {
-  volumerendering::initialize(_state.volume_rendering, viewer->core.viewport, ContourTreeFragmentShader,
-                              ContourTreePickingFragmentShader);
+  volumerendering::initialize(_state.volume_rendering, viewer->core.viewport,
+      ContourTreeFragmentShader, ContourTreePickingFragmentShader);
 
   _state.uniform_locations_rendering.index_volume = glGetUniformLocation(
         _state.volume_rendering.program.program_object, "index_volume"
@@ -68,8 +68,8 @@ void Selection_Menu::initialize() {
   // Index volume
   glGenTextures(1, &_state.index_volume);
   glBindTexture(GL_TEXTURE_3D, _state.index_volume);
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -134,12 +134,8 @@ void Selection_Menu::draw_setup() {
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _state.contour_information_ssbo);
-    glBufferData(
-          GL_SHADER_STORAGE_BUFFER,
-          sizeof(uint32_t) * buffer_data.size(),
-          buffer_data.data(),
-          GL_DYNAMIC_READ
-          );
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
+        buffer_data.data(), GL_DYNAMIC_READ);
 
     number_features_is_dirty = false;
   }
@@ -176,6 +172,9 @@ void Selection_Menu::draw() {
 
   render_bounding_box(_state.volume_rendering, viewer->core.model, viewer->core.view,
                       viewer->core.proj);
+
+  glClearColor(0.f, 0.f, 0.f, 0.f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glUseProgram(_state.volume_rendering.program.program_object);
 

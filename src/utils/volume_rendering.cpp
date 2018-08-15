@@ -255,35 +255,6 @@ namespace volumerendering {
 void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_size,
                 const char* fragment_shader, const char* picking_shader)
 {
-    // This should be enabled by default
-    //glEnable(GL_TEXTURE_1D);
-    //glEnable(GL_TEXTURE_2D);
-    //glEnable(GL_TEXTURE_3D);
-
-    //
-    //   Screen space quad
-    //
-
-    glGenVertexArrays(1, &volume_rendering.screenspace_vao);
-    glBindVertexArray(volume_rendering.screenspace_vao);
-
-
-    glGenBuffers(1, &volume_rendering.screenspace_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, volume_rendering.screenspace_vbo);
-    const GLfloat screenspace_data[] = {
-        -1.f, -1.f,
-         1.f, -1.f,
-         1.f,  1.f,
-
-        -1.f, -1.f,
-         1.f,  1.f,
-        -1.f,  1.f
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(screenspace_data), screenspace_data,
-        GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * sizeof(GLfloat), nullptr);
-    glEnableVertexAttribArray(0);
-
     //
     //   Bounding box information
     //
@@ -635,9 +606,6 @@ void render_volume(const Volume_Rendering& volume_rendering,
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glClearColor(0.f, 0.f, 0.f, 0.f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     //
     //  Volume rendering
     //
@@ -687,9 +655,7 @@ void render_volume(const Volume_Rendering& volume_rendering,
         volume_rendering.program.uniform_location.light_exponent_specular, 10.f
     );
 
-    glBindVertexArray(volume_rendering.screenspace_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
     glPopDebugGroup();
 }
 
@@ -736,9 +702,7 @@ Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
     glUniform3fv(volume_rendering.picking_program.uniform_location.volume_dimensions_rcp,
         1, volume_rendering.parameters.volume_dimensions_rcp.data());
 
-    glBindVertexArray(volume_rendering.screenspace_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
     glUseProgram(0);
 
     GLfloat colors[3];
