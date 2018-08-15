@@ -116,6 +116,13 @@ void Selection_Menu::draw_setup() {
   }
 
   if (number_features_is_dirty) {
+    _state.total_selection_list.clear();
+    for (State::Fish_Status& s : _state.fishes) {
+        s.feature_list.clear();
+    }
+    _state.total_selection_list.clear();
+    _state.selection_list_is_dirty = true;
+
     std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(
           number_features, 0.f);
 
