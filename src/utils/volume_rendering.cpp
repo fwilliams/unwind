@@ -565,7 +565,14 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
         volume_rendering.parameters.normalized_volume_dimensions[1],
         volume_rendering.parameters.normalized_volume_dimensions[2],
         1.f;
-    Eigen::Matrix4f model = model_matrix * scaling;
+
+    Eigen::Matrix4f translation = Eigen::Matrix4f::Zero();
+    translation.diagonal() << 1.f, 1.f, 1.f, 1.f;
+    translation(0, 3) = -0.5f;
+    translation(1, 3) = -0.5f;
+    translation(2, 3) = -0.5f;
+
+    Eigen::Matrix4f model = model_matrix * scaling * translation;
 
     glUniformMatrix4fv(volume_rendering.bounding_box.uniform_location.model_matrix, 1,
         GL_FALSE, model.data());
