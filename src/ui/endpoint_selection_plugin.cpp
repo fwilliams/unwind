@@ -328,6 +328,7 @@ void EndPoint_Selection_Menu::extract_skeleton() {
 
     extracting_skeleton = false;
     done_extracting_skeleton = true;
+    glfwPostEmptyEvent();
   };
 
   extract_skeleton_thread = std::thread(thread_fun);

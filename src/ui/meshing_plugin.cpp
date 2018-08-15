@@ -129,6 +129,7 @@ void Meshing_Menu::initialize() {
 
     _is_meshing = false;
     _done_meshing = true;
+    glfwPostEmptyEvent();
 
   };
 
@@ -180,6 +181,8 @@ bool Meshing_Menu::post_draw() {
   if (_done_meshing) {
     _state.application_state = Application_State::EndPointSelection;
     _done_meshing = false;
+
+    glfwPostEmptyEvent();
   }
 
   ImGui::Render();
