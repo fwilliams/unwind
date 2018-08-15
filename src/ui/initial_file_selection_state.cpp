@@ -124,6 +124,7 @@ bool Initial_File_Selection_Menu::post_draw() {
 
       _state.topological_features.loadData(_state.volume_base_name);
       done_loading = true;
+      glfwPostEmptyEvent();
     };
 
     is_loading = true;
