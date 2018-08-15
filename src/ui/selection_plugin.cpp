@@ -45,11 +45,8 @@ void Selection_Menu::initialize() {
   glGenBuffers(1, &_state.selection_list_ssbo);
 
   Eigen::RowVector3i dims = { _state.volume_file.w, _state.volume_file.h, _state.volume_file.d };
-  _state.volume_rendering.parameters.volume_dimensions = {
-    GLuint(_state.volume_file.w),
-    GLuint(_state.volume_file.h),
-    GLuint(_state.volume_file.d)
-  };
+  _state.volume_rendering.parameters.volume_dimensions = { _state.volume_file.w,
+      _state.volume_file.h, _state.volume_file.d };
   _state.volume_rendering.parameters.volume_dimensions_rcp = {
     1.f / _state.volume_rendering.parameters.volume_dimensions[0],
     1.f / _state.volume_rendering.parameters.volume_dimensions[1],
@@ -152,12 +149,8 @@ void Selection_Menu::draw_setup() {
     selected.insert(selected.begin(), static_cast<int>(selected.size()));
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _state.selection_list_ssbo);
-    glBufferData(
-          GL_SHADER_STORAGE_BUFFER,
-          sizeof(uint32_t) * selected.size(),
-          selected.data(),
-          GL_DYNAMIC_READ
-          );
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
+        selected.data(), GL_DYNAMIC_READ);
 
     _state.selection_list_is_dirty = false;
   }
@@ -174,8 +167,10 @@ void Selection_Menu::draw() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   if (_state.volume_rendering.transfer_function.is_dirty) {
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
     update_transfer_function(_state.volume_rendering.transfer_function);
     _state.volume_rendering.transfer_function.is_dirty = false;
+    glPopDebugGroup();
   }
 
 
@@ -213,6 +208,8 @@ void Selection_Menu::draw() {
   Eigen::Vector3f picking = pick_volume_location(_state.volume_rendering,
                                                  viewer->core.model, viewer->core.view, viewer->core.proj,
   { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y });
+  
+  glUseProgram(0);
 
   // Picking returns a RGB color, but all values should be the same, since the value is
   // fetched from a grayscale volume

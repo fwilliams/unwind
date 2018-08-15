@@ -256,9 +256,33 @@ void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_siz
                 const char* fragment_shader, const char* picking_shader)
 {
     // This should be enabled by default
-    glEnable(GL_TEXTURE_1D);
-    glEnable(GL_TEXTURE_2D);
-    glEnable(GL_TEXTURE_3D);
+    //glEnable(GL_TEXTURE_1D);
+    //glEnable(GL_TEXTURE_2D);
+    //glEnable(GL_TEXTURE_3D);
+
+    //
+    //   Screen space quad
+    //
+
+    glGenVertexArrays(1, &volume_rendering.screenspace_vao);
+    glBindVertexArray(volume_rendering.screenspace_vao);
+
+
+    glGenBuffers(1, &volume_rendering.screenspace_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, volume_rendering.screenspace_vbo);
+    const GLfloat screenspace_data[] = {
+        -1.f, -1.f,
+         1.f, -1.f,
+         1.f,  1.f,
+
+        -1.f, -1.f,
+         1.f,  1.f,
+        -1.f,  1.f
+    };
+    glBufferData(GL_ARRAY_BUFFER, sizeof(screenspace_data), screenspace_data,
+        GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * sizeof(GLfloat), nullptr);
+    glEnableVertexAttribArray(0);
 
     //
     //   Bounding box information
@@ -557,6 +581,7 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
                          Eigen::Matrix4f model_matrix, Eigen::Matrix4f view_matrix,
                          Eigen::Matrix4f proj_matrix)
 {
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
     //
     //  Pre-Rendering
     //
@@ -593,13 +618,14 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
     glDrawElements(GL_TRIANGLES, 12 * 3, GL_UNSIGNED_BYTE, nullptr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+    glPopDebugGroup();
 }
 
 void render_volume(const Volume_Rendering& volume_rendering,
                    Eigen::Matrix4f model_matrix, Eigen::Matrix4f view_matrix,
                    Eigen::Matrix4f proj_matrix, Eigen::Vector3f light_position)
 {
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
     //
     //  Setup
     //
@@ -642,11 +668,11 @@ void render_volume(const Volume_Rendering& volume_rendering,
 
 
     // Rendering parameters
-    glUniform3uiv(volume_rendering.program.uniform_location.volume_dimensions, 3,
+    glUniform3iv(volume_rendering.program.uniform_location.volume_dimensions, 1,
         volume_rendering.parameters.volume_dimensions.data());
-    glUniform3fv(volume_rendering.program.uniform_location.volume_dimensions_rcp, 3,
+    glUniform3fv(volume_rendering.program.uniform_location.volume_dimensions_rcp, 1,
         volume_rendering.parameters.volume_dimensions_rcp.data());
-    glUniform3fv(volume_rendering.program.uniform_location.light_position, 3,
+    glUniform3fv(volume_rendering.program.uniform_location.light_position, 1,
         light_position.data());
     glUniform3f(
         volume_rendering.program.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f
@@ -661,7 +687,10 @@ void render_volume(const Volume_Rendering& volume_rendering,
         volume_rendering.program.uniform_location.light_exponent_specular, 10.f
     );
 
+    glBindVertexArray(volume_rendering.screenspace_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+    glPopDebugGroup();
 }
 
 Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
@@ -670,8 +699,8 @@ Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
                                      Eigen::Matrix4f proj_matrix,
                                      Eigen::Vector2i mouse_position)
 {
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
     glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.picking_framebuffer);
-    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -702,12 +731,14 @@ Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
 
 
     // Rendering parameters
-    glUniform3uiv(volume_rendering.picking_program.uniform_location.volume_dimensions, 3,
+    glUniform3iv(volume_rendering.picking_program.uniform_location.volume_dimensions, 1,
         volume_rendering.parameters.volume_dimensions.data());
     glUniform3fv(volume_rendering.picking_program.uniform_location.volume_dimensions_rcp,
-        3, volume_rendering.parameters.volume_dimensions_rcp.data());
+        1, volume_rendering.parameters.volume_dimensions_rcp.data());
 
+    glBindVertexArray(volume_rendering.screenspace_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
     glUseProgram(0);
 
     GLfloat colors[3];
@@ -715,6 +746,7 @@ Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    glPopDebugGroup();
     return {
         colors[0],
         colors[1],

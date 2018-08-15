@@ -40,7 +40,7 @@ struct Transfer_Function {
 };
 
 struct Parameters {
-    std::array<GLuint, 3> volume_dimensions = { 0, 0, 0 };
+    std::array<GLint, 3> volume_dimensions = { 0, 0, 0 };
     std::array<GLfloat, 3> volume_dimensions_rcp = { 0.f, 0.f, 0.f };
 
     std::array<float, 3> normalized_volume_dimensions = { 0.f, 0.f, 0.f };
@@ -55,6 +55,8 @@ struct Volume_Rendering {
     Transfer_Function transfer_function;
     Parameters parameters;
 
+    GLuint screenspace_vao = 0;
+    GLuint screenspace_vbo = 0;
     struct {
         GLuint program_object = 0;
         struct {

@@ -57,7 +57,7 @@ struct State {
 
   // Sorted list of selected features
   std::vector<uint32_t> total_selection_list;
-  bool selection_list_is_dirty = false;
+  bool selection_list_is_dirty = true;
   GLuint selection_list_ssbo;
 
 
