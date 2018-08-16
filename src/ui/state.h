@@ -78,6 +78,17 @@ struct State {
   // Selected pairs of endpoints
   std::vector<std::array<int, 2>> endpoint_pairs;
 
+  struct BoundingPolygon {
+      int nPoints = 6;
+
+      struct Slice {
+          int vertex_id;
+          std::vector<Eigen::Vector2f> polygon;
+      };
+      std::vector<Slice> polygon_slices;
+  };
+  BoundingPolygon bounding_polygon;
+
   // Extracted skeleton vertices
   Eigen::MatrixXd skeleton_vertices;
 

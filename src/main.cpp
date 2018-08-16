@@ -32,7 +32,7 @@ Rasterization_Menu rasterization_menu(_state);
 void log_opengl_debug(GLenum source, GLenum type, GLuint id,
                       GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 {
-  if (id == 131185) {
+  if (id == 131185 || id == 7) {
     return;
   }
   if (source == GL_DEBUG_SOURCE_APPLICATION) {
@@ -131,6 +131,34 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned int key, int modifiers
   return false;
 }
 
+
+bool mouse_move(igl::opengl::glfw::Viewer& viewer, int mouse_x, int mouse_y) {
+    switch (_state.application_state) {
+        case Application_State::BoundingPolygon:
+            return bounding_polygon_menu.mouse_move(mouse_x, mouse_y);
+        default:
+            return false;
+    }
+}
+
+bool mouse_down(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
+    switch (_state.application_state) {
+        case Application_State::BoundingPolygon:
+            return bounding_polygon_menu.mouse_down(button, modifier);
+        default:
+            return false;
+    }
+}
+
+bool mouse_up(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
+    switch (_state.application_state) {
+        case Application_State::BoundingPolygon:
+            return bounding_polygon_menu.mouse_up(button, modifier);
+        default:
+            return false;
+    }
+}
+
 int main(int argc, char** argv) {
   igl::opengl::glfw::Viewer viewer;
   viewer.core.background_color = Eigen::Vector4f(0.1, 0.1, 0.1, 1.0);
@@ -138,6 +166,9 @@ int main(int argc, char** argv) {
   viewer.callback_pre_draw = pre_draw;
   viewer.callback_post_draw = post_draw;
   viewer.callback_key_pressed = key_down;
+  viewer.callback_mouse_move = mouse_move;
+  viewer.callback_mouse_down = mouse_down;
+  viewer.callback_mouse_up = mouse_up;
   viewer.launch();
 
   return EXIT_SUCCESS;
