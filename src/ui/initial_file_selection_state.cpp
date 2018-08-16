@@ -3,41 +3,11 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <GLFW/glfw3.h>
+#include <utils/mkpath.h>
 
 #include "preprocessing.hpp"
 
 #include "state.h"
-
-#ifdef WIN32
-#include <Windows.h>
-
-BOOL directoryExists(LPCTSTR szPath) {
-    DWORD dwAttrib = GetFileAttributes(szPath);
-
-    return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-}
-
-void createDirectoryRecursively(std::string path) {
-    const int PathBufferSize = 4096;
-    std::vector<char> buffer(PathBufferSize);
-
-    const DWORD success = GetFullPathNameA(path.c_str(), PathBufferSize,
-        buffer.data(), nullptr);
-    path.assign(buffer.data());
-
-    std::string::size_type pos = 0;
-    do {
-        pos = path.find_first_of("\\/", pos + 1);
-        std::string p = path.substr(0, pos);
-        CreateDirectoryA(p.c_str(), nullptr);
-    } while (pos != std::string::npos);
-}
-#else
-void createDirectoryRecursively(std::string path) {
-//    static_assert(false);
-}
-
-#endif // WIN32
 
 
 Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) :
@@ -113,7 +83,7 @@ bool Initial_File_Selection_Menu::post_draw() {
   if (pressed) {
 
     auto thread_fun = [&]() {
-      createDirectoryRecursively(output_folder);
+      mkpath(output_folder, 0777 /* mode */);
 
       SamplingOutput op = ImageData::writeOutput(folder_name, file_prefix, start_index, end_index, extension,
                                                  output_folder, output_prefix, downsample_factor, write_original);

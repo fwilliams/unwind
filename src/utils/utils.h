@@ -15,31 +15,10 @@ void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi&
 bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXd& out, bool normalize = true);
 
 
-// Compute heat diffusion
-void diffusion_distances(const Eigen::MatrixXd& TV,
-                         const Eigen::MatrixXi& TT,
-                         const std::vector<std::array<int, 2>>& endpoints,
-                         Eigen::VectorXd& isovals);
-
-
-// Compute approximate geodesic distance
-void geodesic_distances(const Eigen::MatrixXd& TV,
-                        const Eigen::MatrixXi& TT,
-                        const std::vector<std::array<int, 2>>& endpoints,
-                        Eigen::VectorXd& isovals);
-
-
 void edge_endpoints(const Eigen::MatrixXd& V,
                     const Eigen::MatrixXi& F,
                     Eigen::MatrixXd& V1,
                     Eigen::MatrixXd& V2);
-
-
-// Scale a vector so its values lie between zero and one
-void scale_zero_one(const Eigen::VectorXd& V, Eigen::VectorXd& V_scaled);
-
-
-void scale_zero_one(Eigen::VectorXd& V);
 
 
 // Check if the point pt is in the tet at ID tet

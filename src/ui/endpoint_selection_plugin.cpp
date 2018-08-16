@@ -12,7 +12,7 @@
 #include <GLFW/glfw3.h>
 
 #include <utils/colors.h>
-#include <utils/utils.h>
+#include <utils/geodesic_distances.h>
 
 
 static bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints, const Eigen::VectorXi& components) {
@@ -313,8 +313,7 @@ void EndPoint_Selection_Menu::extract_skeleton() {
     const Eigen::MatrixXi& TT = state.extracted_volume.TT;
     Eigen::VectorXd gdists;
 
-    geodesic_distances(TV, TT, state.endpoint_pairs, gdists);
-    scale_zero_one(gdists, state.geodesic_dists);
+    geodesic_distances(TV, TT, state.endpoint_pairs, state.geodesic_dists, true /* normalized */);
     compute_skeleton(TV, TT, state.geodesic_dists,
                      state.endpoint_pairs, state.extracted_volume.connected_components,
                      100, state.skeleton_vertices);

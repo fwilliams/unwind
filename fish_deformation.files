@@ -9906,6 +9906,10 @@ src/utils/cgal_tetrahedralize.h
 src/utils/colors.h
 src/utils/datfile.cpp
 src/utils/datfile.h
+src/utils/geodesic_distances.cpp
+src/utils/geodesic_distances.h
+src/utils/mkpath.cpp
+src/utils/mkpath.h
 src/utils/rasterizer.cpp
 src/utils/rasterizer.h
 src/utils/utils.cpp

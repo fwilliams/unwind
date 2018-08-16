@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <thread>
+#include <cstdlib>
 
 
 class Initial_File_Selection_Menu : public FishUIViewerPlugin {
@@ -17,7 +18,11 @@ public:
 private:
     State& _state;
 
-    static const int Buffer_Size = 256;
+#ifdef WIN32
+    static const int Buffer_Size = 4096;
+#else
+    static const int Buffer_Size = PATH_MAX;
+#endif
 
     char folder_name[Buffer_Size] = {};
     char file_prefix[Buffer_Size] = {};

@@ -25,7 +25,7 @@
 #include "colors.h"
 #include "rasterizer.h"
 #include "deformation_constraints.h"
-
+#include "geodesic_distances.h"
 
 typedef igl::opengl::glfw::Viewer Viewer;
 
@@ -782,11 +782,9 @@ public:
             m_ui_state.m_error_message = string("Error: Cannot have more than one pair of endpoints per component.");
           } else {
             if (geodesic_distances_thin.rows() == 0) {
-              geodesic_distances(TV_thin, TT_thin, m_ui_state.m_selected_end_pairs, geodesic_distances_thin);
+              geodesic_distances(TV_thin, TT_thin, m_ui_state.m_selected_end_pairs, geodesic_distances_thin, true /*normalized*/);
 //              diffusion_distances(TV, TT, m_ui_state.m_selected_end_pairs, isovals);
-              Eigen::VectorXd isovals_normalized;
-              scale_zero_one(geodesic_distances_thin, isovals_normalized);
-              igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, isovals_normalized, false, m_ui_state.m_isoval_colors);
+              igl::colormap(igl::COLOR_MAP_TYPE_MAGMA, geodesic_distances_thin, false, m_ui_state.m_isoval_colors);
             }
 
             m_double_buf_lock.lock();
