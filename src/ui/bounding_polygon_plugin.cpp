@@ -5,6 +5,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <GLFW/glfw3.h>
+#include <igl/copyleft/cgal/convex_hull.h>
 
 #include <utils/colors.h>
 
@@ -485,6 +486,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
   Eigen::RowVector3d up = right.cross(n);
   up.normalize();
+  right = up.cross(n);
 
   Eigen::MatrixXi PF;
   make_plane(n, up, state.smooth_skeleton_vertices.row(current_vertex_id), 40.0, PV, PF);

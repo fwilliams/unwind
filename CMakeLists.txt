@@ -14,7 +14,6 @@ else ()
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()
 
-message("Release flags ${CMAKE_CXX_FLAGS_RELEASE}")
 
 # Fish deformation options
 option(BUILD_TESTS                   "Build test binaries" OFF)
