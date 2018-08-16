@@ -5,7 +5,8 @@
 #include <unistd.h>
 #endif /* HAVE_UNISTD_H */
 
-#include <string.h>
+#include <string>
+#include <vector>
 #include <cstdlib>
 
 #ifdef WIN32
@@ -17,7 +18,7 @@ static BOOL directoryExists(LPCTSTR szPath) {
   return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-void mkpath(cont char* cpath, mode_t mode=0777) {
+int mkpath(const char* cpath, mode_t mode) {
   std::string path(cpath);
   const int PathBufferSize = 4096;
   std::vector<char> buffer(PathBufferSize);
@@ -32,6 +33,8 @@ void mkpath(cont char* cpath, mode_t mode=0777) {
     std::string p = path.substr(0, pos);
     CreateDirectoryA(p.c_str(), nullptr);
   } while (pos != std::string::npos);
+
+  return 0;
 }
 #else
 
