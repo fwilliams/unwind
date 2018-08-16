@@ -30,15 +30,18 @@ Rasterization_Menu rasterization_menu(_state);
 
 
 void log_opengl_debug(GLenum source, GLenum type, GLuint id,
-    GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+                      GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 {
-    if (source == GL_DEBUG_SOURCE_APPLICATION) {
-        return;
-    }
-    std::cout << "OpenGL Debug msg\nSource: " << source << "\nType: " << type << "\nId: "
-    << id << "\nSeverity: " << severity << "\nMessage: " << std::string(message) << '\n';
+  if (id == 131185) {
+    return;
+  }
+  if (source == GL_DEBUG_SOURCE_APPLICATION) {
+    return;
+  }
+  std::cout << "OpenGL Debug msg\nSource: " << source << "\nType: " << type << "\nId: "
+            << id << "\nSeverity: " << severity << "\nMessage: " << std::string(message) << '\n';
 #ifdef WIN32
-    DebugBreak();
+  DebugBreak();
 #endif
 }
 
@@ -55,7 +58,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
   viewer.plugins.push_back(&initial_file_selection);
 
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-  glDebugMessageCallback(log_opengl_debug, log_opengl_debug);
+  glDebugMessageCallback(log_opengl_debug, NULL);
 
   return false;
 }

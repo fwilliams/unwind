@@ -55,29 +55,29 @@ static void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
   std::vector<Eigen::Vector3d> grid_pts;
   std::vector<double> grid_vals;
 
-  for (int z = -1; z < n_samples+1; ++z) {
-    for (int y = -1; y < dexels.gridSize()[1]+1; ++y) {
-      for (int x = -1; x < dexels.gridSize()[0]+1; ++x) {
+  for (int x = -1; x < dexels.gridSize()[0]+1; ++x) { // z axis
+    for (int y = -1; y < dexels.gridSize()[1]+1; ++y) {   // y axis
+      for (int z = -1; z < n_samples+1; ++z) {                // x axis
         if (x == -1 || y == -1 || z == -1 || x == dexels.gridSize()[0] || y == dexels.gridSize()[1] || z == n_samples) {
           Eigen::Vector3d grid_ctr;
-          grid_ctr[0] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
+          grid_ctr[0] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
           grid_ctr[1] = dexels.origin()[1] + (y+0.5) * (dexels.extent()[1]/dexels.gridSize()[1]);
-          grid_ctr[2] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
+          grid_ctr[2] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
           grid_pts.push_back(grid_ctr);
           grid_vals.push_back(1);
           continue;
         }
         Eigen::Vector3d grid_ctr;
-        grid_ctr[0] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
+        grid_ctr[0] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
         grid_ctr[1] = dexels.origin()[1] + (y+0.5) * (dexels.extent()[1]/dexels.gridSize()[1]);
-        grid_ctr[2] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
+        grid_ctr[2] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
 
         grid_pts.push_back(grid_ctr);
 
         const std::vector<vor3d::Scalar>& d = dexels.at(x, y);
         int idx = -1;
         for (int i = 0; i < d.size(); i++) {
-          if (grid_ctr[2] < d[i]) {
+          if (grid_ctr[0] < d[i]) {
             idx = i-1;
             break;
           }
@@ -104,7 +104,7 @@ static void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
     vals[i] = grid_vals[i];
   }
 
-  igl::copyleft::marching_cubes(vals, pts, dexels.gridSize()[0]+2, dexels.gridSize()[1]+2, n_samples+2, V, F);
+  igl::copyleft::marching_cubes(vals, pts, n_samples+2, dexels.gridSize()[1]+2, dexels.gridSize()[0]+2, V, F);
 }
 
 
@@ -201,9 +201,6 @@ void Meshing_Menu::dilate_volume() {
   op.dilation(input, output, 3, time_1, time_2);
 
   dexels_to_mesh(2*_state.volume_file.w, output, extracted_surface.V_fat, extracted_surface.F_fat);
-
-//  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
-//  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
 }
 
 

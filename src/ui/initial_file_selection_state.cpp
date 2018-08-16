@@ -34,7 +34,7 @@ void createDirectoryRecursively(std::string path) {
 }
 #else
 void createDirectoryRecursively(std::string path) {
-    static_assert(false);
+//    static_assert(false);
 }
 
 #endif // WIN32
