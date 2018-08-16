@@ -38,6 +38,8 @@ int mkpath(const char* cpath, mode_t mode) {
 }
 #else
 
+#include <string.h>
+
 static int do_mkdir(const char *path, mode_t mode) {
   typedef struct stat Stat;
   Stat st;
