@@ -53,6 +53,17 @@ endif()
 ## Static libraries ##
 ######################
 
+#next week, I'm going to pull out a 1d parameterization of the curves I am generating with the autoencoder, if that works, we should decide what the next experiment should be. I think it would be interesting/fun to work on something which more closely resembles real sensor data (maybe without noise).
+# Qhull static library
+set(QHULL_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/qhull/src")
+file(GLOB QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/*.cpp")
+list(REMOVE_ITEM QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/qt-qhull.cpp")
+list(REMOVE_ITEM QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/usermem_r-cpp.cpp")
+message("qhull srcs ${QHULL_CPP_SRCS}")
+add_library(qhull STATIC ${QHULL_CPP_SRCS})
+target_include_directories(qhull PUBLIC ${QHULL_SRC_DIR})
+
+
 # Quartet static library
 set(QUARTET_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src")
 file(GLOB QUARTET_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/*.cpp")
