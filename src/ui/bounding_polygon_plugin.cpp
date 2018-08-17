@@ -128,7 +128,10 @@ bool Bounding_Polygon_Menu::post_draw() {
     current_vertex_id = std::min(current_vertex_id + 1, int(state.skeleton_vertices.rows() - 2));
   }
 
-  widget_2d.post_draw(PV, current_vertex_id);
+  ImGui::Checkbox("Show slice view", &show_slice_view);
+  if (show_slice_view) {
+    widget_2d.post_draw(PV, current_vertex_id);
+  }
   ImGui::End();
   ImGui::Render();
 

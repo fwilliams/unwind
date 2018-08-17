@@ -29,6 +29,8 @@ private:
   int points_overlay_id;
 
   int current_vertex_id = 0;
+
+  bool show_slice_view = false;
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__
