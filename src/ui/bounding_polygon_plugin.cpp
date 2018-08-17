@@ -85,19 +85,16 @@ void Bounding_Polygon_Menu::initialize() {
 
 
 bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
-  FishUIViewerPlugin::mouse_move(mouse_x, mouse_y);
   return widget_2d.mouse_move(mouse_x, mouse_y);
 }
 
 
 bool Bounding_Polygon_Menu::mouse_down(int button, int modifier) {
-  FishUIViewerPlugin::mouse_down(button, modifier);
   return widget_2d.mouse_down(button, modifier);
 }
 
 
 bool Bounding_Polygon_Menu::mouse_up(int button, int modifier) {
-  bool ret = FishUIViewerPlugin::mouse_up(button, modifier);
   return widget_2d.mouse_up(button, modifier);
 }
 
