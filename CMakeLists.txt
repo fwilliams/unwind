@@ -5,7 +5,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/voroffset/cmake)
 
 
-# Fish deformation options
+
+
+###################
+## Build options ##
+###################
+
 option(BUILD_TESTS                   "Build test binaries" OFF)
 option(RELEASE_WITH_SYMBOLS          "Build in release mode but with debug symbols" OFF)
 
@@ -111,6 +116,7 @@ target_link_libraries(vor3d PUBLIC eigen)
 ##################################
 ## Build main and test programs ##
 ##################################
+
 add_subdirectory("src")
 
 IF (BUILD_TESTS)
