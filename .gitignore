@@ -1,5 +1,12 @@
 build
-*.creator.user
+fish_deformation.files
+fish_deformation.includes
+fish_deformation.creator
+fish_deformation.creator.user
+fish_deformation.config
+release_build
+debug_build
+build
 
 # Prerequisites
 *.d
@@ -34,4 +41,6 @@ build
 *.out
 *.app
 
+# Data files
 data
+*.raw
