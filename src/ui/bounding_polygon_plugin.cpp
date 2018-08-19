@@ -11,13 +11,7 @@
 #include <utils/colors.h>
 #include <utils/utils.h>
 
-#include <libqhullcpp/Qhull.h>
-#include <libqhullcpp/QhullFacet.h>
-#include <libqhullcpp/QhullFacetSet.h>
-#include <libqhullcpp/QhullFacetList.h>
-#include <libqhullcpp/QhullVertex.h>
-#include <libqhullcpp/QhullVertexSet.h>
-#include <libqhullcpp/QhullPoints.h>
+#include <igl/copyleft/cgal/convex_hull.h>
 
 static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3d& up,
                        const Eigen::RowVector3d& ctr, double scale,
@@ -93,105 +87,42 @@ void Bounding_Polygon_Menu::initialize() {
 
   widget_2d.initialize(viewer);
 
+  Eigen::MatrixXd PV1, PV2;
+  Eigen::MatrixXi PF1, PF2;
+  Eigen::RowVector3d n1 =
+      state.smooth_skeleton_vertices.row(1) -
+      state.smooth_skeleton_vertices.row(0);
+  n1.normalize();
+  Eigen::RowVector3d right1(1, 0, 0);
+  Eigen::RowVector3d up1 = right1.cross(n1);
+  up1.normalize();
+  right1 = up1.cross(n1);
 
-//  Eigen::MatrixXd PV1, PV2;
-//  Eigen::MatrixXi PF1, PF2;
-//  Eigen::RowVector3d n1 =
-//      state.smooth_skeleton_vertices.row(1) -
-//      state.smooth_skeleton_vertices.row(0);
-//  n1.normalize();
-//  Eigen::RowVector3d right1(1, 0, 0);
-//  Eigen::RowVector3d up1 = right1.cross(n1);
-//  up1.normalize();
-//  right1 = up1.cross(n1);
+  Eigen::RowVector3d n2 =
+      state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-1) -
+      state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-2);
+  n2.normalize();
+  Eigen::RowVector3d right2(1, 0, 0);
+  Eigen::RowVector3d up2 = right2.cross(n1);
+  up2.normalize();
+  right2 = up1.cross(n1);
 
-//  Eigen::RowVector3d n2 =
-//      state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-1) -
-//      state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-2);
-//  n2.normalize();
-//  Eigen::RowVector3d right2(1, 0, 0);
-//  Eigen::RowVector3d up2 = right2.cross(n1);
-//  up2.normalize();
-//  right2 = up1.cross(n1);
+  make_plane(n1, up1, state.smooth_skeleton_vertices.row(0), 40.0, PV1, PF1);
+  make_plane(n2, up2, state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-1), 40.0, PV2, PF2);
 
-//  make_plane(n1, up1, state.smooth_skeleton_vertices.row(0), 40.0, PV1, PF1);
-//  make_plane(n2, up2, state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-1), 40.0, PV2, PF2);
-
-//  using namespace orgQhull;
-//  std::vector<double> vpts;
-//  CV.resize(2*PV1.rows(), 3);
-//  for (int i = 0; i < PV1.rows(); i++) {
-//    CV.row(i) = PV1.row(i);
-//    vpts.push_back(PV1(i, 0));
-//    vpts.push_back(PV1(i, 1));
-//    vpts.push_back(PV1(i, 2));
-//  }
-//  for (int i = 0; i < PV2.rows(); i++) {
-//    CV.row(i+PV1.rows()) = PV2.row(i);
-//    vpts.push_back(PV2(i, 0));
-//    vpts.push_back(PV2(i, 1));
-//    vpts.push_back(PV2(i, 2));
-//  }
-
-//  orgQhull::Qhull qhull("", 3, vpts.size(), vpts.data(), "");
-//  orgQhull::QhullFacetList facets = qhull.facetList();
-
-//  std::vector<std::vector<int>> faces;
-
-//  CF.resize(facets.size(), 3);
-//  int fcount = 0;
-//  for (auto it = facets.begin(); it != facets.end(); it++) {
-//    QhullFacet f = *it;
-
-//    std::vector<QhullFacet> neighbors = f.neighborFacets().toStdVector();
-//    std::cout << "facet " << f.id() << std::endl;
-//    std::cout << " neighbors:";
-//    for (int i = 0; i < neighbors.size(); i++) {
-//      std::cout << " " << neighbors[i].id();
-//    }
-//    std::cout << std::endl;
-
-//    std::vector<QhullVertex> verts = f.vertices().toStdVector();
-////    if (verts.size() != 3) {
-////      std::cerr << "Not a triangle woah wtf" << std::endl;
-////      assert("not a triangle mesh" && false);
-////    }
-
-//    faces.emplace_back();
-//    std::cout << "  vertices";
-//    for (int i = 0; i < verts.size(); i++) {
-//      std::cout << " " << verts[i].id();
-//      faces.back().push_back(verts[i].id());
-//    }
-//    fcount += 1;
-//    std::cout << std::endl;
-//  }
-
-//  int vcount = 0;
-//  std::cout << "points " << qhull.points() << std::endl;
-
-//  std::cout << "Points " << qhull.vertexList().size() << std::endl;
-//  CV.resize(qhull.points().size(), 3);
-//  for (auto it = qhull.points().begin(); it != qhull.points().end(); it++) {
-//    QhullPoint pt = *it;
-//    if (pt.dimension() != 3) {
-//      std::cerr << "pt is not 3d wtf" << std::endl;
-//      assert("pt is not 3d wtf" && false);
-//    }
-//    std::cout << "vpos " << pt << std::endl;
-//    CV.row(vcount++) = Eigen::RowVector3d(pt.begin()[0], pt.begin()[1], pt.begin()[2]);
-//  }
-
-//  std::cout << std::flush;
-
-//  viewer->data().add_points(CV, ColorRGB::BLUE);
-//  for (int f = 0; f < faces.size(); f++) {
-//    for (int i = 0; i < faces[f].size(); i++) {
-//      Eigen::RowVector3d v1 = CV.row(faces[f][i]);
-//      Eigen::RowVector3d v2 = CV.row(faces[f][i+1] % faces[f].size());
-//      viewer->data().add_edges(v1, v2, ColorRGB::BLUE);
-//    }
-//  }
+  CV.resize(2*PV1.rows(), 3);
+  for (int i = 0; i < PV1.rows(); i++) {
+    CV.row(i) = PV1.row(i);
+  }
+  for (int i = 0; i < PV2.rows(); i++) {
+    CV.row(i+PV1.rows()) = PV2.row(i);
+  }
+  igl::copyleft::cgal::convex_hull(CV, CF);
+  P1.resize(0, 0);
+  P2.resize(0, 0);
+  edge_endpoints(CV, CF, P1, P2);
+  viewer->data().add_points(CV, ColorRGB::BLUE);
+  viewer->data().add_edges(P1, P2, ColorRGB::BLUE);
 }
 
 
