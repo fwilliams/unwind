@@ -87,6 +87,8 @@ void Bounding_Polygon_Menu::initialize() {
 
   widget_2d.initialize(viewer);
 
+
+  // Compute initial bounding polyhedron
   Eigen::MatrixXd PV1, PV2;
   Eigen::MatrixXi PF1, PF2;
   Eigen::RowVector3d n1 =

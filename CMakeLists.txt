@@ -4,6 +4,22 @@ project(fish_deformation)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/voroffset/cmake)
 
+
+# Fish deformation options
+option(BUILD_TESTS                   "Build test binaries" OFF)
+option(RELEASE_WITH_SYMBOLS          "Build in release mode but with debug symbols" OFF)
+
+if (RELEASE_WITH_SYMBOLS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCHOLMOD")
+endif()
+
+
+
+
+##############################
+## Build external libraries ##
+##############################
+
 # Find Suitesparse
 if (WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOLMOD")
@@ -14,13 +30,8 @@ else ()
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()
 
-
+# LibIGL
 set(CGAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/cgal)
-# Fish deformation options
-option(BUILD_TESTS                   "Build test binaries" OFF)
-option(RELEASE_WITH_SYMBOLS          "Build in release mode but with debug symbols")
-
-# libigl options
 option(LIBIGL_USE_STATIC_LIBRARY     "Use libigl as static library" ON)
 option(LIBIGL_WITH_ANTTWEAKBAR       "Use AntTweakBar"    OFF)
 option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
@@ -40,30 +51,12 @@ option(LIBIGL_WITH_TETGEN            "Use Tetgen"         ${BUILD_TESTS})
 option(LIBIGL_WITH_TRIANGLE          "Use Triangle"       OFF)
 option(LIBIGL_WITH_VIEWER            "Use OpenGL viewer"  ON)
 option(LIBIGL_WITH_XML               "Use XML"            OFF)
-
 find_package(LIBIGL REQUIRED QUIET)
+
+
+# Qt for Harish' image loading library
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
-
-if (RELEASE_WITH_SYMBOLS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCHOLMOD")
-endif()
-
-
-######################
-## Static libraries ##
-######################
-
-#next week, I'm going to pull out a 1d parameterization of the curves I am generating with the autoencoder, if that works, we should decide what the next experiment should be. I think it would be interesting/fun to work on something which more closely resembles real sensor data (maybe without noise).
-# Qhull static library
-set(QHULL_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/qhull/src")
-file(GLOB QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/*.cpp")
-file(GLOB QHULL_R_SRCS "${QHULL_SRC_DIR}/libqhull_r/*.c")
-message("r sources ${QHULL_R_SRCS}")
-list(REMOVE_ITEM QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/qt-qhull.cpp")
-list(REMOVE_ITEM QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/usermem_r-cpp.cpp")
-add_library(qhull STATIC ${QHULL_CPP_SRCS} ${QHULL_R_SRCS})
-target_include_directories(qhull PUBLIC ${QHULL_SRC_DIR})
 
 
 # Quartet static library
@@ -114,6 +107,10 @@ target_link_libraries(vor3d PUBLIC eigen)
 
 
 
+
+##################################
+## Build main and test programs ##
+##################################
 add_subdirectory("src")
 
 IF (BUILD_TESTS)
