@@ -12,6 +12,6 @@
 [submodule "external/voroffset"]
 	path = external/voroffset
 	url = https://github.com/fwilliams/voroffset.git
-[submodule "external/qhull"]
-	path = external/qhull
-	url = git@github.com:qhull/qhull.git
+[submodule "external/cgal"]
+	path = external/cgal
+	url = https://github.com/CGAL/cgal.git
