@@ -57,10 +57,11 @@ endif()
 # Qhull static library
 set(QHULL_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/qhull/src")
 file(GLOB QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/*.cpp")
+file(GLOB QHULL_R_SRCS "${QHULL_SRC_DIR}/libqhull_r/*.c")
+message("r sources ${QHULL_R_SRCS}")
 list(REMOVE_ITEM QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/qt-qhull.cpp")
 list(REMOVE_ITEM QHULL_CPP_SRCS "${QHULL_SRC_DIR}/libqhullcpp/usermem_r-cpp.cpp")
-message("qhull srcs ${QHULL_CPP_SRCS}")
-add_library(qhull STATIC ${QHULL_CPP_SRCS})
+add_library(qhull STATIC ${QHULL_CPP_SRCS} ${QHULL_R_SRCS})
 target_include_directories(qhull PUBLIC ${QHULL_SRC_DIR})
 
 

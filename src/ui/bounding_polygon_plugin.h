@@ -31,6 +31,9 @@ private:
   int current_vertex_id = 0;
 
   bool show_slice_view = false;
+
+  Eigen::MatrixXd CV;
+  Eigen::MatrixXi CF;
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__
