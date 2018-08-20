@@ -12,6 +12,8 @@
 #include <utils/utils.h>
 
 #include <igl/copyleft/cgal/convex_hull.h>
+#include <igl/per_face_normals.h>
+
 
 static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3d& up,
                        const Eigen::RowVector3d& ctr, double scale,
@@ -33,6 +35,11 @@ static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3
   F.resize(2, 3);
   F.row(0) = Eigen::RowVector3i(0, 1, 3);
   F.row(1) = Eigen::RowVector3i(1, 2, 3);
+}
+
+template <typename T>
+int sgn(T val) {
+  return (T(0) < val) - (val < T(0));
 }
 
 
@@ -73,58 +80,165 @@ void Bounding_Polygon_Menu::initialize() {
   }
   viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
   viewer->data().point_size = 10.0;
-  viewer->data().add_points(state.skeleton_vertices, ColorRGB::GREEN);
+//  viewer->data().add_points(state.skeleton_vertices, ColorRGB::GREEN);
 
   for (int i = 0; i < state.smooth_skeleton_vertices.rows()-1; i++) {
     P1.row(i) = state.smooth_skeleton_vertices.row(i);
     P2.row(i) = state.smooth_skeleton_vertices.row(i+1);
   }
   viewer->data().add_edges(P1, P2, ColorRGB::RED);
-  viewer->data().point_size = 10.0;
-  viewer->data().add_points(state.smooth_skeleton_vertices, ColorRGB::RED);
+  viewer->data().point_size = 20.0;
+//  viewer->data().add_points(state.smooth_skeleton_vertices, ColorRGB::RED);
 
   viewer->selected_data_index = push_mesh_id;
 
+  // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
+  make_bounding_cage();
 
+}
 
+bool Bounding_Polygon_Menu::make_bounding_cage() {
   // Compute initial bounding polyhedron
-  Eigen::MatrixXd PV1, PV2;
-  Eigen::MatrixXi PF1, PF2;
-  Eigen::RowVector3d n1 =
-      state.smooth_skeleton_vertices.row(1) -
-      state.smooth_skeleton_vertices.row(0);
-  n1.normalize();
-  Eigen::RowVector3d right1(1, 0, 0);
-  Eigen::RowVector3d up1 = right1.cross(n1);
-  up1.normalize();
-  right1 = up1.cross(n1);
-
-  Eigen::RowVector3d n2 =
-      state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-1) -
-      state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-2);
-  n2.normalize();
-  Eigen::RowVector3d right2(1, 0, 0);
-  Eigen::RowVector3d up2 = right2.cross(n1);
-  up2.normalize();
-  right2 = up1.cross(n1);
-
-  make_plane(n1, up1, state.smooth_skeleton_vertices.row(0), 40.0, PV1, PF1);
-  make_plane(n2, up2, state.smooth_skeleton_vertices.row(state.smooth_skeleton_vertices.rows()-1), 40.0, PV2, PF2);
-
-  CV.resize(2*PV1.rows(), 3);
-  for (int i = 0; i < PV1.rows(); i++) {
-    CV.row(i) = PV1.row(i);
+  const Eigen::MatrixXd& SV = state.smooth_skeleton_vertices;
+  auto root = make_bounding_cage_component(0, SV.rows()-2, 0 /* level */);
+  if (!root) {
+    // TODO: Use the bounding box of the mesh instead
+    std::cerr << "*****THIS IS BAD UNTIL I FIX IT******" << std::endl;
+    assert(false);
+    return false;
   }
-  for (int i = 0; i < PV2.rows(); i++) {
-    CV.row(i+PV1.rows()) = PV2.row(i);
+
+  make_bounding_cage_r(root);
+
+  for (int i = 0; i < cage_components.size(); i++) {
+    auto node = cage_components[i];
+    Eigen::MatrixXd P1, P2;
+    edge_endpoints(node->V, node->F, P1, P2);
+    viewer->data().add_points(node->V, ColorRGB::BLUE);
+    viewer->data().add_edges(P1, P2, ColorRGB::BLUE);
+    viewer->data().add_edges(node->C, node->C + node->N*20.0, ColorRGB::CRIMSON);
   }
-  igl::copyleft::cgal::convex_hull(CV, CF);
-  P1.resize(0, 0);
-  P2.resize(0, 0);
-  edge_endpoints(CV, CF, P1, P2);
-  viewer->data().add_points(CV, ColorRGB::BLUE);
-  viewer->data().add_edges(P1, P2, ColorRGB::BLUE);
+}
+
+bool Bounding_Polygon_Menu::make_bounding_cage_r(
+    std::shared_ptr<Bounding_Polygon_Menu::BoundingCageNode> root) {
+  for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+  std::cout << root->level << ") make_bounding_cage" << std::endl;
+
+  // If the node is in the cage, then we're done
+  if (skeleton_in_cage(root->C, root->N, root->start, root->end)) {
+    for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+    std::cout << root->level << ") cage contains skeleton" << std::endl;
+    cage_components.push_back(root);
+    return true;
+  }
+
+  // Otherwise split and recurse
+  const int mid = root->start + (root->end - root->start) / 2;
+
+  for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+  std::cout << root->level << ") " <<
+               "root_start = " << root->start << ", " <<
+               "root_end = " << root->end << ", " <<
+               "root_mid = " << mid << std::endl;
+
+  root->left = make_bounding_cage_component(root->start, mid, root->level+1);
+  if (root->left) {
+    for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+    std::cout << root->level << ") recurse left" << std::endl;
+    make_bounding_cage_r(root->left);
+  } else {
+    for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+    std::cout << root->level << ") left was not recursable" << std::endl;
+    root->left.reset();
+    cage_components.push_back(root);
+    return true;
+  }
+
+  root->right = make_bounding_cage_component(mid, root->end, root->level+1);
+  if (root->right) {
+    for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+    std::cout << root->level << ") recurse right" << std::endl;
+    make_bounding_cage_r(root->right);
+  } else {
+    for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+    std::cout << root->level << ") right was not recursable" << std::endl;
+    root->right.reset();
+    cage_components.push_back(root);
+    return true;
+  }
+
+  for (int i = 0; i < root->level; i++) { std::cout << "  "; }
+  std::cout << root->level << ") returned normally" << std::endl;
+  return true;
+}
+
+bool Bounding_Polygon_Menu::skeleton_in_cage(
+    const Eigen::MatrixXd& CC,
+    const Eigen::MatrixXd& CN,
+    int start, int end) {
+  assert(start < end);
+  if ((end - start) <= 1) {
+    return false;
+  }
+
+  const Eigen::MatrixXd& SV = state.smooth_skeleton_vertices;
+  const int check_sign = sgn(CN.row(0).dot(SV.row(start+1)-CC.row(0)));
+  for (int i = 0; i < end-start-1; i++) {
+    const Eigen::RowVector3d V = SV.row(start+1+i);
+    for (int j = 0; j < CN.rows(); j++) {
+      const int sign = sgn(CN.row(j).dot(V-CC.row(j)));
+      if (sign != check_sign) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+std::shared_ptr<Bounding_Polygon_Menu::BoundingCageNode>
+Bounding_Polygon_Menu::make_bounding_cage_component(int v1, int v2, int level) {
+  std::shared_ptr<BoundingCageNode> node = std::make_shared<BoundingCageNode>();
+  if ((v2 - v1) <= 1) {
+    for (int i = 0; i < level-1; i++) { std::cout << "  "; }
+    std::cout << level-1 << ") v1 = " << v1 << ", v2 = " << v2 << std::endl;
+    node.reset();
+    return node;
+  }
+
+  node->start = v1;
+  node->end = v2;
+  node->level = level;
+
+  { // Construct the vertices of the bounding polyhedron
+    auto p1 = plane_for_vertex(v1, 40.0);
+    auto p2 = plane_for_vertex(v2, 40.0);
+    Eigen::MatrixXd PV1 = std::get<0>(p1);
+    Eigen::MatrixXd PV2 = std::get<0>(p2);
+    Eigen::MatrixXd PV(2*PV1.rows(), 3);
+    for (int i = 0; i < PV1.rows(); i++) {
+      PV.row(i) = PV1.row(i);
+      PV.row(i+PV1.rows()) = PV2.row(i);
+    }
+    igl::copyleft::cgal::convex_hull(PV, node->V, node->F);
+    // If the planes self intersect, then return false
+    if (PV.rows() != node->V.rows()) {
+      node.reset();
+      for (int i = 0; i < level-1; i++) { std::cout << "  "; }
+      std::cout << level-1 << ") PV.rows() = " << PV.rows() << ", V.rows() = " << node->V.rows() << std::endl;
+      return node;
+    }
+  }
+
+  node->C.resize(node->F.rows(), 3);
+  for (int i = 0; i < node->F.rows(); i++) {
+    node->C.row(i) = (node->V.row(node->F(i, 0)) + node->V.row(node->F(i, 1)) + node->V.row(node->F(i, 2))) / 3;
+  }
+  igl::per_face_normals_stable(node->V, node->F, node->N);
+
+  return node;
 }
 
 
@@ -206,4 +320,22 @@ bool Bounding_Polygon_Menu::pre_draw() {
   viewer->selected_data_index = push_overlay_id;
 
   return ret;
+}
+
+
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> Bounding_Polygon_Menu::plane_for_vertex(int vid, double radius) {
+  Eigen::MatrixXd PV;
+  Eigen::MatrixXi PF;
+  Eigen::RowVector3d n1 =
+      state.smooth_skeleton_vertices.row(vid+1) -
+      state.smooth_skeleton_vertices.row(vid);
+  n1.normalize();
+  Eigen::RowVector3d right1(1, 0, 0);
+  Eigen::RowVector3d up1 = right1.cross(n1);
+  up1.normalize();
+  right1 = up1.cross(n1);
+
+  make_plane(n1, up1, state.smooth_skeleton_vertices.row(vid), radius, PV, PF);
+
+  return std::make_tuple(PV, PF);
 }

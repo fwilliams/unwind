@@ -5,6 +5,9 @@
 #include "fish_ui_viewer_plugin.h"
 #include "bounding_polygon_widget.h"
 
+#include <tuple>
+
+
 class Bounding_Polygon_Menu : public FishUIViewerPlugin {
 public:
   Bounding_Polygon_Menu(State& state);
@@ -19,6 +22,29 @@ public:
   void initialize();
 
 private:
+  struct BoundingCageNode {
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    Eigen::MatrixXd C;
+    Eigen::MatrixXd N;
+
+    int level;
+
+    int start;
+    int end;
+
+    std::shared_ptr<BoundingCageNode> left;
+    std::shared_ptr<BoundingCageNode> right;
+  };
+  std::vector<std::shared_ptr<BoundingCageNode>> cage_components;
+
+  bool skeleton_in_cage(const Eigen::MatrixXd& CC, const Eigen::MatrixXd& CN, int start, int end);
+  std::shared_ptr<BoundingCageNode> make_bounding_cage_component(int v1, int v2, int level);
+  bool make_bounding_cage();
+  bool make_bounding_cage_r(std::shared_ptr<BoundingCageNode> root);
+
+  std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> plane_for_vertex(int vid, double radius);
+
   Bounding_Polygon_Widget widget_2d;
   State& state;
 
@@ -32,8 +58,7 @@ private:
 
   bool show_slice_view = false;
 
-  Eigen::MatrixXd CV;
-  Eigen::MatrixXi CF;
+
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__
