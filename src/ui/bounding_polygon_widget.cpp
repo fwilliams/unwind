@@ -153,7 +153,7 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
   start.polygon = create_default_points(state.bounding_polygon.nPoints, 0.5f);
 
   State::BoundingPolygon::Slice end;
-  end.vertex_id = state.skeleton_vertices.rows() - 2;
+  end.vertex_id = state.bounding_cage.skeleton_vertices().rows() - 2;
   end.polygon = create_default_points(state.bounding_polygon.nPoints, 0.5f);
 
   state.bounding_polygon.polygon_slices.push_back(start);

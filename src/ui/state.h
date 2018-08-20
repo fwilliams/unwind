@@ -3,6 +3,7 @@
 
 #include "volume_rendering.h"
 #include "preprocessing.hpp"
+#include "bounding_cage.h"
 
 #include <vector>
 #include <array>
@@ -10,6 +11,7 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <utils/utils.h>
 #include <utils/datfile.h>
+
 
 enum class Application_State {
   Initial_File_Selection = 0,
@@ -87,13 +89,10 @@ struct State {
       };
       std::vector<Slice> polygon_slices;
   };
+
   BoundingPolygon bounding_polygon;
 
-  // Extracted skeleton vertices
-  Eigen::MatrixXd skeleton_vertices;
-
-  // Extracted skeleton vertices
-  Eigen::MatrixXd smooth_skeleton_vertices;
+  BoundingCage bounding_cage;
 
   // Geodesic distances
   Eigen::VectorXd geodesic_dists;

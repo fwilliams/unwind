@@ -1,31 +1,13 @@
 #include "bounding_cage.h"
 
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+
 #include <igl/copyleft/cgal/convex_hull.h>
 #include <igl/per_face_normals.h>
 
 #include <iostream>
 
-static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3d& up,
-                       const Eigen::RowVector3d& ctr, double scale,
-                       Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
-
-  Eigen::RowVector3d n = normal;
-  n.normalize();
-  Eigen::RowVector3d u = up;
-  u.normalize();
-  Eigen::RowVector3d r = n.cross(u);
-
-  V.resize(4, 3);
-
-  V.row(0) = ctr + scale*(0.5*r + 0.5*u);
-  V.row(1) = ctr + scale*(-0.5*r + 0.5*u);
-  V.row(2) = ctr + scale*(-0.5*r - 0.5*u);
-  V.row(3) = ctr + scale*(0.5*r - 0.5*u);
-
-  F.resize(2, 3);
-  F.row(0) = Eigen::RowVector3i(0, 1, 3);
-  F.row(1) = Eigen::RowVector3i(1, 2, 3);
-}
 
 template <typename T>
 int sgn(T val) {
@@ -33,9 +15,14 @@ int sgn(T val) {
 }
 
 
-BoundingCage::BoundingCage(State& state) : state(state) {
-  const Eigen::MatrixXd& SV = state.smooth_skeleton_vertices;
-  auto root = make_bounding_cage_component(0, SV.rows()-2, 0 /* level */);
+BoundingCage::BoundingCage() {}
+
+
+void BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& sv, unsigned smoothing_iters) {
+  SV = sv;
+  smooth_skeleton(smoothing_iters);
+
+  root = make_bounding_cage_component(0, SV.rows()-2, 0 /* level */);
   if (!root) {
     // TODO: Use the bounding box of the mesh instead
     std::cerr << "*****THIS IS BAD UNTIL I FIX IT******" << std::endl;
@@ -124,10 +111,9 @@ bool BoundingCage::skeleton_in_cage(
     return false;
   }
 
-  const Eigen::MatrixXd& SV = state.smooth_skeleton_vertices;
-  const int check_sign = sgn(CN.row(0).dot(SV.row(start+1)-CC.row(0)));
+  const int check_sign = sgn(CN.row(0).dot(SV_smooth.row(start+1)-CC.row(0)));
   for (int i = 0; i < end-start-1; i++) {
-    const Eigen::RowVector3d V = SV.row(start+1+i);
+    const Eigen::RowVector3d V = SV_smooth.row(start+1+i);
     for (int j = 0; j < CN.rows(); j++) {
       const int sign = sgn(CN.row(j).dot(V-CC.row(j)));
       if (sign != check_sign) {
@@ -139,21 +125,55 @@ bool BoundingCage::skeleton_in_cage(
   return true;
 }
 
+
+static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3d& up,
+                       const Eigen::RowVector3d& ctr, double scale,
+                       Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
+
+  Eigen::RowVector3d n = normal;
+  n.normalize();
+  Eigen::RowVector3d u = up;
+  u.normalize();
+  Eigen::RowVector3d r = n.cross(u);
+
+  V.resize(4, 3);
+
+  V.row(0) = ctr + scale*(0.5*r + 0.5*u);
+  V.row(1) = ctr + scale*(-0.5*r + 0.5*u);
+  V.row(2) = ctr + scale*(-0.5*r - 0.5*u);
+  V.row(3) = ctr + scale*(0.5*r - 0.5*u);
+
+  F.resize(2, 3);
+  F.row(0) = Eigen::RowVector3i(0, 1, 3);
+  F.row(1) = Eigen::RowVector3i(1, 2, 3);
+}
+
+
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> BoundingCage::plane_for_vertex(int vid, double radius) {
   Eigen::MatrixXd PV;
   Eigen::MatrixXi PF;
-  Eigen::RowVector3d n1 =
-      state.smooth_skeleton_vertices.row(vid+1) -
-      state.smooth_skeleton_vertices.row(vid);
+  Eigen::RowVector3d n1 = SV_smooth.row(vid+1) - SV_smooth.row(vid);
   n1.normalize();
+
   Eigen::RowVector3d right1(1, 0, 0);
   Eigen::RowVector3d up1 = right1.cross(n1);
   up1.normalize();
   right1 = up1.cross(n1);
 
-  make_plane(n1, up1, state.smooth_skeleton_vertices.row(vid), radius, PV, PF);
+  make_plane(n1, up1, SV_smooth.row(vid), radius, PV, PF);
 
   return std::make_tuple(PV, PF);
 }
 
+void BoundingCage::smooth_skeleton(int num_iters) {
+  Eigen::MatrixXd SV_i = SV;
+  SV_smooth.resize(SV_i.rows(), 3);
+  for (int iter = 0; iter < num_iters; iter++) {
+    SV_smooth.row(0) = SV_i.row(0);
+    for (int i = 1; i < SV_i.rows()-1; i++) {
+      SV_smooth.row(i) = 0.5 * (SV_i.row(i-1) + SV_i.row(i+1));
+    }
+    SV_smooth.row(SV_i.rows()-1) = SV_i.row(SV_i.rows()-1);
+  }
+}
 

@@ -311,19 +311,14 @@ void EndPoint_Selection_Menu::extract_skeleton() {
     extracting_skeleton = true;
     const Eigen::MatrixXd& TV = state.extracted_volume.TV;
     const Eigen::MatrixXi& TT = state.extracted_volume.TT;
-    Eigen::VectorXd gdists;
+
+    Eigen::MatrixXd skeleton_vertices;
 
     geodesic_distances(TV, TT, state.endpoint_pairs, state.geodesic_dists, true /* normalized */);
     compute_skeleton(TV, TT, state.geodesic_dists,
                      state.endpoint_pairs, state.extracted_volume.connected_components,
-                     100, state.skeleton_vertices);
-    Eigen::MatrixXd smooth = state.skeleton_vertices;
-    Eigen::MatrixXd smooth_next;
-    for (int i = 0; i < 50; i++) {
-      smooth_skeleton(smooth, smooth_next);
-      smooth = smooth_next;
-    }
-    state.smooth_skeleton_vertices = smooth_next;
+                     100, skeleton_vertices);
+    state.bounding_cage.set_skeleton_vertices(skeleton_vertices, 50/* smoothing iterations */);
 
     extracting_skeleton = false;
     done_extracting_skeleton = true;
