@@ -127,18 +127,18 @@ bool Bounding_Polygon_Menu::post_draw() {
                ImGuiWindowFlags_NoTitleBar);
 
   if (ImGui::Button("< Prev")) {
-    current_vertex_id = std::max(current_vertex_id - 1, 0);
+//    current_cut_index = std::max(current_cut_index - 1, 0);
   }
   ImGui::SameLine();
-  if (ImGui::SliderInt("#vertexid", &current_vertex_id, 0, state.cage.skeleton_vertices().rows() - 2)) {}
+  if (ImGui::SliderFloat("#vertexid", &current_cut_index, (float)state.cage.min_index(), (float)state.cage.max_index())) {}
   ImGui::SameLine();
   if (ImGui::Button("Next >")) {
-    current_vertex_id = std::min(current_vertex_id + 1, int(state.cage.skeleton_vertices().rows() - 2));
+//    current_cut_index = std::min(current_cut_index + 1, int(state.cage.skeleton_vertices().rows() - 2));
   }
 
   ImGui::Checkbox("Show slice view", &show_slice_view);
   if (show_slice_view) {
-    widget_2d.post_draw(PV, current_vertex_id);
+    widget_2d.post_draw(PV, current_cut_index);
   }
   ImGui::End();
   ImGui::Render();
@@ -151,26 +151,12 @@ bool Bounding_Polygon_Menu::pre_draw() {
   bool ret = FishUIViewerPlugin::pre_draw();
 
   glDisable(GL_CULL_FACE);
-  Eigen::RowVector3d n =
-      state.cage.smooth_skeleton_vertices().row(current_vertex_id+1) -
-      state.cage.smooth_skeleton_vertices().row(current_vertex_id);
-  n.normalize();
-  Eigen::RowVector3d right(1, 0, 0);
-  Eigen::RowVector3d up = right.cross(n);
-  up.normalize();
-  right = up.cross(n);
-
-  Eigen::MatrixXi PF;
-  make_plane(n, up, state.cage.smooth_skeleton_vertices().row(current_vertex_id), 40.0, PV, PF);
-
 
   int push_overlay_id = viewer->selected_data_index;
   viewer->selected_data_index = points_overlay_id;
   viewer->data().clear();
-  viewer->data().set_mesh(PV, PF);
-  viewer->data().add_points(PV, ColorRGB::CRIMSON);
   viewer->data().point_size = 10.0;
-  Eigen::MatrixXd pts = state.cage.intersecting_plane(current_vertex_id);
+  Eigen::MatrixXd pts = state.cage.intersecting_plane(current_cut_index);
   viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
 
   viewer->selected_data_index = push_overlay_id;

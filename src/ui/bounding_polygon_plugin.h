@@ -31,7 +31,7 @@ private:
   int mesh_overlay_id;
   int points_overlay_id;
 
-  int current_vertex_id = 0;
+  float current_cut_index = 0;
 
   bool show_slice_view = false;
 

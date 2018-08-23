@@ -177,6 +177,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 
       current_edit_element->x() = std::max(std::min(mapped_mouse_x, 1.f), -1.f);
       current_edit_element->y() = std::max(std::min(mapped_mouse_y, 1.f), -1.f);
+      return true;
   }
 
   return false;
