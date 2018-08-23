@@ -92,8 +92,6 @@ struct State {
 
   BoundingPolygon bounding_polygon;
 
-  BoundingCage bounding_cage;
-
   Cage cage;
 
   // Geodesic distances

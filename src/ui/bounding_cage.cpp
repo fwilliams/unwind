@@ -9,200 +9,81 @@
 #include <iostream>
 
 
-template <typename T>
-int sgn(T val) {
-  return (T(0) < val) - (val < T(0));
+KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
+                   const Eigen::RowVector3d& center,
+                   const Eigen::MatrixXd& pts,
+                   int idx) {
+  curve_index = idx;
+  plane_normal = normal;
+  plane_normal.normalize();
+  plane_up = Eigen::RowVector3d(0, 1, 0);
+  plane_right = Eigen::RowVector3d(1, 0, 0);
+  plane_center = center;
+
+  // If the up vector and the normal are about the same
+  if (fabs(1.0 - plane_normal.dot(plane_up)) < 1e-8) {
+    plane_up = plane_normal.cross(plane_right);
+    plane_up.normalize();
+    plane_right = plane_normal.cross(plane_up);
+    plane_right.normalize();
+  } else if (fabs(1.0 - plane_normal.dot(plane_right)) < 1e-8) {
+    plane_right = plane_normal.cross(plane_up);
+    plane_right.normalize();
+    plane_up = plane_normal.cross(plane_right);
+    plane_up.normalize();
+  } else {
+    plane_up = plane_normal.cross(plane_right);
+    plane_up.normalize();
+    plane_right = plane_normal.cross(plane_up);
+    plane_right.normalize();
+  }
+
+  points2d = pts;
 }
 
-
-BoundingCage::BoundingCage() {}
-
-
-void BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& sv, unsigned smoothing_iters) {
-  SV = sv;
-  smooth_skeleton(smoothing_iters);
-
-  root = make_bounding_cage_component(0, SV.rows()-1, 0 /* level */);
-  if (!root) {
-    // TODO: Use the bounding box of the mesh instead
-    std::cerr << "*****THIS IS BAD UNTIL I FIX IT******" << std::endl;
-    assert(false);
+bool KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos) {
+  if (i < 0 || i >= points2d.rows()) {
+    assert("i in move_vertex() was out of range" && false);
+    return false;
   }
+  Eigen::RowVector2d old_pt_2d = points2d.row(i);
+  Eigen::RowVector3d old_pt_3d = points3d.row(i);
+  points2d.row(i) = newpos;
+  points3d.row(i) = plane_center + newpos[0]*plane_right + newpos[1]*plane_up;
 
-  make_bounding_cage_r(root);
-}
-
-
-bool BoundingCage::make_bounding_cage_r(std::shared_ptr<BoundingCageNode> root) {
-  // If the node is in the cage, then we're done
-  if (skeleton_in_cage(root->C, root->N, root->start, root->end)) {
-    cage_components.push_back(root);
-    return true;
+  if (!(validate_points_2d() && validate_cage())) {
+    points2d.row(i) = old_pt_2d;
+    points3d.row(i) = old_pt_3d;
+    return false;
   }
-
-  // Otherwise split and recurse
-  const int mid = root->start + (root->end - root->start) / 2;
-
-  root->left = make_bounding_cage_component(root->start, mid, root->level+1);
-  if (root->left) {
-    make_bounding_cage_r(root->left);
-  } else {
-    root->left.reset();
-    cage_components.push_back(root);
-    return true;
-  }
-
-  root->right = make_bounding_cage_component(mid, root->end, root->level+1);
-  if (root->right) {
-    make_bounding_cage_r(root->right);
-  } else {
-    root->right.reset();
-    cage_components.push_back(root);
-    return true;
-  }
-
   return true;
 }
 
-
-std::shared_ptr<BoundingCage::BoundingCageNode>
-BoundingCage::make_bounding_cage_component(int v1, int v2, int level) {
-  std::shared_ptr<BoundingCageNode> node = std::make_shared<BoundingCageNode>();
-  if ((v2 - v1) <= 1) {
-    node.reset();
-    return node;
+bool KeyFrame::validate_points_2d() {
+  if (points2d.rows() != points2d.rows()) {
+    assert("points 2d has wrong number of rows" && false);
+    return false;
   }
-
-  node->start = v1;
-  node->end = v2;
-  node->level = level;
-
-  { // Construct the vertices of the bounding polyhedron
-    auto p1 = plane_for_vertex(v1, 40.0);
-    auto p2 = plane_for_vertex(v2, 40.0);
-    Eigen::MatrixXd PV1 = std::get<0>(p1);
-    Eigen::MatrixXd PV2 = std::get<0>(p2);
-    Eigen::MatrixXd PV(2*PV1.rows(), 3);
-    for (int i = 0; i < PV1.rows(); i++) {
-      PV.row(i) = PV1.row(i);
-      PV.row(i+PV1.rows()) = PV2.row(i);
-    }
-    igl::copyleft::cgal::convex_hull(PV, node->V, node->F);
-    // If the planes self intersect, then return false
-    if (PV.rows() != node->V.rows()) {
-      node.reset();
-      return node;
-    }
-  }
-
-  node->C.resize(node->F.rows(), 3);
-  for (int i = 0; i < node->F.rows(); i++) {
-    node->C.row(i) = (node->V.row(node->F(i, 0)) + node->V.row(node->F(i, 1)) + node->V.row(node->F(i, 2))) / 3;
-  }
-  igl::per_face_normals_stable(node->V, node->F, node->N);
-
-  return node;
-}
-
-bool BoundingCage::skeleton_in_cage(
-    const Eigen::MatrixXd& CC, const Eigen::MatrixXd& CN, int start, int end) {
-  assert(start < end);
-  if ((end - start) <= 1) {
+  if (points2d.cols() != 2) {
+    assert("points 2d has wrong number of cols" && false);
     return false;
   }
 
-  const int check_sign = sgn(CN.row(0).dot(SV_smooth.row(start+1)-CC.row(0)));
-  for (int i = 0; i < end-start-1; i++) {
-    const Eigen::RowVector3d V = SV_smooth.row(start+1+i);
-    for (int j = 0; j < CN.rows(); j++) {
-      const int sign = sgn(CN.row(j).dot(V-CC.row(j)));
-      if (sign != check_sign) {
-        return false;
-      }
-    }
-  }
-
+  // TODO: Ensure there are no self intersections so we never get in a bad state
   return true;
 }
 
-
-static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3d& up,
-                       const Eigen::RowVector3d& ctr, double scale,
-                       Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
-
-  Eigen::RowVector3d n = normal;
-  n.normalize();
-  Eigen::RowVector3d u = up;
-  u.normalize();
-  Eigen::RowVector3d r = n.cross(u);
-
-  V.resize(4, 3);
-
-  V.row(0) = ctr + scale*(0.5*r + 0.5*u);
-  V.row(1) = ctr + scale*(-0.5*r + 0.5*u);
-  V.row(2) = ctr + scale*(-0.5*r - 0.5*u);
-  V.row(3) = ctr + scale*(0.5*r - 0.5*u);
-
-  F.resize(2, 3);
-  F.row(0) = Eigen::RowVector3i(0, 1, 3);
-  F.row(1) = Eigen::RowVector3i(1, 2, 3);
-}
-
-
-std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> BoundingCage::plane_for_vertex(int vid, double radius) {
-  Eigen::MatrixXd PV;
-  Eigen::MatrixXi PF;
-  Eigen::RowVector3d n1;
-  if (vid == SV.rows()-1) {
-    n1 = SV_smooth.row(vid) - SV_smooth.row(vid-1);
-  } else if (vid == 0) {
-    n1 = SV_smooth.row(vid+1) - SV_smooth.row(vid);
-  } else {
-    n1 = 0.5 * (SV_smooth.row(vid+1) - SV_smooth.row(vid-1));
+bool KeyFrame::validate_cage() {
+  bool ret = true;
+  if (cage_nodes[0]) {
+    ret = ret && cage_nodes[0]->update();
   }
-  n1.normalize();
-
-  Eigen::RowVector3d right1(1, 0, 0);
-  Eigen::RowVector3d up1 = right1.cross(n1);
-  up1.normalize();
-  right1 = up1.cross(n1);
-
-  make_plane(n1, up1, SV_smooth.row(vid), radius, PV, PF);
-
-  return std::make_tuple(PV, PF);
-}
-
-void BoundingCage::smooth_skeleton(int num_iters) {
-  Eigen::MatrixXd SV_i = SV;
-  SV_smooth.resize(SV_i.rows(), 3);
-  for (int iter = 0; iter < num_iters; iter++) {
-    SV_smooth.row(0) = SV_i.row(0);
-    for (int i = 1; i < SV_i.rows()-1; i++) {
-      SV_smooth.row(i) = 0.5 * (SV_i.row(i-1) + SV_i.row(i+1));
-    }
-    SV_smooth.row(SV_i.rows()-1) = SV_i.row(SV_i.rows()-1);
-    SV_i = SV_smooth;
+  if(cage_nodes[1]) {
+    ret = ret && cage_nodes[1]->update();
   }
+
+  return ret;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 std::shared_ptr<CageNode> CageNode::make_cage_node(std::shared_ptr<KeyFrame> front,
                                                    std::shared_ptr<KeyFrame> back,

@@ -64,18 +64,18 @@ void Bounding_Polygon_Menu::initialize() {
   igl::edges(state.extracted_volume.TF, E);
   viewer->data().set_edges(state.extracted_volume.TV, E, Eigen::RowVector3d(0.75, 0.75, 0.75));
 
-  Eigen::MatrixXd P1(state.bounding_cage.skeleton_vertices().rows()-1, 3), P2(state.bounding_cage.skeleton_vertices().rows()-1, 3);
-  for (int i = 0; i < state.bounding_cage.skeleton_vertices().rows()-1; i++) {
-    P1.row(i) = state.bounding_cage.skeleton_vertices().row(i);
-    P2.row(i) = state.bounding_cage.skeleton_vertices().row(i+1);
+  Eigen::MatrixXd P1(state.cage.skeleton_vertices().rows()-1, 3), P2(state.cage.skeleton_vertices().rows()-1, 3);
+  for (int i = 0; i < state.cage.skeleton_vertices().rows()-1; i++) {
+    P1.row(i) = state.cage.skeleton_vertices().row(i);
+    P2.row(i) = state.cage.skeleton_vertices().row(i+1);
   }
   viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
   viewer->data().point_size = 10.0;
   // viewer->data().add_points(state.bounding_cage.skeleton_vertices(), ColorRGB::GREEN);
 
-  for (int i = 0; i < state.bounding_cage.smooth_skeleton_vertices().rows()-1; i++) {
-    P1.row(i) = state.bounding_cage.smooth_skeleton_vertices().row(i);
-    P2.row(i) = state.bounding_cage.smooth_skeleton_vertices().row(i+1);
+  for (int i = 0; i < state.cage.smooth_skeleton_vertices().rows()-1; i++) {
+    P1.row(i) = state.cage.smooth_skeleton_vertices().row(i);
+    P2.row(i) = state.cage.smooth_skeleton_vertices().row(i+1);
   }
   viewer->data().add_edges(P1, P2, ColorRGB::RED);
   viewer->data().point_size = 20.0;
@@ -86,21 +86,11 @@ void Bounding_Polygon_Menu::initialize() {
   // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
 
-  for (int i = 0; i < state.bounding_cage.components().size(); i++) {
-    auto node = state.bounding_cage.components()[i];
-    Eigen::MatrixXd P1, P2;
-    edge_endpoints(node->V, node->F, P1, P2);
-    viewer->data().add_points(node->V, ColorRGB::BLUE);
-    viewer->data().add_edges(P1, P2, ColorRGB::BLUE);
-    viewer->data().add_edges(node->C, node->C + node->N*20.0, ColorRGB::CRIMSON);
-  }
-
   for (auto node = state.cage.head; node.get() != nullptr; node = node->next) {
     Eigen::MatrixXd P1, P2;
     edge_endpoints(node->V, node->F, P1, P2);
     viewer->data().add_points(node->V, ColorRGB::GREEN);
     viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
-    node = node->next;
   }
 }
 
@@ -140,10 +130,10 @@ bool Bounding_Polygon_Menu::post_draw() {
     current_vertex_id = std::max(current_vertex_id - 1, 0);
   }
   ImGui::SameLine();
-  if (ImGui::SliderInt("#vertexid", &current_vertex_id, 0, state.bounding_cage.skeleton_vertices().rows() - 2)) {}
+  if (ImGui::SliderInt("#vertexid", &current_vertex_id, 0, state.cage.skeleton_vertices().rows() - 2)) {}
   ImGui::SameLine();
   if (ImGui::Button("Next >")) {
-    current_vertex_id = std::min(current_vertex_id + 1, int(state.bounding_cage.skeleton_vertices().rows() - 2));
+    current_vertex_id = std::min(current_vertex_id + 1, int(state.cage.skeleton_vertices().rows() - 2));
   }
 
   ImGui::Checkbox("Show slice view", &show_slice_view);
@@ -162,8 +152,8 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
   glDisable(GL_CULL_FACE);
   Eigen::RowVector3d n =
-      state.bounding_cage.smooth_skeleton_vertices().row(current_vertex_id+1) -
-      state.bounding_cage.smooth_skeleton_vertices().row(current_vertex_id);
+      state.cage.smooth_skeleton_vertices().row(current_vertex_id+1) -
+      state.cage.smooth_skeleton_vertices().row(current_vertex_id);
   n.normalize();
   Eigen::RowVector3d right(1, 0, 0);
   Eigen::RowVector3d up = right.cross(n);
@@ -171,7 +161,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
   right = up.cross(n);
 
   Eigen::MatrixXi PF;
-  make_plane(n, up, state.bounding_cage.smooth_skeleton_vertices().row(current_vertex_id), 40.0, PV, PF);
+  make_plane(n, up, state.cage.smooth_skeleton_vertices().row(current_vertex_id), 40.0, PV, PF);
 
   int push_overlay_id = viewer->selected_data_index;
   viewer->selected_data_index = points_overlay_id;
