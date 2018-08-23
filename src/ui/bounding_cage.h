@@ -14,7 +14,7 @@
 
 struct CageNode;
 struct KeyFrame;
-struct Cage;
+struct BoundingCage;
 
 
 struct CageNode {
@@ -40,12 +40,9 @@ struct CageNode {
   bool split(std::shared_ptr<KeyFrame> key_frame);
   bool split();
 
-  int left_index() const;
+  double left_index() const;
 
-  int right_index() const;
-
-private:
-  friend class KeyFrame;
+  double right_index() const;
 
   bool update() {
     // Check that the edges in the two endplanes don't cross
@@ -57,7 +54,7 @@ struct KeyFrame {
   KeyFrame(const Eigen::RowVector3d& normal,
            const Eigen::RowVector3d& center,
            const Eigen::MatrixXd& pts,
-           int idx);
+           double idx);
 
   const Eigen::RowVector3d& normal() const {
     return plane_normal;
@@ -80,7 +77,7 @@ struct KeyFrame {
     return points3d;
   }
 
-  const int index() const {
+  const double index() const {
     return curve_index;
   }
 
@@ -98,15 +95,15 @@ private:
   Eigen::RowVector3d plane_center;
   Eigen::MatrixXd points2d;
   Eigen::MatrixXd points3d;
-  int curve_index;
+  double curve_index;
 
   std::array<std::shared_ptr<CageNode>, 2> cage_nodes;
 };
 
 
-struct Cage {
+struct BoundingCage {
 
-  Cage() {}
+  BoundingCage() {}
 
   // Root node of the cage tree
   std::shared_ptr<CageNode> root;
@@ -122,9 +119,15 @@ struct Cage {
   const Eigen::MatrixXd& skeleton_vertices() const { return SV; }
   const Eigen::MatrixXd& smooth_skeleton_vertices() const { return SV_smooth; }
 
+  double min_index() const { return head->left_index(); }
+  double max_index() const { return tail->right_index(); }
+
+  Eigen::MatrixXd intersecting_plane(double index);
+
 private:
   bool fit_cage_r(std::shared_ptr<CageNode> node);
   bool skeleton_in_cage(std::shared_ptr<CageNode> node);
+  std::shared_ptr<CageNode> find_cage_node(std::shared_ptr<CageNode> node, double index);
 
   Eigen::MatrixXd SV;
   Eigen::MatrixXd SV_smooth;

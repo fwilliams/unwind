@@ -163,12 +163,15 @@ bool Bounding_Polygon_Menu::pre_draw() {
   Eigen::MatrixXi PF;
   make_plane(n, up, state.cage.smooth_skeleton_vertices().row(current_vertex_id), 40.0, PV, PF);
 
+
   int push_overlay_id = viewer->selected_data_index;
   viewer->selected_data_index = points_overlay_id;
   viewer->data().clear();
   viewer->data().set_mesh(PV, PF);
   viewer->data().add_points(PV, ColorRGB::CRIMSON);
   viewer->data().point_size = 10.0;
+  Eigen::MatrixXd pts = state.cage.intersecting_plane(current_vertex_id);
+  viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
 
   viewer->selected_data_index = push_overlay_id;
 

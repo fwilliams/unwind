@@ -12,7 +12,7 @@
 KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                    const Eigen::RowVector3d& center,
                    const Eigen::MatrixXd& pts,
-                   int idx) {
+                   double idx) {
   curve_index = idx;
   plane_normal = normal;
   plane_normal.normalize();
@@ -115,34 +115,25 @@ std::shared_ptr<CageNode> CageNode::make_cage_node(std::shared_ptr<KeyFrame> fro
   igl::per_face_normals_stable(ret->V, ret->F, ret->N);
 }
 
-int CageNode::left_index() const {
+double CageNode::left_index() const {
   return left_keyframe->index();
 }
 
-int CageNode::right_index() const {
+double CageNode::right_index() const {
   return right_keyframe->index();
 }
 
 bool CageNode::split(std::shared_ptr<KeyFrame> key_frame) {
   if (key_frame->index() > right_index() || key_frame->index() < left_index()) {
-    std::cout << "split: index out of range" << std::endl;
-    std::cout << "split: left_keyframe index = " << left_index() << std::endl;
-    std::cout << "split: new_keyframe index = " << key_frame->index() << std::endl;
-    std::cout << "split: right_keyframe index = " << right_index() << std::endl;
     return false;
   }
 
   // This node has already been split by the keyframe
   if (key_frame->index() == right_index() || key_frame->index() == left_index()) {
-    std::cout << "split: index already exists range" << std::endl;
     return true;
   }
 
   if (!left_child && !right_child) {
-    std::cout << "split: is leaf, splitting that shit" << std::endl;
-    std::cout << "split: left_keyframe index is " << left_keyframe->index() << std::endl;
-    std::cout << "split: new_keyframe index is " << key_frame->index() << std::endl;
-    std::cout << "split: right_keyframe index is " << right_keyframe->index() << std::endl;
     left_child = CageNode::make_cage_node(left_keyframe, key_frame);
     if (!left_child) {
       return false;
@@ -166,10 +157,8 @@ bool CageNode::split(std::shared_ptr<KeyFrame> key_frame) {
 
     return true;
   } else if(key_frame->index() > left_child->left_index() && key_frame->index() < left_child->right_index()) {
-    std::cout << "split: recurse left" << std::endl;
     return left_child->split(key_frame);
   } else if(key_frame->index() > right_child->left_index() && key_frame->index() < right_child->right_index()) {
-    std::cout << "split: recurse right" << std::endl;
     return right_child->split(key_frame);
   }
 
@@ -178,8 +167,21 @@ bool CageNode::split(std::shared_ptr<KeyFrame> key_frame) {
   return false;
 }
 
+std::shared_ptr<CageNode> BoundingCage::find_cage_node(std::shared_ptr<CageNode> node, double index) {
+  if (!node || index < node->left_index() || index > node->right_index()) {
+    return std::shared_ptr<CageNode>();
+  } else if (!node->left_child && !node->right_child) {
+    return node;
+  } else if (node->left_child && index >= node->left_child->left_index() && index <= node->left_child->right_index()) {
+    return find_cage_node(node->left_child, index);
+  } else if (node->right_child && index >= node->right_child->left_index() && index <= node->right_child->right_index()) {
+    return find_cage_node(node->right_child, index);
+  } else {
+    assert("This should never happen" && false);
+  }
+}
 
-Eigen::MatrixXd Cage::polygon_template() {
+Eigen::MatrixXd BoundingCage::polygon_template() {
   Eigen::MatrixXd poly_template(4, 2);
   poly_template << -1, -1,
                      1, -1,
@@ -190,7 +192,7 @@ Eigen::MatrixXd Cage::polygon_template() {
   return rad * poly_template;
 }
 
-bool Cage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters) {
+bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters) {
   auto smooth_skeleton = [&](int num_iters) {
     Eigen::MatrixXd SV_i = SV;
     SV_smooth.resize(SV_i.rows(), 3);
@@ -228,7 +230,7 @@ bool Cage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothi
   if (!root) {
     // TODO: Use the bounding box of the mesh instead
     std::cerr << "*****THIS IS BAD UNTIL I FIX IT******" << std::endl;
-    assert(false);
+    assert("TODO: Use bounding box" && false);
 
     return false;
   }
@@ -241,7 +243,18 @@ bool Cage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothi
   return true;
 }
 
-bool Cage::skeleton_in_cage(std::shared_ptr<CageNode> node) {
+Eigen::MatrixXd BoundingCage::intersecting_plane(double index) {
+  auto node = find_cage_node(root, index);
+  if (!node) {
+    return Eigen::MatrixXd();
+  }
+
+  double coeff = (index - node->left_index()) / (node->right_index() - node->left_index());
+
+  return (1.0-coeff)*node->left_keyframe->points_3d() + coeff*node->right_keyframe->points_3d();
+}
+
+bool BoundingCage::skeleton_in_cage(std::shared_ptr<CageNode> node) {
   int start = node->left_index();
   int end = node->right_index();
 
@@ -275,20 +288,19 @@ bool Cage::skeleton_in_cage(std::shared_ptr<CageNode> node) {
   return true;
 }
 
-bool Cage::fit_cage_r(std::shared_ptr<CageNode> node) {
+bool BoundingCage::fit_cage_r(std::shared_ptr<CageNode> node) {
   // If all the skeleton vertices are in the cage node, then we're done
   if (skeleton_in_cage(node)) {
-    std::cout << "Skeleton in cage!" << std::endl;
     return true;
   }
 
-  std::cout << "fit_cage_r: left_idx = " << node->left_index() << ", right_idx = " << node->right_index() << std::endl;
   // Otherwise split the cage node and try again
   const int mid = node->left_index() + (node->right_index() - node->left_index()) / 2;
   if (mid == node->left_index() || mid == node->right_index()) {
-    std::cout << "bailout!" << std::endl;
     return false;
   }
+
+  assert("Bad mid index" && (mid > 0) && (mid_index < SV_smooth.rows()-1));
 
   Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+1) - SV_smooth.row(mid-1));
   mid_normal.normalize();
@@ -305,11 +317,9 @@ bool Cage::fit_cage_r(std::shared_ptr<CageNode> node) {
       tail = node->right_child;
     }
 
-    std::cout << "splitting" << std::endl;
     bool ret = fit_cage_r(node->left_child);
     return ret && fit_cage_r(node->right_child);
   } else {
-    std::cout << "failed to split" << std::endl;
     return false;
   }
 }

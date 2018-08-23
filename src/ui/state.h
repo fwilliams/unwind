@@ -92,7 +92,7 @@ struct State {
 
   BoundingPolygon bounding_polygon;
 
-  Cage cage;
+  BoundingCage cage;
 
   // Geodesic distances
   Eigen::VectorXd geodesic_dists;
