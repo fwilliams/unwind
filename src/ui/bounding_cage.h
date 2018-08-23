@@ -122,7 +122,8 @@ struct BoundingCage {
   double min_index() const { return head->left_index(); }
   double max_index() const { return tail->right_index(); }
 
-  Eigen::MatrixXd intersecting_plane(double index);
+  Eigen::MatrixXd vertices_for_index(double index);
+  std::pair<Eigen::RowVector3d, Eigen::RowVector3d> plane_for_index(double index);
 
 private:
   bool fit_cage_r(std::shared_ptr<CageNode> node);

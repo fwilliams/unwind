@@ -243,7 +243,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   return true;
 }
 
-Eigen::MatrixXd BoundingCage::intersecting_plane(double index) {
+Eigen::MatrixXd BoundingCage::vertices_for_index(double index) {
   auto node = find_cage_node(root, index);
   if (!node) {
     return Eigen::MatrixXd();
