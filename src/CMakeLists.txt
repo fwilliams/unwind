@@ -1,4 +1,6 @@
 
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-DNDEBUG -g")
+
 # Main application binary
 file(GLOB UI_SRCS ui/*.cpp)
 add_executable(fish_deformation main.cpp ${UI_SRCS})

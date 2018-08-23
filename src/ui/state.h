@@ -94,6 +94,8 @@ struct State {
 
   BoundingCage bounding_cage;
 
+  Cage cage;
+
   // Geodesic distances
   Eigen::VectorXd geodesic_dists;
 };

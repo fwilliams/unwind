@@ -94,6 +94,14 @@ void Bounding_Polygon_Menu::initialize() {
     viewer->data().add_edges(P1, P2, ColorRGB::BLUE);
     viewer->data().add_edges(node->C, node->C + node->N*20.0, ColorRGB::CRIMSON);
   }
+
+  for (auto node = state.cage.head; node.get() != nullptr; node = node->next) {
+    Eigen::MatrixXd P1, P2;
+    edge_endpoints(node->V, node->F, P1, P2);
+    viewer->data().add_points(node->V, ColorRGB::GREEN);
+    viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+    node = node->next;
+  }
 }
 
 
