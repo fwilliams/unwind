@@ -11,6 +11,8 @@
 #include "ui/rasterization_state.h"
 #include "ui/state.h"
 
+#include <GLFW/glfw3.h>
+
 State _state;
 Application_State previous_state;
 
@@ -64,10 +66,10 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 }
 
 bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
-  if (previous_state != _state.application_state) {
+  if (previous_state != _state.get_application_state()) {
     viewer.plugins.clear();
 
-    switch (_state.application_state) {
+    switch (_state.get_application_state()) {
     case Application_State::Initial_File_Selection:
       viewer.plugins.push_back(&initial_file_selection);
       break;
@@ -95,12 +97,13 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
       break;
     }
 
-    previous_state = _state.application_state;
+    previous_state = _state.get_application_state();
 
+    glfwPostEmptyEvent();
     return true;
   }
 
-  switch (_state.application_state) {
+  switch (_state.get_application_state()) {
   case Application_State::Segmentation:
     selection_menu.draw_setup();
     break;
@@ -112,7 +115,7 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
 bool post_draw(igl::opengl::glfw::Viewer& viewer) {
   _state.frame_counter++;
 
-  switch (_state.application_state) {
+  switch (_state.get_application_state()) {
   case Application_State::Segmentation:
     selection_menu.draw();
     break;
@@ -122,7 +125,7 @@ bool post_draw(igl::opengl::glfw::Viewer& viewer) {
 }
 
 bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned int key, int modifiers) {
-  switch (_state.application_state) {
+  switch (_state.get_application_state()) {
   case Application_State::Segmentation:
     selection_menu.key_down(key, modifiers);
     break;
@@ -133,7 +136,7 @@ bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned int key, int modifiers
 
 
 bool mouse_move(igl::opengl::glfw::Viewer& viewer, int mouse_x, int mouse_y) {
-    switch (_state.application_state) {
+    switch (_state.get_application_state()) {
         case Application_State::BoundingPolygon:
             return bounding_polygon_menu.mouse_move(mouse_x, mouse_y);
         default:
@@ -142,7 +145,7 @@ bool mouse_move(igl::opengl::glfw::Viewer& viewer, int mouse_x, int mouse_y) {
 }
 
 bool mouse_down(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
-    switch (_state.application_state) {
+    switch (_state.get_application_state()) {
         case Application_State::BoundingPolygon:
             return bounding_polygon_menu.mouse_down(button, modifier);
         default:
@@ -151,7 +154,7 @@ bool mouse_down(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
 }
 
 bool mouse_up(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
-    switch (_state.application_state) {
+    switch (_state.get_application_state()) {
         case Application_State::BoundingPolygon:
             return bounding_polygon_menu.mouse_up(button, modifier);
         default:

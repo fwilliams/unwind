@@ -63,7 +63,7 @@ bool Initial_File_Selection_Menu::post_draw() {
     if (done_loading) {
       is_loading = false;
       done_loading = false;
-      _state.application_state = Application_State::Segmentation;
+      _state.set_application_state(Application_State::Segmentation);
     }
   }
   ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);

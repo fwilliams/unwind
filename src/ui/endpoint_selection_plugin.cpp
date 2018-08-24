@@ -161,7 +161,7 @@ bool EndPoint_Selection_Menu::post_draw() {
                ImGuiWindowFlags_AlwaysAutoResize);
 
   if (done_extracting_skeleton) {
-    state.application_state = Application_State::BoundingPolygon;
+    state.set_application_state(Application_State::BoundingPolygon);
   }
 
   if (extracting_skeleton) {
@@ -240,7 +240,7 @@ bool EndPoint_Selection_Menu::post_draw() {
   ImGui::NewLine();
   ImGui::Separator();
   if (ImGui::Button("Back")) {
-    state.application_state = Application_State::Segmentation;
+    state.set_application_state(Application_State::Segmentation);
   }
   ImGui::SameLine();
   if (state.endpoint_pairs.size() == 0) {
@@ -309,6 +309,8 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
 void EndPoint_Selection_Menu::extract_skeleton() {
   auto thread_fun = [&]() {
     extracting_skeleton = true;
+    glfwPostEmptyEvent();
+
     const Eigen::MatrixXd& TV = state.extracted_volume.TV;
     const Eigen::MatrixXi& TT = state.extracted_volume.TT;
 
@@ -318,6 +320,7 @@ void EndPoint_Selection_Menu::extract_skeleton() {
     compute_skeleton(TV, TT, state.geodesic_dists,
                      state.endpoint_pairs, state.extracted_volume.connected_components,
                      100, skeleton_vertices);
+
     state.cage.set_skeleton_vertices(skeleton_vertices, 50/* smoothing iterations */);
 
     extracting_skeleton = false;

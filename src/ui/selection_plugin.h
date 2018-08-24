@@ -17,7 +17,6 @@ public:
     bool post_draw() override;
 
 private:
-    Eigen::VectorXd export_selected_volume(const std::vector<uint32_t>& feature_list);
     void resize_framebuffer_textures(igl::opengl::ViewerCore& core);
 
     State& _state;
@@ -27,7 +26,6 @@ private:
     int current_interaction_index = -1;
     bool has_added_node_since_initial_click = false;
 
-    int number_features = 10;
     bool number_features_is_dirty = true;
 
     int current_selected_feature = -1;

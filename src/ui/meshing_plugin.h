@@ -30,6 +30,7 @@ private:
   std::atomic_bool _done_meshing;
   State& _state;
 
+  Eigen::VectorXd export_selected_volume(const std::vector<uint32_t>& feature_list);
   void tetrahedralize_surface_mesh();
   void dilate_volume();
   void extract_surface_mesh();

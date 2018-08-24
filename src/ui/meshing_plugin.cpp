@@ -118,6 +118,13 @@ void Meshing_Menu::initialize() {
 
   auto thread_fun = [&]() {
     _is_meshing = true;
+    glfwPostEmptyEvent();
+
+    std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
+    // The feature list used in export_selected_volume uses a zero-based indexing, we use
+    // 0 for the non-feature, so we have to convert into the zero-based indexing here
+    std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(), [](uint32_t v) { return v - 1; });
+    _state.skeleton_masking_volume = export_selected_volume(feature_list);
 
     dilate_volume();
     if (extracted_surface.V_fat.rows() == 0) {
@@ -129,8 +136,8 @@ void Meshing_Menu::initialize() {
 
     _is_meshing = false;
     _done_meshing = true;
-    glfwPostEmptyEvent();
 
+    glfwPostEmptyEvent();
   };
 
   extracted_surface.V_thin.resize(0, 0);
@@ -138,6 +145,7 @@ void Meshing_Menu::initialize() {
   extracted_surface.V_fat.resize(0, 0);
   extracted_surface.F_fat.resize(0, 0);
 
+  std::cout << "starting bg thread" << std::endl << std::flush;
   bg_thread = std::thread(thread_fun);
   bg_thread.detach();
 }
@@ -179,7 +187,7 @@ bool Meshing_Menu::post_draw() {
   }
 
   if (_done_meshing) {
-    _state.application_state = Application_State::EndPointSelection;
+    _state.set_application_state(Application_State::EndPointSelection);
     _done_meshing = false;
 
     glfwPostEmptyEvent();
@@ -309,4 +317,33 @@ void Meshing_Menu::extract_surface_mesh() {
   }
   //  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
   //  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
+}
+
+
+Eigen::VectorXd Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list) {
+  using namespace std;
+  cout << "Feature list size: " << feature_list.size() << endl;
+  Eigen::VectorXd data = _state.volume_data;
+
+  std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_features, 0.f);
+
+  std::vector<uint32_t> good_arcs;
+  for (uint32_t f : feature_list) {
+    cout << "feature: " << f << endl;
+    cout << "feature arcs size: " << features[f].arcs.size() << endl;
+    good_arcs.insert(good_arcs.end(), features[f].arcs.begin(), features[f].arcs.end());
+    cout << "good arcs size: " << good_arcs.size() << endl;
+  }
+  std::sort(good_arcs.begin(), good_arcs.end());
+
+  for (int i = 0; i < data.size(); ++i) {
+    unsigned int idx = _state.index_volume_data[i];
+    if (std::binary_search(good_arcs.begin(), good_arcs.end(), idx)) {
+      data[i] = 1.0;
+    } else {
+      data[i] = -1.0;
+    }
+  }
+
+  return data;
 }

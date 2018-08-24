@@ -123,8 +123,8 @@ void Selection_Menu::draw_setup() {
     _state.total_selection_list.clear();
     _state.selection_list_is_dirty = true;
 
-    std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(
-          number_features, 0.f);
+    std::vector<contourtree::Feature> features =
+        _state.topological_features.getFeatures(_state.number_features, 0.f);
 
     uint32_t size = _state.topological_features.ctdata.noArcs;
 
@@ -289,7 +289,7 @@ bool Selection_Menu::post_draw() {
 
   ImGui::Text("Number of features:");
   ImGui::PushItemWidth(-1);
-  if (ImGui::SliderInt("Number of features", &number_features, 1, 100)) {
+  if (ImGui::SliderInt("Number of features", &_state.number_features, 1, 100)) {
     number_features_is_dirty = true;
   }
   ImGui::NewLine();
@@ -359,13 +359,7 @@ bool Selection_Menu::post_draw() {
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
   }
   if (ImGui::Button("Next")) {
-    std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
-    // The feature list used in export_selected_volume uses a zero-based indexing, we use
-    // 0 for the non-feature, so we have to convert into the zero-based indexing here
-    std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(), [](uint32_t v) { return v - 1; });
-
-    _state.skeleton_masking_volume = export_selected_volume(feature_list);
-    _state.application_state = Application_State::Meshing;
+    _state.set_application_state(Application_State::Meshing);
   }
   if (list.size() == 0) {
     ImGui::PopItemFlag();
@@ -587,30 +581,4 @@ bool Selection_Menu::post_draw() {
   return ret;
 }
 
-Eigen::VectorXd Selection_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list) {
-  using namespace std;
-  cout << "Feature list size: " << feature_list.size() << endl;
-  Eigen::VectorXd data = _state.volume_data;
 
-  std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(number_features, 0.f);
-
-  std::vector<uint32_t> good_arcs;
-  for (uint32_t f : feature_list) {
-    cout << "feature: " << f << endl;
-    cout << "feature arcs size: " << features[f].arcs.size() << endl;
-    good_arcs.insert(good_arcs.end(), features[f].arcs.begin(), features[f].arcs.end());
-    cout << "good arcs size: " << good_arcs.size() << endl;
-  }
-  std::sort(good_arcs.begin(), good_arcs.end());
-
-  for (int i = 0; i < data.size(); ++i) {
-    unsigned int idx = _state.index_volume_data[i];
-    if (std::binary_search(good_arcs.begin(), good_arcs.end(), idx)) {
-      data[i] = 1.0;
-    } else {
-      data[i] = -1.0;
-    }
-  }
-
-  return data;
-}

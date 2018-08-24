@@ -12,6 +12,7 @@
 #include <utils/utils.h>
 #include <utils/datfile.h>
 
+#include <GLFW/glfw3.h>
 
 enum class Application_State {
   Initial_File_Selection = 0,
@@ -23,11 +24,23 @@ enum class Application_State {
   Rasterization
 };
 
-struct State {
+class State {
   Application_State application_state = Application_State::Initial_File_Selection;
+public:
+
+  void set_application_state(Application_State new_state) {
+    application_state = new_state;
+    glfwPostEmptyEvent();
+  }
+
+  Application_State get_application_state() const {
+    return application_state;
+  }
 
   std::string volume_base_name;
   DatFile volume_file;
+
+  int num_features = 10;
 
   GLuint index_volume = 0;
   struct {

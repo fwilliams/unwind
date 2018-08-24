@@ -12,28 +12,6 @@
 #include <utils/utils.h>
 
 
-static void make_plane(const Eigen::RowVector3d& normal, const Eigen::RowVector3d& up,
-                       const Eigen::RowVector3d& ctr, double scale,
-                       Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
-
-  Eigen::RowVector3d n = normal;
-  n.normalize();
-  Eigen::RowVector3d u = up;
-  u.normalize();
-  Eigen::RowVector3d r = n.cross(u);
-
-  V.resize(4, 3);
-
-  V.row(0) = ctr + scale*(0.5*r + 0.5*u);
-  V.row(1) = ctr + scale*(-0.5*r + 0.5*u);
-  V.row(2) = ctr + scale*(-0.5*r - 0.5*u);
-  V.row(3) = ctr + scale*(0.5*r - 0.5*u);
-
-  F.resize(2, 3);
-  F.row(0) = Eigen::RowVector3i(0, 1, 3);
-  F.row(1) = Eigen::RowVector3i(1, 2, 3);
-}
-
 Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
   : state(state), widget_2d(Bounding_Polygon_Widget(state))
 {}
@@ -86,11 +64,25 @@ void Bounding_Polygon_Menu::initialize() {
   // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
 
-  for (auto node = state.cage.head; node.get() != nullptr; node = node->next) {
+  for (const BoundingCage::Cell& cell : state.cage.cells) {
     Eigen::MatrixXd P1, P2;
-    edge_endpoints(node->V, node->F, P1, P2);
-    viewer->data().add_points(node->V, ColorRGB::GREEN);
+    edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
     viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+  }
+
+  for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
+    std::cout << kf.index() << std::endl;
+    viewer->data().add_points(kf.points_3d(), ColorRGB::NAVY);
+  }
+
+  for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
+    Eigen::MatrixXd P1, P2;
+    edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
+    viewer->data().add_edges(P1, P2, ColorRGB::DARK_MAGENTA);
+  }
+
+  for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
+    viewer->data().add_points(kf->points_3d(), ColorRGB::CRIMSON);
   }
 }
 
@@ -158,7 +150,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
   viewer->selected_data_index = points_overlay_id;
   viewer->data().clear();
   viewer->data().point_size = 10.0;
-  Eigen::MatrixXd pts = state.cage.vertices_for_index(current_cut_index);
+  Eigen::MatrixXd pts = state.cage.vertices_3d_for_index(current_cut_index);
   viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
 
   viewer->selected_data_index = push_overlay_id;
