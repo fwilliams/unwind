@@ -124,7 +124,7 @@ void Selection_Menu::draw_setup() {
     _state.selection_list_is_dirty = true;
 
     std::vector<contourtree::Feature> features =
-        _state.topological_features.getFeatures(_state.number_features, 0.f);
+        _state.topological_features.getFeatures(_state.num_features, 0.f);
 
     uint32_t size = _state.topological_features.ctdata.noArcs;
 
@@ -289,7 +289,7 @@ bool Selection_Menu::post_draw() {
 
   ImGui::Text("Number of features:");
   ImGui::PushItemWidth(-1);
-  if (ImGui::SliderInt("Number of features", &_state.number_features, 1, 100)) {
+  if (ImGui::SliderInt("Number of features", &_state.num_features, 1, 100)) {
     number_features_is_dirty = true;
   }
   ImGui::NewLine();
