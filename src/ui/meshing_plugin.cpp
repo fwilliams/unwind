@@ -128,7 +128,7 @@ void Meshing_Menu::initialize() {
 
     dilate_volume();
     if (extracted_surface.V_fat.rows() == 0) {
-      std::cerr << "Empty mesh!" << std::endl;
+      _state.logger->error("Extracted empty mesh after dilation! Something went wrong!");
       abort();
     }
     tetrahedralize_surface_mesh();
@@ -137,6 +137,7 @@ void Meshing_Menu::initialize() {
     _is_meshing = false;
     _done_meshing = true;
 
+    _state.logger->info("Done meshing background thread.");
     glfwPostEmptyEvent();
   };
 
@@ -145,7 +146,7 @@ void Meshing_Menu::initialize() {
   extracted_surface.V_fat.resize(0, 0);
   extracted_surface.F_fat.resize(0, 0);
 
-  std::cout << "starting bg thread" << std::endl << std::flush;
+  _state.logger->info("Starting meshing background thread...");
   bg_thread = std::thread(thread_fun);
   bg_thread.detach();
 }
@@ -322,17 +323,17 @@ void Meshing_Menu::extract_surface_mesh() {
 
 Eigen::VectorXd Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list) {
   using namespace std;
-  cout << "Feature list size: " << feature_list.size() << endl;
+  _state.logger->debug("Feature list size: {}", feature_list.size());
   Eigen::VectorXd data = _state.volume_data;
 
   std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_features, 0.f);
 
   std::vector<uint32_t> good_arcs;
   for (uint32_t f : feature_list) {
-    cout << "feature: " << f << endl;
-    cout << "feature arcs size: " << features[f].arcs.size() << endl;
+    _state.logger->debug("Feature: {}", f);
+    _state.logger->debug("Feature arcs size: {}", features[f].arcs.size());
     good_arcs.insert(good_arcs.end(), features[f].arcs.begin(), features[f].arcs.end());
-    cout << "good arcs size: " << good_arcs.size() << endl;
+    _state.logger->debug("Good arcs size: {}", good_arcs.size());
   }
   std::sort(good_arcs.begin(), good_arcs.end());
 

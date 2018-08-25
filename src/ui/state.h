@@ -14,6 +14,8 @@
 
 #include <GLFW/glfw3.h>
 
+#include <spdlog/spdlog.h>
+
 enum class Application_State {
   Initial_File_Selection = 0,
   Segmentation,
@@ -109,6 +111,8 @@ public:
 
   // Geodesic distances
   Eigen::VectorXd geodesic_dists;
+
+  std::shared_ptr<spdlog::logger> logger;
 };
 
 #endif // __FISH_DEFORMATION_STATE__

@@ -15,3 +15,6 @@
 [submodule "external/cgal"]
 	path = external/cgal
 	url = https://github.com/CGAL/cgal.git
+[submodule "external/spdlog"]
+	path = external/spdlog
+	url = https://github.com/gabime/spdlog.git

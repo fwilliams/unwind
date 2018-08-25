@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include "ui/initial_file_selection_state.h"
 #include "ui/selection_plugin.h"
 #include "ui/meshing_plugin.h"
@@ -11,7 +13,6 @@
 #include "ui/rasterization_state.h"
 #include "ui/state.h"
 
-#include <GLFW/glfw3.h>
 
 State _state;
 Application_State previous_state;
@@ -40,8 +41,10 @@ void log_opengl_debug(GLenum source, GLenum type, GLuint id,
   if (source == GL_DEBUG_SOURCE_APPLICATION) {
     return;
   }
-  std::cout << "OpenGL Debug msg\nSource: " << source << "\nType: " << type << "\nId: "
+  std::stringstream ss;
+  ss << "OpenGL Debug msg\nSource: " << source << "\nType: " << type << "\nId: "
             << id << "\nSeverity: " << severity << "\nMessage: " << std::string(message) << '\n';
+  _state.logger->debug("{}", ss.str().c_str());
 #ifdef WIN32
   DebugBreak();
 #endif
@@ -59,6 +62,8 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 
   viewer.plugins.push_back(&initial_file_selection);
 
+  _state.logger = spdlog::stdout_color_mt("stdout logger");
+  _state.logger->set_level(spdlog::level::debug);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   glDebugMessageCallback(log_opengl_debug, NULL);
 

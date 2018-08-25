@@ -136,23 +136,18 @@ bool Bounding_Polygon_Menu::pre_draw() {
   viewer->selected_data_index = points_overlay_id;
   viewer->data().clear();
 
-  int cell_count_forward = 0;
   for (const BoundingCage::Cell& cell : state.cage.cells) {
     Eigen::MatrixXd P1, P2;
     edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
     viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
-    cell_count_forward += 1;
   }
 
-  int cell_count_reverse = 0;
   for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
     Eigen::MatrixXd P1, P2;
     edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
     viewer->data().add_edges(P1, P2, ColorRGB::RED);
-    cell_count_reverse += 1;
   }
 
-//  std::cout << "count_fwd: " << cell_count_forward << ", count_rev: " << cell_count_reverse << std::endl;
   for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
     viewer->data().add_points(kf.points_3d(), ColorRGB::DARK_GRAY);
   }
