@@ -63,27 +63,6 @@ void Bounding_Polygon_Menu::initialize() {
 
   // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
-
-  for (const BoundingCage::Cell& cell : state.cage.cells) {
-    Eigen::MatrixXd P1, P2;
-    edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
-    viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
-  }
-
-  for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-    std::cout << kf.index() << std::endl;
-    viewer->data().add_points(kf.points_3d(), ColorRGB::NAVY);
-  }
-
-  for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
-    Eigen::MatrixXd P1, P2;
-    edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
-    viewer->data().add_edges(P1, P2, ColorRGB::DARK_MAGENTA);
-  }
-
-  for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
-    viewer->data().add_points(kf->points_3d(), ColorRGB::CRIMSON);
-  }
 }
 
 
@@ -124,7 +103,9 @@ bool Bounding_Polygon_Menu::post_draw() {
     current_cut_index = std::max(current_cut_index - delta, 0.0);
   }
   ImGui::SameLine();
-  if (ImGui::SliderFloat("#vertexid", &current_cut_index, (float)state.cage.min_index(), (float)state.cage.max_index())) {}
+  if (ImGui::SliderFloat("#vertexid", &current_cut_index, (float)state.cage.min_index(), (float)state.cage.max_index())) {
+    current_cut_index = std::max(state.cage.min_index(), std::min((double)current_cut_index, state.cage.max_index()));
+  }
   ImGui::SameLine();
   if (ImGui::Button("Next >")) {
     current_cut_index = std::min(current_cut_index + delta, state.cage.max_index());
@@ -133,6 +114,10 @@ bool Bounding_Polygon_Menu::post_draw() {
   ImGui::Checkbox("Show slice view", &show_slice_view);
   if (show_slice_view) {
     widget_2d.post_draw(PV, current_cut_index);
+  }
+
+  if (ImGui::Button("Split")) {
+    state.cage.split(current_cut_index);
   }
   ImGui::End();
   ImGui::Render();
@@ -147,12 +132,43 @@ bool Bounding_Polygon_Menu::pre_draw() {
   glDisable(GL_CULL_FACE);
 
   int push_overlay_id = viewer->selected_data_index;
+
   viewer->selected_data_index = points_overlay_id;
   viewer->data().clear();
+
+  int cell_count_forward = 0;
+  for (const BoundingCage::Cell& cell : state.cage.cells) {
+    Eigen::MatrixXd P1, P2;
+    edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
+    viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+    cell_count_forward += 1;
+  }
+
+  int cell_count_reverse = 0;
+  for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
+    Eigen::MatrixXd P1, P2;
+    edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
+    viewer->data().add_edges(P1, P2, ColorRGB::RED);
+    cell_count_reverse += 1;
+  }
+
+//  std::cout << "count_fwd: " << cell_count_forward << ", count_rev: " << cell_count_reverse << std::endl;
+  for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
+    viewer->data().add_points(kf.points_3d(), ColorRGB::DARK_GRAY);
+  }
+
+  for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
+    viewer->data().add_points(kf->points_3d(), ColorRGB::CRIMSON);
+    viewer->data().add_points(kf->center(), ColorRGB::GREEN);
+  }
+
   viewer->data().point_size = 10.0;
   Eigen::MatrixXd pts = state.cage.vertices_3d_for_index(current_cut_index);
+  std::pair<Eigen::RowVector3d, Eigen::RowVector3d> plane =
+      state.cage.plane_for_index(current_cut_index);
+  viewer->data().add_points(plane.first, ColorRGB::RED);
   viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
-
+  viewer->data().add_edges(plane.first, plane.first + 100*plane.second, ColorRGB::RED);
   viewer->selected_data_index = push_overlay_id;
 
   return ret;

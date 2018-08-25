@@ -14,11 +14,18 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                                  const Eigen::MatrixXd& pts,
                                  double idx) {
   curve_index = idx;
-  plane_normal = normal;
-  plane_normal.normalize();
-  plane_up = Eigen::RowVector3d(0, 1, 0);
-  plane_right = Eigen::RowVector3d(1, 0, 0);
+  coord_system = local_coordinate_system(normal);
   plane_center = center;
+
+  points2d = pts;
+}
+
+
+Eigen::Matrix3d BoundingCage::KeyFrame::local_coordinate_system(const Eigen::RowVector3d& normal) {
+  Eigen::RowVector3d plane_normal = normal;
+  plane_normal.normalize();
+  Eigen::RowVector3d plane_up = Eigen::RowVector3d(0, 1, 0);
+  Eigen::RowVector3d plane_right = Eigen::RowVector3d(1, 0, 0);
 
   // If the up vector and the normal are about the same
   if (fabs(1.0 - plane_normal.dot(plane_up)) < 1e-8) {
@@ -38,7 +45,12 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
     plane_right.normalize();
   }
 
-  points2d = pts;
+  Eigen::Matrix3d ret;
+  ret.row(0) = plane_right;
+  ret.row(1) = plane_up;
+  ret.row(2) = plane_normal;
+
+  return ret;
 }
 
 bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos) {
@@ -49,7 +61,7 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos) {
   Eigen::RowVector2d old_pt_2d = points2d.row(i);
   Eigen::RowVector3d old_pt_3d = points3d.row(i);
   points2d.row(i) = newpos;
-  points3d.row(i) = plane_center + newpos[0]*plane_right + newpos[1]*plane_up;
+  points3d.row(i) = plane_center + newpos[0]*coord_system.row(0) + newpos[1]*coord_system.row(1);
 
   if (!(validate_points_2d() && validate_cage())) {
     points2d.row(i) = old_pt_2d;
@@ -110,7 +122,9 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
 
   igl::copyleft::cgal::convex_hull(CHV, ret->V, ret->F);
   if (CHV.rows() != ret->V.rows()) {
+    // TODO: Log here
     std::cerr << "*****THIS IS BAD UNTIL I FIX IT******" << std::endl;
+    std::cerr << CHV.rows() << ", " << ret->V.rows() << std::endl;
     ret.reset();
     return ret;
   }
@@ -118,30 +132,34 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   igl::per_face_normals_stable(ret->V, ret->F, ret->N);
 }
 
-bool BoundingCage::Cell::split(std::shared_ptr<KeyFrame> key_frame) {
+std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> key_frame) {
   // The index of the keyframe is out of range, since this method is called, internally,
   // this should fail
   if (key_frame->index() > max_index() || key_frame->index() < min_index()) {
     assert("split index is out of range" && false);
-    return false;
+    return std::shared_ptr<KeyFrame>();
   }
 
   // This node has already been split by the keyframe
-  if (key_frame->index() == max_index() || key_frame->index() == min_index()) {
-    return true;
+  if (key_frame->index() == max_index()) {
+    return right_keyframe;
+  }
+  if (key_frame->index() == min_index()) {
+    return left_keyframe;
   }
 
   // This node is a leaf node, so split it
   if (!left_child && !right_child) {
+
     // Initialize new Cells for the left and right children
     left_child = Cell::make_cell(left_keyframe, key_frame);
     if (!left_child) {
-      return false;
+      return std::shared_ptr<KeyFrame>();
     }
     right_child = Cell::make_cell(key_frame, right_keyframe);
     if (!right_child) {
       left_child.reset();
-      return false;
+      return std::shared_ptr<KeyFrame>();
     }
 
     // Fix the indices of the children to keep the leaf-list valid
@@ -162,7 +180,7 @@ bool BoundingCage::Cell::split(std::shared_ptr<KeyFrame> key_frame) {
     next_cell.reset();
     prev_cell.reset();
 
-    return true;
+    return key_frame;
 
   // This node is not a leaf node, split one of the children
   } else if(key_frame->index() > left_child->min_index() && key_frame->index() < left_child->max_index()) {
@@ -172,7 +190,7 @@ bool BoundingCage::Cell::split(std::shared_ptr<KeyFrame> key_frame) {
   } else {
     assert("BoundingCage tree is in a bad state" && false);
     assert("BoundingCage tree is in a bad state" && ((left_child && !right_child) || (right_child && !left_child)));
-    return false;
+    return std::shared_ptr<KeyFrame>();;
   }
   assert(false);
 }
@@ -191,18 +209,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::find_cell_r(std::shared_ptr<Bo
   }
 }
 
-Eigen::MatrixXd BoundingCage::polygon_template() {
-  Eigen::MatrixXd poly_template(4, 2);
-  poly_template << -1, -1,
-                     1, -1,
-                     1,  1,
-                    -1,  1;
-
-  const double rad = 20.0;
-  return rad * poly_template;
-}
-
-bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters) {
+bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters, const Eigen::MatrixXd &poly_template) {
   assert(cells.begin() == cells.end());
   assert(keyframes.begin() == keyframes.end());
   assert(cells.rbegin() == cells.rend());
@@ -229,7 +236,13 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
   smooth_skeleton(smoothing_iters);
 
-  Eigen::MatrixXd poly_template = polygon_template();
+  if(poly_template.rows() < 3 || poly_template.cols() != 2) {
+    // TODO: Log here
+    std::cerr << "Polygon template was invalid. Needs to have at least "
+                 "3 points and exactly 2 columns. Got " << poly_template.rows() <<
+                 "x" << poly_template.cols() << std::endl;
+    return false;
+  }
 
   Eigen::RowVector3d front_normal = SV_smooth.row(1) - SV_smooth.row(0);
   Eigen::RowVector3d back_normal = SV_smooth.row(SV.rows()-1) - SV_smooth.row(SV.rows()-2);
@@ -257,15 +270,50 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   return true;
 }
 
+std::pair<Eigen::VectorXd, Eigen::VectorXd> BoundingCage::plane_for_index(double index) const {
+  auto cell = find_cell_r(root, index);
+  if (!cell) { return std::make_pair(Eigen::VectorXd(), Eigen::VectorXd()); }
+
+  const double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
+  Eigen::MatrixXd V = (1.0-coeff)*cell->left_keyframe->points_3d() + coeff*cell->right_keyframe->points_3d();
+  Eigen::RowVector3d C = (1.0-coeff)*cell->left_keyframe->center() + coeff*cell->right_keyframe->center();
+
+  V.rowwise() -= C;
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(V, Eigen::ComputeThinV);
+  return std::make_pair(C, svd.matrixV().col(2));
+}
+
 Eigen::MatrixXd BoundingCage::vertices_3d_for_index(double index) const {
-  auto node = find_cell_r(root, index);
-  if (!node) {
+  auto cell = find_cell_r(root, index);
+  if (!cell) {
     return Eigen::MatrixXd();
   }
 
-  double coeff = (index - node->min_index()) / (node->max_index() - node->min_index());
+  double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
+  return (1.0-coeff)*cell->left_keyframe->points_3d() + coeff*cell->right_keyframe->points_3d();
+}
 
-  return (1.0-coeff)*node->left_keyframe->points_3d() + coeff*node->right_keyframe->points_3d();
+Eigen::MatrixXd BoundingCage::vertices_2d_for_index(double index) const {
+  auto cell = find_cell_r(root, index);
+  if (!cell) {
+    return Eigen::MatrixXd();
+  }
+
+  const double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
+  Eigen::MatrixXd V = (1.0-coeff)*cell->left_keyframe->points_3d() + coeff*cell->right_keyframe->points_3d();
+  Eigen::RowVector3d C = (1.0-coeff)*cell->left_keyframe->center() + coeff*cell->right_keyframe->center();
+
+  Eigen::MatrixXd A = V.rowwise() - C;
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
+  Eigen::RowVector3d N = svd.matrixV().col(2).transpose();
+
+  Eigen::Matrix3d coord = KeyFrame::local_coordinate_system(N);
+
+  Eigen::MatrixXd points2d(V.rows(), 2);
+  points2d.col(0) = A*coord.row(0).transpose();
+  points2d.col(1) = A*coord.row(1).transpose();
+
+  return points2d;
 }
 
 bool BoundingCage::skeleton_in_cage(std::shared_ptr<Cell> node) const {
@@ -335,4 +383,36 @@ bool BoundingCage::fit_cage_r(std::shared_ptr<Cell> node) {
   } else {
     return false;
   }
+}
+
+BoundingCage::KeyFrameIterator BoundingCage::split(double index) {
+  auto cell = find_cell_r(root, index);
+  if (!cell) {
+    return KeyFrameIterator();
+  }
+
+  const double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
+  Eigen::MatrixXd V = (1.0-coeff)*cell->left_keyframe->points_3d() + coeff*cell->right_keyframe->points_3d();
+  Eigen::RowVector3d C = (1.0-coeff)*cell->left_keyframe->center() + coeff*cell->right_keyframe->center();
+
+  Eigen::MatrixXd A = V.rowwise() - C;
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
+  Eigen::RowVector3d N = svd.matrixV().col(2).transpose();
+
+  Eigen::Matrix3d coord = KeyFrame::local_coordinate_system(N);
+
+  Eigen::MatrixXd points2d(V.rows(), 2);
+  points2d.col(0) = A*coord.row(0).transpose();
+  points2d.col(1) = A*coord.row(1).transpose();
+
+  std::shared_ptr<KeyFrame> kf(new KeyFrame(N, C, points2d, index));
+  KeyFrameIterator ret(cell->split(kf));
+
+  if (cell == cells.head) {
+    cells.head = ret.keyframe->cells[0].lock();
+  } else if (cell == cells.tail) {
+    cells.tail = ret.keyframe->cells[1].lock();
+  }
+
+  return ret;
 }
