@@ -16,6 +16,8 @@
 
 #include <spdlog/spdlog.h>
 
+extern const char* FISH_LOGGER_NAME;
+
 enum class Application_State {
   Initial_File_Selection = 0,
   Segmentation,
@@ -29,6 +31,8 @@ enum class Application_State {
 class State {
   Application_State application_state = Application_State::Initial_File_Selection;
 public:
+
+
 
   void set_application_state(Application_State new_state) {
     application_state = new_state;

@@ -9,8 +9,8 @@
 #include "ui/meshing_plugin.h"
 #include "ui/endpoint_selection_plugin.h"
 #include "ui/bounding_polygon_plugin.h"
-#include "ui/straightening_state.h"
-#include "ui/rasterization_state.h"
+#include "ui/straightening_plugin.h"
+#include "ui/rasterization_plugin.h"
 #include "ui/state.h"
 
 
@@ -18,6 +18,7 @@ State _state;
 Application_State previous_state;
 
 
+const char* FISH_LOGGER_NAME = "fish_deformation_logger";
 
 //#define Debugging
 
@@ -42,8 +43,8 @@ void log_opengl_debug(GLenum source, GLenum type, GLuint id,
     return;
   }
   std::stringstream ss;
-  ss << "OpenGL Debug msg\nSource: " << source << "\nType: " << type << "\nId: "
-            << id << "\nSeverity: " << severity << "\nMessage: " << std::string(message) << '\n';
+  ss << "OpenGL Debug msg: Source: " << source << ", Type: " << type << ", Id: "
+     << id << ", Severity: " << severity << ", Message: " << std::string(message);
   _state.logger->debug("{}", ss.str().c_str());
 #ifdef WIN32
   DebugBreak();
@@ -62,7 +63,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 
   viewer.plugins.push_back(&initial_file_selection);
 
-  _state.logger = spdlog::stdout_color_mt("stdout logger");
+  _state.logger = spdlog::stdout_color_mt(FISH_LOGGER_NAME);
   _state.logger->set_level(spdlog::level::debug);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   glDebugMessageCallback(log_opengl_debug, NULL);
@@ -168,6 +169,7 @@ bool mouse_up(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
 }
 
 int main(int argc, char** argv) {
+  FISH_LOGGER_NAME = "fish_deformation logger";
   igl::opengl::glfw::Viewer viewer;
   viewer.core.background_color = Eigen::Vector4f(0.1, 0.1, 0.1, 1.0);
   viewer.callback_init = init;

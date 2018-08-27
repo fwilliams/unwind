@@ -2,8 +2,13 @@
 
 #include <memory>
 
+#include <spdlog/spdlog.h>
+
+
 #ifndef BOUNDING_CAGE_H
 #define BOUNDING_CAGE_H
+
+extern const char* FISH_LOGGER_NAME;
 
 class BoundingCage {
 public:
@@ -38,6 +43,10 @@ private:
   /// Root node of the Cell tree
   ///
   std::shared_ptr<Cell> root;
+
+  /// Logger for this class
+  /// By default this is the null logger
+  std::shared_ptr<spdlog::logger> logger;
 
 public:
   /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
@@ -93,6 +102,10 @@ public:
     ///
     std::shared_ptr<KeyFrame> split(std::shared_ptr<KeyFrame> key_frame);
 
+    /// Logger for this class
+    ///
+    std::shared_ptr<spdlog::logger> logger;
+
     /// This method gets called when one of the "left" or "right" KeyFrame
     /// changes. The update method propagates the change in state of the KeyFrame
     /// to the cell.
@@ -114,7 +127,8 @@ public:
          std::shared_ptr<Cell> prev,
          std::shared_ptr<Cell> next) :
       left_keyframe(left_kf), right_keyframe(right_kf),
-      prev_cell(prev), next_cell(next) {}
+      prev_cell(prev), next_cell(next),
+      logger(spdlog::get(FISH_LOGGER_NAME)) {}
 
   public:
     const Eigen::MatrixXd& vertices() const { return V; }
@@ -225,7 +239,15 @@ public:
     /// The index of this KeyFrame.
     double curve_index;
 
+    /// Pointers to the Cells bounidng this keyframe
+    /// cells[0] is to the left, and cells[1] is to the right
+    ///
     std::array<std::weak_ptr<BoundingCage::Cell>, 2> cells;
+
+    /// Logger for this class
+    ///
+    std::shared_ptr<spdlog::logger> logger;
+
 
   public:
     /// Get the normal of the plane of this KeyFrame.
@@ -388,7 +410,9 @@ public:
 
   } keyframes;
 
-  BoundingCage() { keyframes.cage = this; }
+  BoundingCage() {
+    keyframes.cage = this;
+  }
 
   /// Set the skeleton vertices to whatever the user provides.
   /// There must be at least two vertices, if not the method returns false.

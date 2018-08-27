@@ -1,4 +1,4 @@
-#include "straightening_state.h"
+#include "straightening_plugin.h"
 
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
