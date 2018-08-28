@@ -36,6 +36,10 @@ private:
   ///
   std::shared_ptr<Cell> find_cell_r(std::shared_ptr<Cell> node, double index) const;
 
+  /// Core method to split the bounding cage using the keyframe.
+  ///
+  std::shared_ptr<KeyFrame> split_internal(std::shared_ptr<KeyFrame> kf);
+
   /// Skeleton Vertices
   ///
   Eigen::MatrixXd SV;
@@ -102,6 +106,9 @@ public:
     ///
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
+
+    /// Indexes of faces in the BoundingCage mesh
+    Eigen::MatrixXi face_indexes;
 
     /// Split the Cell into two cells divided by key_frame.
     /// If the index of key_frame is outside the cell, this method
@@ -231,6 +238,14 @@ public:
              const Eigen::MatrixXd& pts,
              double idx,
              const BoundingCage *cage);
+
+    KeyFrame(const Eigen::RowVector3d& normal,
+             const Eigen::RowVector3d& center,
+             const KeyFrame& from_kf,
+             const Eigen::MatrixXd& pts,
+             std::shared_ptr<Cell> cell,
+             double idx,
+             const BoundingCage* cage);
 
 
     /// When polygon vertex changes (via `set_point_2d()`), these methods
