@@ -213,16 +213,18 @@ public:
 
     static Eigen::Matrix3d local_coordinate_system(const Eigen::RowVector3d& normal);
 
-    KeyFrame(const Eigen::RowVector3d& normal,
-             const Eigen::RowVector3d& center,
-             const Eigen::MatrixXd& pts,
-             double idx);
 
     KeyFrame(const Eigen::RowVector3d& normal,
              const Eigen::RowVector3d& center,
              const KeyFrame& kf,
              const Eigen::MatrixXd& pts,
              double idx);
+
+    KeyFrame(const Eigen::RowVector3d& center,
+             const Eigen::Matrix3d& coord_frame,
+             const Eigen::MatrixXd& pts,
+             double idx);
+
 
     /// When polygon vertex changes (via `set_point_2d()`), these methods
     /// validate that the change does not create self intersections.
@@ -292,14 +294,14 @@ public:
 
     /// Get the ordered 2d points of the KeyFrame polygon boundary.
     ///
-    const Eigen::MatrixXd& points_2d() const {
+    const Eigen::MatrixXd& vertices_2d() const {
       return points2d;
     }
 
     /// Get the ordered 3d points of the keyframe polygon boundary.
     /// These points are just the 2d points projected onto the KeyFrame plane.
     ///
-    const Eigen::MatrixXd& points_3d() {
+    const Eigen::MatrixXd& vertices_3d() {
       // TODO: Recomputing this every frame might be a bit slow but we'll optimize it if we need to
       points3d.conservativeResize(points2d.rows(), 3);
       for (int i = 0; i < points2d.rows(); i++) {
@@ -321,6 +323,12 @@ public:
     /// and this method returns false.
     ///
     bool move_point_2d(int i, Eigen::RowVector2d& newpos);
+
+
+    /// If this keyframe is not part of the bounding cage, this method adds it to the bounding cage
+    /// If the keyframe causes local self intersections, this method returns false
+    ///
+//    bool commit();
   };
 
   /// Bidirectional Iterator class used to traverse the linked list of KeyFrames
@@ -445,6 +453,7 @@ public:
   /// base KeyFrames of the Cell containing its index.
   ///
   KeyFrameIterator split(double index);
+  KeyFrameIterator split(KeyFrameIterator& it);
 
   /// Get the skeleton vertex positions
   ///
@@ -477,9 +486,11 @@ public:
   Eigen::MatrixXd vertices_3d_for_index(double index) const;
   Eigen::MatrixXd vertices_2d_for_index(double index) const;
 
+  KeyFrameIterator keyframe_for_index(double index) const;
+
   /// Get the plane cutting the cage at the given index
   ///
-  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> plane_for_index(double index) const;
+  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> coordinate_system_for_index(double index) const;
 };
 
 

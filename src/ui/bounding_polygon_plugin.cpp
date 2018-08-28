@@ -162,12 +162,12 @@ bool Bounding_Polygon_Menu::pre_draw() {
   }
 
   for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-    viewer->data().add_points(kf.points_3d(), ColorRGB::RED);
+    viewer->data().add_points(kf.vertices_3d(), ColorRGB::RED);
     viewer->data().add_points(kf.center(), ColorRGB::GREEN);
   }
 
   for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
-    viewer->data().add_points(kf->points_3d(), ColorRGB::GRAY);
+    viewer->data().add_points(kf->vertices_3d(), ColorRGB::GRAY);
     Eigen::Matrix3d cf = kf->coordinate_system();
 
     viewer->data().line_width = 2.4;
@@ -178,7 +178,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
   viewer->data().point_size = 10.0;
   Eigen::MatrixXd pts = state.cage.vertices_3d_for_index(current_cut_index);
-  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> plane = state.cage.plane_for_index(current_cut_index);
+  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> plane = state.cage.coordinate_system_for_index(current_cut_index);
   viewer->data().add_points(plane.first, ColorRGB::RED);
   viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
   viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(0), ColorRGB::RED);
