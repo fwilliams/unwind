@@ -50,8 +50,11 @@ private:
   std::shared_ptr<spdlog::logger> logger;
 
   /// Mesh for the whole bounding cage
+  ///
   Eigen::MatrixXd CV;
   Eigen::MatrixXi CF;
+  int num_mesh_vertices = 0;
+  int num_mesh_faces = 0;
 
 public:
   /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
@@ -215,17 +218,19 @@ public:
 
     static Eigen::Matrix3d local_coordinate_system(const Eigen::RowVector3d& normal);
 
+    const BoundingCage* cage;
 
     KeyFrame(const Eigen::RowVector3d& normal,
              const Eigen::RowVector3d& center,
              const KeyFrame& kf,
              const Eigen::MatrixXd& pts,
-             double idx);
+             double idx, const BoundingCage* cage);
 
     KeyFrame(const Eigen::RowVector3d& center,
              const Eigen::Matrix3d& coord_frame,
              const Eigen::MatrixXd& pts,
-             double idx);
+             double idx,
+             const BoundingCage *cage);
 
 
     /// When polygon vertex changes (via `set_point_2d()`), these methods
@@ -245,7 +250,7 @@ public:
     /// Cached positions of the bounding polygon for this KeyFrame in 2d
     /// and 3d.
     Eigen::MatrixXd points2d;
-    Eigen::MatrixXd points3d;
+    Eigen::VectorXi point_indexes3d;
 
     /// The index of this KeyFrame.
     double curve_index;
@@ -261,6 +266,12 @@ public:
 
 
   public:
+
+    /// Returns true if this KeyFrame is part of the bounding cage
+    ///
+    bool in_bounding_cage() {
+      return point_indexes3d.rows() != 0;
+    }
 
     /// Get the normal of the plane of this KeyFrame.
     ///
@@ -303,9 +314,9 @@ public:
     /// Get the ordered 3d points of the keyframe polygon boundary.
     /// These points are just the 2d points projected onto the KeyFrame plane.
     ///
-    const Eigen::MatrixXd& vertices_3d() {
+    Eigen::MatrixXd vertices_3d() const {
       // TODO: Recomputing this every frame might be a bit slow but we'll optimize it if we need to
-      points3d.conservativeResize(points2d.rows(), 3);
+      Eigen::MatrixXd points3d(points2d.rows(), 3);
       for (int i = 0; i < points2d.rows(); i++) {
         points3d.row(i) = plane_center + points2d(i, 0) *coord_system.row(0) + points2d(i, 1) *coord_system.row(1);
       }
@@ -325,12 +336,6 @@ public:
     /// and this method returns false.
     ///
     bool move_point_2d(int i, Eigen::RowVector2d& newpos);
-
-
-    /// If this keyframe is not part of the bounding cage, this method adds it to the bounding cage
-    /// If the keyframe causes local self intersections, this method returns false
-    ///
-//    bool commit();
   };
 
   /// Bidirectional Iterator class used to traverse the linked list of KeyFrames
@@ -448,6 +453,10 @@ public:
     cells.tail.reset();
     SV.resize(0, 0);
     SV_smooth.resize(0, 0);
+    CV.resize(0, 0);
+    CF.resize(0, 0);
+    num_mesh_faces = 0;
+    num_mesh_vertices = 0;
   }
 
   /// Add a new KeyFrame at the given index in the bounding Cage.

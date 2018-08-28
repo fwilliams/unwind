@@ -31,7 +31,8 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                                  const Eigen::RowVector3d& center,
                                  const BoundingCage::KeyFrame& from_kf,
                                  const Eigen::MatrixXd& pts,
-                                 double idx) {
+                                 double idx,
+                                 const BoundingCage* cage) : cage(cage) {
   curve_index = idx;
   coord_system = parallel_transport(from_kf, normal);
 
@@ -44,7 +45,8 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
 BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
                                  const Eigen::Matrix3d& coord_frame,
                                  const Eigen::MatrixXd& pts,
-                                 double idx) {
+                                 double idx,
+                                 const BoundingCage *cage) : cage(cage) {
   curve_index = idx;
   coord_system = coord_frame;
   plane_center = center;
@@ -97,13 +99,13 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos) {
     return false;
   }
   Eigen::RowVector2d old_pt_2d = points2d.row(i);
-  Eigen::RowVector3d old_pt_3d = points3d.row(i);
+//  Eigen::RowVector3d old_pt_3d = points3d.row(i);
   points2d.row(i) = newpos;
-  points3d.row(i) = plane_center + newpos[0]*coord_system.row(0) + newpos[1]*coord_system.row(1);
+//  points3d.row(i) = plane_center + newpos[0]*coord_system.row(0) + newpos[1]*coord_system.row(1);
 
   if (!(validate_points_2d() && validate_cage())) {
     points2d.row(i) = old_pt_2d;
-    points3d.row(i) = old_pt_3d;
+//    points3d.row(i) = old_pt_3d;
     logger->debug("move_point_2d() would have created invalid cage, reverting");
     return false;
   }
@@ -302,6 +304,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     }
   };
 
+  clear();
+  CV.resize(10*poly_template.rows(), 3);
+
   logger = spdlog::get(FISH_LOGGER_NAME);
 
   logger->info("Constructing intial bounding cage for skeleton.");
@@ -342,9 +347,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   back_normal.normalize();
 
   Eigen::Matrix3d front_coord_system = KeyFrame::local_coordinate_system(front_normal);
-  std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template, 0));
+  std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template, 0, this));
   std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), *front_keyframe,
-                                                       poly_template, SV.rows()-1));
+                                                       poly_template, SV.rows()-1, this));
   assert("Parallel transport bug" && (1.0-fabs(back_keyframe->normal().dot(back_normal))) < 1e-6);
 
   root = Cell::make_cell(front_keyframe, back_keyframe);
@@ -396,7 +401,7 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
   points2d.col(0) = A*coord_frame.row(0).transpose();
   points2d.col(1) = A*coord_frame.row(1).transpose();
 
-  std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, index));
+  std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, index, this));
   kf->cells[0] = cell;
   kf->cells[1] = cell;
 
@@ -462,7 +467,7 @@ bool BoundingCage::fit_cage_r(std::shared_ptr<Cell> node) {
   mid_normal.normalize();
 
   Eigen::MatrixXd pts = 0.5 * (node->left_keyframe->vertices_2d() + node->left_keyframe->vertices_2d());
-  std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *node->left_keyframe, pts, mid));
+  std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *node->left_keyframe, pts, mid, this));
   assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
 
   if(node->split(mid_keyframe)) {
@@ -521,6 +526,14 @@ BoundingCage::KeyFrameIterator BoundingCage::split(BoundingCage::KeyFrameIterato
   } else if (right_cell == cells.tail) {
     cells.tail = right_cell->right_child;
   }
+
+  int num_new_vertices = split_kf->vertices_2d().rows();
+  if (CV.rows() < num_mesh_vertices + num_new_vertices) {
+    CV.resize(2*CV.rows(), 3);
+  }
+  CV.block(num_mesh_vertices, 0, num_new_vertices, 3) = split_kf->vertices_3d();
+  split_kf.keyframe->point_indexes3d.setLinSpaced(num_mesh_vertices, num_mesh_vertices+num_new_vertices-1);
+  num_mesh_vertices += num_new_vertices;
 
   return split_kf;
 }
