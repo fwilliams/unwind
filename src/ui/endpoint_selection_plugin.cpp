@@ -322,7 +322,7 @@ void EndPoint_Selection_Menu::extract_skeleton() {
                      100, skeleton_vertices);
 
     Eigen::MatrixXd poly_template(4, 2);
-    const double rad = 20.0;
+    const double rad = 7.5;
     poly_template << -rad, -rad,
                       rad, -rad,
                       rad,  rad,

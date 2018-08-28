@@ -1,4 +1,5 @@
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include <memory>
 
@@ -217,6 +218,12 @@ public:
              const Eigen::MatrixXd& pts,
              double idx);
 
+    KeyFrame(const Eigen::RowVector3d& normal,
+             const Eigen::RowVector3d& center,
+             const KeyFrame& kf,
+             const Eigen::MatrixXd& pts,
+             double idx);
+
     /// When polygon vertex changes (via `set_point_2d()`), these methods
     /// validate that the change does not create self intersections.
     ///
@@ -250,6 +257,7 @@ public:
 
 
   public:
+
     /// Get the normal of the plane of this KeyFrame.
     ///
     Eigen::RowVector3d normal() const {
@@ -398,7 +406,7 @@ public:
 
     KeyFrameIterator rbegin() {
       if(cage->cells.tail) {
-        return KeyFrameIterator(cage->cells.head->left_keyframe);
+        return KeyFrameIterator(cage->cells.tail->right_keyframe);
       } else {
         return KeyFrameIterator();
       }
@@ -471,7 +479,7 @@ public:
 
   /// Get the plane cutting the cage at the given index
   ///
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> plane_for_index(double index) const;
+  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> plane_for_index(double index) const;
 };
 
 

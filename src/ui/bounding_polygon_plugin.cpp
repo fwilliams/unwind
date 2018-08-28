@@ -63,21 +63,34 @@ void Bounding_Polygon_Menu::initialize() {
 
   // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
+  state.logger->trace("Done initializing bounding polygon plugin!");
 }
 
 
 bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
-  return widget_2d.mouse_move(mouse_x, mouse_y);
+  if (show_slice_view) {
+    return widget_2d.mouse_move(mouse_x, mouse_y);
+  } else {
+    return FishUIViewerPlugin::mouse_move(mouse_x, mouse_y);
+  }
 }
 
 
 bool Bounding_Polygon_Menu::mouse_down(int button, int modifier) {
-  return widget_2d.mouse_down(button, modifier);
+  if (show_slice_view) {
+    return widget_2d.mouse_down(button, modifier);
+  } else {
+    return FishUIViewerPlugin::mouse_down(button, modifier);
+  }
 }
 
 
 bool Bounding_Polygon_Menu::mouse_up(int button, int modifier) {
-  return widget_2d.mouse_up(button, modifier);
+  if (show_slice_view) {
+    return widget_2d.mouse_up(button, modifier);
+  } else {
+    return FishUIViewerPlugin::mouse_up(button, modifier);
+  }
 }
 
 
@@ -145,25 +158,32 @@ bool Bounding_Polygon_Menu::pre_draw() {
   for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
     Eigen::MatrixXd P1, P2;
     edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
-    viewer->data().add_edges(P1, P2, ColorRGB::RED);
+    viewer->data().add_edges(P1, P2, ColorRGB::NAVY);
   }
 
   for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-    viewer->data().add_points(kf.points_3d(), ColorRGB::DARK_GRAY);
+    viewer->data().add_points(kf.points_3d(), ColorRGB::RED);
+    viewer->data().add_points(kf.center(), ColorRGB::GREEN);
   }
 
   for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
-    viewer->data().add_points(kf->points_3d(), ColorRGB::CRIMSON);
-    viewer->data().add_points(kf->center(), ColorRGB::GREEN);
+    viewer->data().add_points(kf->points_3d(), ColorRGB::GRAY);
+    Eigen::Matrix3d cf = kf->coordinate_system();
+
+    viewer->data().line_width = 2.4;
+    viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(0), ColorRGB::RED);
+    viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(1), ColorRGB::GREEN);
+    viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(2), ColorRGB::BLUE);
   }
 
   viewer->data().point_size = 10.0;
   Eigen::MatrixXd pts = state.cage.vertices_3d_for_index(current_cut_index);
-  std::pair<Eigen::RowVector3d, Eigen::RowVector3d> plane =
-      state.cage.plane_for_index(current_cut_index);
+  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> plane = state.cage.plane_for_index(current_cut_index);
   viewer->data().add_points(plane.first, ColorRGB::RED);
   viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
-  viewer->data().add_edges(plane.first, plane.first + 100*plane.second, ColorRGB::RED);
+  viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(0), ColorRGB::RED);
+  viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(1), ColorRGB::GREEN);
+  viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(2), ColorRGB::BLUE);
   viewer->selected_data_index = push_overlay_id;
 
   return ret;

@@ -64,7 +64,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
   viewer.plugins.push_back(&initial_file_selection);
 
   _state.logger = spdlog::stdout_color_mt(FISH_LOGGER_NAME);
-  _state.logger->set_level(spdlog::level::debug);
+  _state.logger->set_level(spdlog::level::trace);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   glDebugMessageCallback(log_opengl_debug, NULL);
 

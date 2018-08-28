@@ -7,6 +7,13 @@
 #include <igl/per_face_normals.h>
 
 
+static Eigen::Matrix3d parallel_transport(Eigen::RowVector3d n1, Eigen::RowVector3d n2, Eigen::Matrix3d coord_1) {
+  Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(n1, n2).matrix();
+  Eigen::Matrix3d coord_system = (R*coord_1.transpose()).transpose();
+  for (int i = 0; i < coord_system.rows(); i++) { coord_system.row(i) /= coord_system.row(i).norm(); }
+  return coord_system;
+}
+
 BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                                  const Eigen::RowVector3d& center,
                                  const Eigen::MatrixXd& pts,
@@ -17,8 +24,23 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
 
   points2d = pts;
   logger = spdlog::get(FISH_LOGGER_NAME);
+  logger->trace("Creating KeyFrame at index {}", idx);
 }
 
+BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
+                                 const Eigen::RowVector3d& center,
+                                 const BoundingCage::KeyFrame& from_kf,
+                                 const Eigen::MatrixXd& pts,
+                                 double idx) {
+  curve_index = idx;
+  coord_system = parallel_transport(from_kf.normal().normalized(), normal.normalized(), from_kf.coordinate_system());
+
+  plane_center = center;
+
+  points2d = pts;
+  logger = spdlog::get(FISH_LOGGER_NAME);
+  logger->trace("Creating KeyFrame at index {}", idx);
+}
 
 Eigen::Matrix3d BoundingCage::KeyFrame::local_coordinate_system(const Eigen::RowVector3d& normal) {
   Eigen::RowVector3d plane_normal = normal;
@@ -48,6 +70,10 @@ Eigen::Matrix3d BoundingCage::KeyFrame::local_coordinate_system(const Eigen::Row
   ret.row(0) = plane_right;
   ret.row(1) = plane_up;
   ret.row(2) = plane_normal;
+
+  ret.row(0).normalize();
+  ret.row(1).normalize();
+  ret.row(2).normalize();
 
   return ret;
 }
@@ -177,6 +203,13 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
     key_frame->cells[0] = left_child;
     key_frame->cells[1] = right_child;
 
+    // If we added a cell with a different normal than the left key-frame, we need to recompute the
+    // the local coordinate frame of the right keyframe
+    right_keyframe->coord_system = parallel_transport(
+          right_child->left_keyframe->normal(),
+          right_keyframe->normal(),
+          right_child->left_keyframe->coord_system);
+
     // This cell is no longer a leaf, so clear its linked list pointers
     next_cell.reset();
     prev_cell.reset();
@@ -281,7 +314,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   back_normal.normalize();
 
   std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(front_normal, SV.row(0), poly_template, 0));
-  std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), poly_template, SV.rows()-1));
+  std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), *front_keyframe,
+                                                       poly_template, SV.rows()-1));
+  assert("Parallel transport bug" && (1.0-fabs(back_keyframe->normal().dot(back_normal))) < 1e-6);
 
   root = Cell::make_cell(front_keyframe, back_keyframe);
   if (!root) {
@@ -304,20 +339,25 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   return true;
 }
 
-std::pair<Eigen::VectorXd, Eigen::VectorXd> BoundingCage::plane_for_index(double index) const {
+std::pair<Eigen::RowVector3d, Eigen::Matrix3d> BoundingCage::plane_for_index(double index) const {
   auto cell = find_cell_r(root, index);
   if (!cell) {
-    logger->error("plane_for_index() could not find cell at index {}", index);
-    return std::make_pair(Eigen::VectorXd(), Eigen::VectorXd());
+    logger->error("vertices_2d_for_index() could not find cell at index {}", index);
+    return std::make_pair(Eigen::RowVector3d::Zero(), Eigen::Matrix3d::Zero());
   }
 
   const double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
   Eigen::MatrixXd V = (1.0-coeff)*cell->left_keyframe->points_3d() + coeff*cell->right_keyframe->points_3d();
-  Eigen::RowVector3d C = (1.0-coeff)*cell->left_keyframe->center() + coeff*cell->right_keyframe->center();
+  Eigen::RowVector3d ctr = (1.0-coeff)*cell->left_keyframe->center() + coeff*cell->right_keyframe->center();
 
-  V.rowwise() -= C;
-  Eigen::JacobiSVD<Eigen::MatrixXd> svd(V, Eigen::ComputeThinV);
-  return std::make_pair(C, svd.matrixV().col(2));
+  Eigen::MatrixXd A = V.rowwise() - ctr;
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
+  Eigen::RowVector3d n = svd.matrixV().col(2).transpose().normalized();
+
+  assert("Parallel transport bug" && (1.0-fabs(cell->right_keyframe->normal().dot(n))) < 1e-6);
+
+  Eigen::Matrix3d coord_frame = parallel_transport(cell->left_keyframe->normal(), n, cell->left_keyframe->coordinate_system());
+  return std::make_pair(ctr, coord_frame);
 }
 
 Eigen::MatrixXd BoundingCage::vertices_3d_for_index(double index) const {
@@ -346,7 +386,7 @@ Eigen::MatrixXd BoundingCage::vertices_2d_for_index(double index) const {
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
   Eigen::RowVector3d N = svd.matrixV().col(2).transpose();
 
-  Eigen::Matrix3d coord = KeyFrame::local_coordinate_system(N);
+  Eigen::Matrix3d coord = parallel_transport(cell->left_keyframe->normal(), N, cell->left_keyframe->coord_system);
 
   Eigen::MatrixXd points2d(V.rows(), 2);
   points2d.col(0) = A*coord.row(0).transpose();
@@ -404,13 +444,14 @@ bool BoundingCage::fit_cage_r(std::shared_ptr<Cell> node) {
     return false;
   }
 
-  assert("Bad mid index" && (mid > 0) && (mid_index < SV_smooth.rows()-1));
+  assert("Bad mid index" && (mid > 0) && (mid < SV_smooth.rows()-1));
 
   Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+1) - SV_smooth.row(mid-1));
   mid_normal.normalize();
 
   Eigen::MatrixXd pts = 0.5 * (node->left_keyframe->points_2d() + node->left_keyframe->points_2d());
-  std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), pts, mid));
+  std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *node->left_keyframe, pts, mid));
+  assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
 
   if(node->split(mid_keyframe)) {
     if (node == cells.head) {
