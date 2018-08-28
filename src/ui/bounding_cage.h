@@ -29,7 +29,7 @@ private:
   /// Return true if a Cell contains the skeleton vertices corresponding
   /// to its index range, and false otherwise.
   ///
-  bool skeleton_in_cage(std::shared_ptr<Cell> node) const;
+  bool skeleton_in_cell(std::shared_ptr<Cell> node) const;
 
   /// Find the Cell for a given index in the Cell tree.
   /// If index is out of range, this method returns a null pointer.
@@ -48,6 +48,10 @@ private:
   /// Logger for this class
   /// By default this is the null logger
   std::shared_ptr<spdlog::logger> logger;
+
+  /// Mesh for the whole bounding cage
+  Eigen::MatrixXd CV;
+  Eigen::MatrixXi CF;
 
 public:
   /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
@@ -95,7 +99,6 @@ public:
     ///
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
-    Eigen::MatrixXd N;
 
     /// Split the Cell into two cells divided by key_frame.
     /// If the index of key_frame is outside the cell, this method
@@ -134,7 +137,6 @@ public:
   public:
     const Eigen::MatrixXd& vertices() const { return V; }
     const Eigen::MatrixXi& faces() const { return F; }
-    const Eigen::MatrixXd& normals() const { return N; }
     double min_index() const { return left_keyframe->index(); }
     double max_index() const { return right_keyframe->index(); }
   };
@@ -480,17 +482,12 @@ public:
     return root->max_index();
   }
 
-  /// Get the 2d or 3d vertices for the plane cutting the cage at index.
-  /// These methods return an empty matrix if the index is out of range
-  ///
-  Eigen::MatrixXd vertices_3d_for_index(double index) const;
-  Eigen::MatrixXd vertices_2d_for_index(double index) const;
 
+  /// Get a KeyFrame at the specified index.
+  /// The KeyFrame may not yet be inserted into the bounding cage.
+  /// To insert it, call split()
+  ///
   KeyFrameIterator keyframe_for_index(double index) const;
-
-  /// Get the plane cutting the cage at the given index
-  ///
-  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> coordinate_system_for_index(double index) const;
 };
 
 

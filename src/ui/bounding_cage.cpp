@@ -148,7 +148,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
                                                                   std::shared_ptr<BoundingCage::Cell> next) {
   std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, prev, next));
 
-  std::shared_ptr<spdlog::logger> logger = spdlog::get(FISH_LOGGER_NAME);
+  std::shared_ptr<spdlog::logger> logger = ret->logger;
 
   if (!left_kf || !right_kf) {
     logger->warn("Cell::make_cell failed to construct Cell. "
@@ -160,6 +160,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   left_kf->cells[1] = ret;
   right_kf->cells[0] = ret;
 
+  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
   Eigen::MatrixXd CHV(left_kf->vertices_2d().rows() + right_kf->vertices_2d().rows(), 3);
   CHV.block(0, 0, left_kf->vertices_2d().rows(), 3) = left_kf->vertices_3d();
   CHV.block(left_kf->vertices_2d().rows(), 0, right_kf->vertices_2d().rows(), 3) = right_kf->vertices_3d();
@@ -172,8 +173,6 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
     ret.reset();
     return ret;
   }
-
-  igl::per_face_normals_stable(ret->V, ret->F, ret->N);
 }
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> key_frame) {
@@ -369,33 +368,6 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   return true;
 }
 
-std::pair<Eigen::RowVector3d, Eigen::Matrix3d> BoundingCage::coordinate_system_for_index(double index) const {
-  KeyFrameIterator kf = keyframe_for_index(index);
-  if (!kf.keyframe) {
-    return std::make_pair(Eigen::RowVector3d::Zero(), Eigen::Matrix3d::Zero());
-  } else {
-    return std::make_pair(kf->center(), kf->coordinate_system());
-  }
-}
-
-Eigen::MatrixXd BoundingCage::vertices_3d_for_index(double index) const {
-  KeyFrameIterator kf = keyframe_for_index(index);
-  if (!kf.keyframe) {
-    return Eigen::MatrixXd();
-  } else {
-    return kf->points3d;
-  }
-}
-
-Eigen::MatrixXd BoundingCage::vertices_2d_for_index(double index) const {
-  KeyFrameIterator kf = keyframe_for_index(index);
-  if (!kf.keyframe) {
-    return Eigen::MatrixXd();
-  } else {
-    return kf->points2d;
-  }
-}
-
 BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) const {
   auto cell = find_cell_r(root, index);
   if (!cell) {
@@ -431,9 +403,9 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
   return KeyFrameIterator(kf);
 }
 
-bool BoundingCage::skeleton_in_cage(std::shared_ptr<Cell> node) const {
-  int start = node->min_index();
-  int end = node->max_index();
+bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
+  int start = cell->min_index();
+  int end = cell->max_index();
 
   assert(start < end);
   if ((end - start) <= 1) {
@@ -444,18 +416,22 @@ bool BoundingCage::skeleton_in_cage(std::shared_ptr<Cell> node) const {
       return (double(0) < val) - (val < double(0));
   };
 
-  Eigen::MatrixXd C(node->F.rows(), 3);
-  for (int i = 0; i < node->F.rows(); i++) {
-    C.row(i) = (node->V.row(node->F(i, 0)) +
-                node->V.row(node->F(i, 1)) +
-                node->V.row(node->F(i, 2))) / 3;
+  Eigen::MatrixXd C(cell->F.rows(), 3);
+  for (int i = 0; i < cell->F.rows(); i++) {
+    C.row(i) = (cell->V.row(cell->F(i, 0)) +
+                cell->V.row(cell->F(i, 1)) +
+                cell->V.row(cell->F(i, 2))) / 3;
   }
 
-  const int check_sign = sgn(node->N.row(0).dot(SV_smooth.row(start+1)-C.row(0)));
+  // Computing the normals here is fine since this function only gets called
+  // on construction when the cage is very simple
+  Eigen::MatrixXd N;
+  igl::per_face_normals(cell->vertices(), cell->faces(), N);
+  const int check_sign = sgn(N.row(0).dot(SV_smooth.row(start+1)-C.row(0)));
   for (int i = 0; i < end-start-1; i++) {
     const Eigen::RowVector3d V = SV_smooth.row(start+1+i);
-    for (int j = 0; j < node->N.rows(); j++) {
-      const int sign = sgn(node->N.row(j).dot(V-C.row(j)));
+    for (int j = 0; j < N.rows(); j++) {
+      const int sign = sgn(N.row(j).dot(V-C.row(j)));
       if (sign != check_sign) {
         return false;
       }
@@ -467,7 +443,7 @@ bool BoundingCage::skeleton_in_cage(std::shared_ptr<Cell> node) const {
 
 bool BoundingCage::fit_cage_r(std::shared_ptr<Cell> node) {
   // If all the skeleton vertices are in the cage node, then we're done
-  if (skeleton_in_cage(node)) {
+  if (skeleton_in_cell(node)) {
     return true;
   }
 

@@ -177,13 +177,12 @@ bool Bounding_Polygon_Menu::pre_draw() {
   }
 
   viewer->data().point_size = 10.0;
-  Eigen::MatrixXd pts = state.cage.vertices_3d_for_index(current_cut_index);
-  std::pair<Eigen::RowVector3d, Eigen::Matrix3d> plane = state.cage.coordinate_system_for_index(current_cut_index);
-  viewer->data().add_points(plane.first, ColorRGB::RED);
-  viewer->data().add_points(pts, ColorRGB::LIGHT_GREEN);
-  viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(0), ColorRGB::RED);
-  viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(1), ColorRGB::GREEN);
-  viewer->data().add_edges(plane.first, plane.first + 100*plane.second.row(2), ColorRGB::BLUE);
+  BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
+  viewer->data().add_points(kf->center(), ColorRGB::RED);
+  viewer->data().add_points(kf->vertices_3d(), ColorRGB::LIGHT_GREEN);
+  viewer->data().add_edges(kf->center(), kf->center() + 100*kf->coordinate_system().row(0), ColorRGB::RED);
+  viewer->data().add_edges(kf->center(), kf->center() + 100*kf->coordinate_system().row(1), ColorRGB::GREEN);
+  viewer->data().add_edges(kf->center(), kf->center() + 100*kf->coordinate_system().row(2), ColorRGB::BLUE);
   viewer->selected_data_index = push_overlay_id;
 
   return ret;
