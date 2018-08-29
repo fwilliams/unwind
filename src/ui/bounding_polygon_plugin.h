@@ -29,6 +29,7 @@ private:
   Eigen::MatrixXd PV;
 
   int mesh_overlay_id;
+  int cage_mesh_overlay_id;
   int points_overlay_id;
 
   float current_cut_index = 0;

@@ -5,68 +5,18 @@
 
 #include <igl/copyleft/cgal/convex_hull.h>
 #include <igl/per_face_normals.h>
-
+#include <igl/triangle/triangulate.h>
 
 // Parallel transport a coordinate system from a KeyFrame along a curve to a point with normal, to_n
 static Eigen::Matrix3d parallel_transport(const BoundingCage::KeyFrame& from_kf, Eigen::RowVector3d to_n) {
   Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(from_kf.normal().normalized(), to_n.normalized()).matrix();
-  Eigen::Matrix3d coord_system = (R*from_kf.coordinate_system().transpose()).transpose();
+  Eigen::Matrix3d coord_system = (R*from_kf.orientation().transpose()).transpose();
   for (int i = 0; i < coord_system.rows(); i++) { coord_system.row(i) /= coord_system.row(i).norm(); }
   return coord_system;
 }
 
-
-
-
-
-
-
-// |--------------------------------| //
-// |                                | //
-// | BoundingCage::KeyFrame methods | //
-// |                                | //
-// |================================| //
-
-BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
-                                 const Eigen::RowVector3d& center,
-                                 const BoundingCage::KeyFrame& from_kf,
-                                 const Eigen::MatrixXd& pts,
-                                 std::shared_ptr<BoundingCage::Cell> cell,
-                                 double idx,
-                                 const BoundingCage* cage) : KeyFrame(normal, center, from_kf, pts, idx, cage) {
-  cells[0] = cell;
-  cells[1] = cell;
-}
-
-BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
-                                 const Eigen::RowVector3d& center,
-                                 const BoundingCage::KeyFrame& from_kf,
-                                 const Eigen::MatrixXd& pts,
-                                 double idx,
-                                 const BoundingCage* cage) : cage(cage) {
-  curve_index = idx;
-  coord_system = parallel_transport(from_kf, normal);
-
-  plane_center = center;
-
-  points2d = pts;
-  logger = spdlog::get(FISH_LOGGER_NAME);
-}
-
-BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
-                                 const Eigen::Matrix3d& coord_frame,
-                                 const Eigen::MatrixXd& pts,
-                                 double idx,
-                                 const BoundingCage *cage) : cage(cage) {
-  curve_index = idx;
-  coord_system = coord_frame;
-  plane_center = center;
-
-  points2d = pts;
-  logger = spdlog::get(FISH_LOGGER_NAME);
-}
-
-Eigen::Matrix3d BoundingCage::KeyFrame::local_coordinate_system(const Eigen::RowVector3d& normal) {
+// Construct a 3x3 rotation matrix whose 3rd row is normal
+static Eigen::Matrix3d local_coordinate_system(const Eigen::RowVector3d& normal) {
   Eigen::RowVector3d plane_normal = normal;
   plane_normal.normalize();
   Eigen::RowVector3d plane_up = Eigen::RowVector3d(0, 1, 0);
@@ -102,21 +52,68 @@ Eigen::Matrix3d BoundingCage::KeyFrame::local_coordinate_system(const Eigen::Row
   return ret;
 }
 
+
+
+
+
+// |--------------------------------| //
+// |                                | //
+// | BoundingCage::KeyFrame methods | //
+// |                                | //
+// |================================| //
+BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
+                                 const Eigen::RowVector3d& center,
+                                 const BoundingCage::KeyFrame& from_kf,
+                                 const Eigen::MatrixXd& pts,
+                                 std::shared_ptr<BoundingCage::Cell> cell,
+                                 double idx,
+                                 const BoundingCage* cage) {
+  _cage = cage;
+  _index = idx;
+  _orientation = parallel_transport(from_kf, normal);
+  _center = center;
+  _vertices_2d = pts;
+
+  _cells[0] = cell;
+  _cells[1] = cell;
+
+  logger = spdlog::get(FISH_LOGGER_NAME);
+}
+
+BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
+                                 const Eigen::Matrix3d& coord_frame,
+                                 const Eigen::MatrixXd& pts,
+                                  std::shared_ptr<BoundingCage::Cell> cell,
+                                 double idx,
+                                 const BoundingCage *cage) {
+  _cage = cage;
+  _index = idx;
+  _orientation = coord_frame;
+  _center = center;
+  _vertices_2d = pts;
+
+  _cells[0] = cell;
+  _cells[1] = cell;
+
+  logger = spdlog::get(FISH_LOGGER_NAME);
+}
+
 bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos) {
-  if (i < 0 || i >= points2d.rows()) {
+  if (i < 0 || i >= _vertices_2d.rows()) {
     assert("i in move_vertex() was out of range" && false);
     logger->error("move_point_2d(i, newpos), index i={} was out of range, ({}, {})",
-                  i, 0, points2d.rows()-1);
+                  i, 0, _vertices_2d.rows()-1);
     return false;
   }
-  Eigen::RowVector2d old_pt_2d = points2d.row(i);
-//  Eigen::RowVector3d old_pt_3d = points3d.row(i);
-  points2d.row(i) = newpos;
-//  points3d.row(i) = plane_center + newpos[0]*coord_system.row(0) + newpos[1]*coord_system.row(1);
+  Eigen::RowVector2d old_pt_2d = _vertices_2d.row(i);
+  Eigen::RowVector3d old_pt_3d = _cage->CV.row(_mesh_vertex_indices[i]);
+
+  _vertices_2d.row(i) = newpos;
+  ((BoundingCage*) _cage)->CV.row(_mesh_vertex_indices[i]) = _center + newpos[0]*right()+ newpos[1]*up();
 
   if (!(validate_points_2d() && validate_cage())) {
-    points2d.row(i) = old_pt_2d;
-//    points3d.row(i) = old_pt_3d;
+    _vertices_2d.row(i) = old_pt_2d;
+    ((BoundingCage*) _cage)->CV.row(_mesh_vertex_indices[i]) = old_pt_3d;
     logger->debug("move_point_2d() would have created invalid cage, reverting");
     return false;
   }
@@ -130,8 +127,8 @@ bool BoundingCage::KeyFrame::validate_points_2d() {
 
 bool BoundingCage::KeyFrame::validate_cage() {
   bool ret = true;
-  std::shared_ptr<Cell> left_cell = cells[0].lock();
-  std::shared_ptr<Cell> right_cell = cells[1].lock();
+  std::shared_ptr<Cell> left_cell = _cells[0].lock();
+  std::shared_ptr<Cell> right_cell = _cells[1].lock();
 
   if (left_cell) {
     ret = ret && left_cell->update();
@@ -143,9 +140,67 @@ bool BoundingCage::KeyFrame::validate_cage() {
   return ret;
 }
 
+bool BoundingCage::KeyFrame::init_mesh(bool tesellate) {
+  BoundingCage* unconst = (BoundingCage*) _cage;
 
+  if (tesellate) {
+    logger->trace("Tesselating!!!");
+    Eigen::MatrixXi E(_vertices_2d.rows(), 2);
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    Eigen::MatrixXd H(0, 2);
+    Eigen::VectorXi VMin(_vertices_2d.rows()), VMout;
+    Eigen::VectorXi EMin, EMout;
+    std::string args("Q");
 
+    for (int i = 0; i < _vertices_2d.rows(); i++) {
+      E.row(i) = Eigen::RowVector2i(i, (i+1)%_vertices_2d.rows());
+      VMin[i] = i+1;
+    }
 
+    igl::triangle::triangulate(_vertices_2d, E, H, VMin, EMin, args, V, F, VMout, EMout);
+
+    while (unconst->CV.rows() < unconst->num_mesh_vertices + V.rows()) {
+      logger->trace("resizing CV!");
+      unconst->CV.conservativeResize(2*unconst->CV.rows(), 3);
+    }
+    while (unconst->CF.rows() < unconst->num_mesh_faces + F.rows()) {
+      logger->trace("resizing CF!");
+      unconst->CF.conservativeResize(2*unconst->CF.rows(), 3);
+    }
+
+    logger->trace("Triangle outputted {} vertices and {} faces", V.rows(), F.rows());
+    _mesh_vertex_indices.resize(_vertices_2d.rows());
+    for (int i = 0; i < V.rows(); i++) {
+      const int vidx = unconst->num_mesh_vertices + i;
+      if (VMout[i] != 0) {
+        _mesh_vertex_indices[VMout[i]-1] = vidx;
+      }
+      unconst->CV.row(vidx) = V(i, 0)*right() + V(i, 1)*up() + center();
+    }
+
+    for (int i = 0; i < F.rows(); i++) {
+      unconst->CF.row(i + unconst->num_mesh_faces) = F.row(i) + Eigen::RowVector3i::Ones() * unconst->num_mesh_vertices;
+    }
+
+    unconst->num_mesh_faces += F.rows();
+    unconst->num_mesh_vertices += V.rows();
+
+  } else {
+    int num_new_vertices = _vertices_2d.rows();
+    while (unconst->CV.rows() < unconst->num_mesh_vertices + num_new_vertices) {
+      logger->trace("resizing CV!");
+      unconst->CV.conservativeResize(2*unconst->CV.rows(), 3);
+    }
+    unconst->CV.block(unconst->num_mesh_vertices, 0, num_new_vertices, 3) = vertices_3d();
+    _mesh_vertex_indices.resize(num_new_vertices);
+    _mesh_vertex_indices.setLinSpaced(unconst->num_mesh_vertices,
+                                 unconst->num_mesh_vertices+num_new_vertices-1);
+    unconst->num_mesh_vertices += num_new_vertices;
+  }
+
+  return true;
+}
 
 
 
@@ -157,9 +212,10 @@ bool BoundingCage::KeyFrame::validate_cage() {
 
 std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
                                                                   std::shared_ptr<BoundingCage::KeyFrame> right_kf,
+                                                                  const BoundingCage* cage,
                                                                   std::shared_ptr<BoundingCage::Cell> prev,
                                                                   std::shared_ptr<BoundingCage::Cell> next) {
-  std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, prev, next));
+  std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, prev, next, cage));
 
   std::shared_ptr<spdlog::logger> logger = ret->logger;
 
@@ -170,39 +226,94 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
     return ret;
   }
 
-  left_kf->cells[1] = ret;
-  right_kf->cells[0] = ret;
+  left_kf->_cells[1] = ret;
+  right_kf->_cells[0] = ret;
 
   assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
   Eigen::MatrixXd CHV(left_kf->vertices_2d().rows() + right_kf->vertices_2d().rows(), 3);
   CHV.block(0, 0, left_kf->vertices_2d().rows(), 3) = left_kf->vertices_3d();
   CHV.block(left_kf->vertices_2d().rows(), 0, right_kf->vertices_2d().rows(), 3) = right_kf->vertices_3d();
 
-  igl::copyleft::cgal::convex_hull(CHV, ret->V, ret->F);
-  if (CHV.rows() != ret->V.rows()) {
+  Eigen::MatrixXd V;
+  igl::copyleft::cgal::convex_hull(CHV, V, ret->F);
+  ret->V = V;
+  if (CHV.rows() != V.rows()) {
     logger->warn("Convex Hull of keyframes for Cell does not enclose all its points. "
                  "There were {} input points but the convex hull had {} points.",
-                 CHV.rows(), CHV.rows());
+                 CHV.rows(), V.rows());
     ret.reset();
     return ret;
   }
+
+  return ret;
 }
 
-std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> key_frame) {
+bool BoundingCage::Cell::init_mesh() {
+  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
+
+  BoundingCage* unconst = (BoundingCage*) cage;
+  int num_new_faces = 2 * left_keyframe->vertices_2d().rows();
+
+  while (unconst->CF.rows() < unconst->num_mesh_faces + num_new_faces) {
+    logger->trace("resizing CF!");
+    logger->trace("old size is {}", unconst->CF.rows());
+    unconst->CF.conservativeResize(2*unconst->CF.rows(), 3);
+    logger->trace("new size is {}", unconst->CF.rows());
+  }
+
+  int fcount = cage->num_mesh_faces;
+  for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
+    int next_i =(i+1) % right_keyframe->_mesh_vertex_indices.rows();
+    unconst->CF.row(fcount++) = Eigen::RowVector3i(
+          left_keyframe->_mesh_vertex_indices[i],
+          right_keyframe->_mesh_vertex_indices[i],
+          right_keyframe->_mesh_vertex_indices[next_i]);
+    unconst->CF.row(fcount++) = Eigen::RowVector3i(
+          left_keyframe->_mesh_vertex_indices[i],
+          right_keyframe->_mesh_vertex_indices[next_i],
+          left_keyframe->_mesh_vertex_indices[next_i]);
+  }
+  mesh_face_indexes.conservativeResize(num_new_faces);
+  mesh_face_indexes.setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+num_new_faces-1);
+  unconst->num_mesh_faces += num_new_faces;
+}
+
+bool BoundingCage::Cell::update_mesh(Cell& parent) {
+  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
+
+  BoundingCage* unconst = (BoundingCage*) cage;
+
+  int fcount = 0;
+  for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
+    int next_i =(i+1) % right_keyframe->_mesh_vertex_indices.rows();
+    unconst->CF.row(parent.mesh_face_indexes[fcount++]) = Eigen::RowVector3i(
+          left_keyframe->_mesh_vertex_indices[i],
+          right_keyframe->_mesh_vertex_indices[i],
+          right_keyframe->_mesh_vertex_indices[next_i]);
+    unconst->CF.row(parent.mesh_face_indexes[fcount++]) = Eigen::RowVector3i(
+          left_keyframe->_mesh_vertex_indices[i],
+          right_keyframe->_mesh_vertex_indices[next_i],
+          left_keyframe->_mesh_vertex_indices[next_i]);
+  }
+  mesh_face_indexes = parent.mesh_face_indexes;
+  parent.mesh_face_indexes.conservativeResize(0, 0);
+}
+
+std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
   // The index of the keyframe is out of range, since this method is called, internally,
   // this should fail
-  if (key_frame->index() > max_index() || key_frame->index() < min_index()) {
+  if (keyframe->index() > max_index() || keyframe->index() < min_index()) {
     assert("split index is out of range" && false);
     logger->error("index of keyframe ({}) in split(), was out of range ({}, {})",
-                  key_frame->index(), min_index(), max_index());
+                  keyframe->index(), min_index(), max_index());
     return std::shared_ptr<KeyFrame>();
   }
 
   // This node has already been split by the keyframe
-  if (key_frame->index() == max_index()) {
+  if (keyframe->index() == max_index()) {
     return right_keyframe;
   }
-  if (key_frame->index() == min_index()) {
+  if (keyframe->index() == min_index()) {
     return left_keyframe;
   }
 
@@ -210,12 +321,12 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
   if (!left_child && !right_child) {
 
     // Initialize new Cells for the left and right children
-    left_child = Cell::make_cell(left_keyframe, key_frame);
+    left_child = Cell::make_cell(left_keyframe, keyframe, cage);
     if (!left_child) {
       logger->warn("Cell::split() failed to construct left child.");
       return std::shared_ptr<KeyFrame>();
     }
-    right_child = Cell::make_cell(key_frame, right_keyframe);
+    right_child = Cell::make_cell(keyframe, right_keyframe, cage);
     if (!right_child) {
       logger->warn("Cell::split() failed to construct right child.");
       left_child.reset();
@@ -231,32 +342,37 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
     if (prev_cell) { prev_cell->next_cell = left_child; }
 
     // Fix the cell pointers in the new keyframe
-    left_keyframe->cells[1] = left_child;
-    right_keyframe->cells[0] = right_child;
-    key_frame->cells[0] = left_child;
-    key_frame->cells[1] = right_child;
+    left_keyframe->_cells[1] = left_child;
+    right_keyframe->_cells[0] = right_child;
+    keyframe->_cells[0] = left_child;
+    keyframe->_cells[1] = right_child;
 
     // If we added a cell with a different normal than the left key-frame, we need to recompute the
     // the local coordinate frame of the right keyframe
-    right_keyframe->coord_system = parallel_transport(*right_child->left_keyframe, right_keyframe->normal());
+    right_keyframe->_orientation = parallel_transport(*right_child->left_keyframe, right_keyframe->normal());
 
     // This cell is no longer a leaf, so clear its linked list pointers
     next_cell.reset();
     prev_cell.reset();
 
-    return key_frame;
+    // We've successfully inserted, update the BoundingCage mesh
+    keyframe->init_mesh();
+    left_child->update_mesh(*this);
+    right_child->init_mesh();
+
+    return keyframe;
 
   // This node is not a leaf node, split one of the children
-  } else if(key_frame->index() > left_child->min_index() && key_frame->index() < left_child->max_index()) {
-    return left_child->split(key_frame);
-  } else if(key_frame->index() > right_child->min_index() && key_frame->index() < right_child->max_index()) {
-    return right_child->split(key_frame);
+  } else if(keyframe->index() > left_child->min_index() && keyframe->index() < left_child->max_index()) {
+    return left_child->split(keyframe);
+  } else if(keyframe->index() > right_child->min_index() && keyframe->index() < right_child->max_index()) {
+    return right_child->split(keyframe);
   } else {
     logger->error("BoundingCage tree is in an incorrect state. split() failed."
                   "Cell split index = {}, left_keyframe_index = {}, "
                   "right_keyframe_index = {}, "
                   "left_child = {0:x}, right_child = {0:x}.",
-                  key_frame->index(), left_keyframe->index(), right_keyframe->index(),
+                  keyframe->index(), left_keyframe->index(), right_keyframe->index(),
                   (std::ptrdiff_t)left_child.get(), (std::ptrdiff_t)right_child.get());
     assert("BoundingCage tree is in a bad state" && false);
     assert("BoundingCage tree is in a bad state" && ((left_child && !right_child) || (right_child && !left_child)));
@@ -276,33 +392,13 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
 // |                      | //
 // |======================| //
 
-std::shared_ptr<BoundingCage::Cell> BoundingCage::find_cell_r(std::shared_ptr<BoundingCage::Cell> cell, double index) const {
-  if (!cell) {
-    logger->error("find_cell_r(cell, index): cell is null.");
-  } else if (cell && (index < cell->min_index() || index > cell->max_index())) {
-    logger->error("find_cell_r(cell, index) index, {} was out of range ({}, {})",
-                  index, cell->min_index(), cell->max_index());
-    return std::shared_ptr<Cell>();
-  } else if (!cell->left_child && !cell->right_child) {
-    return cell;
-  } else if (cell->left_child && index >= cell->left_child->min_index() && index <= cell->left_child->max_index()) {
-    return find_cell_r(cell->left_child, index);
-  } else if (cell->right_child && index >= cell->right_child->min_index() && index <= cell->right_child->max_index()) {
-    return find_cell_r(cell->right_child, index);
-  } else {
-    logger->error("BUG!!! This branch in find_cell_r should never execute.");
-    assert("This should never happen" && false);
-    return std::shared_ptr<Cell>();
-  }
-}
-
 bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters, const Eigen::MatrixXd &poly_template) {
   assert(cells.begin() == cells.end());
   assert(keyframes.begin() == keyframes.end());
   assert(cells.rbegin() == cells.rend());
   assert(keyframes.rbegin() == keyframes.rend());
 
-  auto smooth_skeleton = [&](int num_iters) {
+  std::function<void(int)> smooth_skeleton = [&](int num_iters) {
     Eigen::MatrixXd SV_i = SV;
     SV_smooth.resize(SV_i.rows(), 3);
     for (int iter = 0; iter < num_iters; iter++) {
@@ -315,8 +411,45 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     }
   };
 
+  // Fit the an initial BoundingCage to the skeleton. This will
+  // attempt to construct a series of prisms which fully enclose the skeleton
+  // vertices.
+  //
+  // If the resulting BoundingCage does not contain all the skeleton vertices,
+  // this method returns false.
+  std::function<bool(std::shared_ptr<Cell>)> fit_cage_rec = [&](std::shared_ptr<Cell> cell) -> bool {
+    // If all the skeleton vertices are in the cage node, then we're done
+    if (skeleton_in_cell(cell)) {
+      return true;
+    }
+
+    // Otherwise split the cage node and try again
+    const int mid = cell->min_index() + (cell->max_index() - cell->min_index()) / 2;
+    if (mid == cell->min_index() || mid == cell->max_index()) {
+      logger->info("mid value, {}, equalled boundary ({}, {}), "
+                   "while splitting cage cell in fit_cage_rec",
+                   mid, cell->min_index(), cell->max_index());
+      return false;
+    }
+    assert("Bad mid index" && (mid > 0) && (mid < SV_smooth.rows()-1));
+
+    Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+1) - SV_smooth.row(mid-1)).normalized();
+    Eigen::MatrixXd mid_pts_2d = 0.5 * (cell->left_keyframe->vertices_2d() + cell->left_keyframe->vertices_2d());
+    std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->left_keyframe, mid_pts_2d, cell, mid, this));
+    assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
+
+    if(split_internal(mid_keyframe)) {
+      bool ret = fit_cage_rec(cell->left_child);
+      return ret && fit_cage_rec(cell->right_child);
+    } else {
+      return false;
+    }
+  };
+
+
   clear();
-  CV.resize(10*poly_template.rows(), 3);
+  CV.resize(poly_template.rows(), 3);
+  CF.resize(CV.rows(), 3);
 
   logger = spdlog::get(FISH_LOGGER_NAME);
 
@@ -357,13 +490,15 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   front_normal.normalize();
   back_normal.normalize();
 
-  Eigen::Matrix3d front_coord_system = KeyFrame::local_coordinate_system(front_normal);
-  std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template, 0, this));
+  Eigen::Matrix3d front_coord_system = local_coordinate_system(front_normal);
+  std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template,
+                                                        std::shared_ptr<Cell>(), 0, this));
   std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), *front_keyframe,
-                                                       poly_template, SV.rows()-1, this));
+                                                       poly_template, std::shared_ptr<Cell>(),
+                                                       SV.rows()-1, this));
   assert("Parallel transport bug" && (1.0-fabs(back_keyframe->normal().dot(back_normal))) < 1e-6);
 
-  root = Cell::make_cell(front_keyframe, back_keyframe);
+  root = Cell::make_cell(front_keyframe, back_keyframe, this);
   if (!root) {
     // TODO: Use the bounding box of the mesh instead
     logger->warn("set_skeleton_vertices was unable to fit the first Cell. Using bounding box instead.");
@@ -371,10 +506,14 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     return false;
   }
 
+  front_keyframe->init_mesh(true);
+  back_keyframe->init_mesh(true);
+  root->init_mesh();
+
   cells.head = root;
   cells.tail = cells.head;
 
-  if (!fit_cage_r(root)) {
+  if (!fit_cage_rec(root)) {
     logger->info("Initial bounding cage does not contain all the skeleton vertices.");
   } else {
     logger->info("Successfully fit all skeleton vertices inside BoundingCage.");
@@ -385,7 +524,32 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 }
 
 BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) const {
-  auto cell = find_cell_r(root, index);
+  // Recursively find the Cell for a given index in the Cell tree.
+  // If index is out of range, this method returns a null pointer.
+  std::function<std::shared_ptr<Cell>(std::shared_ptr<Cell>, double)> find_cell_rec =
+      [&] (std::shared_ptr<Cell> cell, double index) ->std::shared_ptr<Cell> {
+    if (!cell) {
+      logger->error("find_cell_r(cell, index): cell is null.");
+    } else if (cell && (index < cell->min_index() || index > cell->max_index())) {
+      logger->error("find_cell_r(cell, index) index, {} was out of range ({}, {})",
+                    index, cell->min_index(), cell->max_index());
+      return std::shared_ptr<Cell>();
+    } else if (!cell->left_child && !cell->right_child) {
+      return cell;
+    } else if (cell->left_child && index >= cell->left_child->min_index() && index <= cell->left_child->max_index()) {
+      return find_cell_rec(cell->left_child, index);
+    } else if (cell->right_child && index >= cell->right_child->min_index() && index <= cell->right_child->max_index()) {
+      return find_cell_rec(cell->right_child, index);
+    } else {
+      logger->error("BUG!!! This branch in find_cell_r should never execute.");
+      assert("This should never happen" && false);
+      return std::shared_ptr<Cell>();
+    }
+  };
+
+
+  auto cell = find_cell_rec(root, index);
+
   if (!cell) {
     logger->error("vertices_2d_for_index() could not find cell at index {}", index);
     return KeyFrameIterator();
@@ -412,10 +576,7 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
   points2d.col(0) = A*coord_frame.row(0).transpose();
   points2d.col(1) = A*coord_frame.row(1).transpose();
 
-  std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, index, this));
-  kf->cells[0] = cell;
-  kf->cells[1] = cell;
-
+  std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, cell, index, this));
   return KeyFrameIterator(kf);
 }
 
@@ -457,38 +618,9 @@ bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
   return true;
 }
 
-bool BoundingCage::fit_cage_r(std::shared_ptr<Cell> cell) {
-  // If all the skeleton vertices are in the cage node, then we're done
-  if (skeleton_in_cell(cell)) {
-    return true;
-  }
-
-  // Otherwise split the cage node and try again
-  const int mid = cell->min_index() + (cell->max_index() - cell->min_index()) / 2;
-  if (mid == cell->min_index() || mid == cell->max_index()) {
-    logger->info("mid value, {}, equalled boundary ({}, {}), "
-                 "while splitting cage cell in fit_cage_r",
-                 mid, cell->min_index(), cell->max_index());
-    return false;
-  }
-  assert("Bad mid index" && (mid > 0) && (mid < SV_smooth.rows()-1));
-
-  Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+1) - SV_smooth.row(mid-1)).normalized();
-  Eigen::MatrixXd mid_pts_2d = 0.5 * (cell->left_keyframe->vertices_2d() + cell->left_keyframe->vertices_2d());
-  std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->left_keyframe, mid_pts_2d, cell, mid, this));
-  assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
-
-  if(split_internal(mid_keyframe)) {
-    bool ret = fit_cage_r(cell->left_child);
-    return ret && fit_cage_r(cell->right_child);
-  } else {
-    return false;
-  }
-}
-
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared_ptr<BoundingCage::KeyFrame> split_kf) {
-  std::shared_ptr<Cell> left_cell = split_kf->cells[0].lock();
-  std::shared_ptr<Cell> right_cell = split_kf->cells[1].lock();
+  std::shared_ptr<Cell> left_cell = split_kf->_cells[0].lock();
+  std::shared_ptr<Cell> right_cell = split_kf->_cells[1].lock();
 
   // A KeyFrame should never have both left and right Cell pointers set to null
   if(!left_cell && !right_cell) {
@@ -505,7 +637,7 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared
 
   // Otherwise, the KeyFrame's Cell pointers match and the KeyFrame has not been inserted
   // into the BoundingCage, so insert it.
-  assert("KeyFrame cells not equal" && split_kf->cells[0] == split_kf->cells[1]);
+  assert("KeyFrame cells not equal" && split_kf->_cells[0] == split_kf->_cells[1]);
   if (!left_cell->split(split_kf)) {
     logger->error("Failed to split Cell with KeyFrame.");
     assert(false);
@@ -519,15 +651,6 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared
   if (right_cell == cells.tail) {
     cells.tail = right_cell->right_child;
   }
-
-  // We've successfully inserted, update the vertices of the cage mesh
-  int num_new_vertices = split_kf->vertices_2d().rows();
-  if (CV.rows() < num_mesh_vertices + num_new_vertices) {
-    CV.resize(2*CV.rows(), 3);
-  }
-  CV.block(num_mesh_vertices, 0, num_new_vertices, 3) = split_kf->vertices_3d();
-  split_kf->point_indexes3d.setLinSpaced(num_mesh_vertices, num_mesh_vertices+num_new_vertices-1);
-  num_mesh_vertices += num_new_vertices;
 
   return split_kf;
 }

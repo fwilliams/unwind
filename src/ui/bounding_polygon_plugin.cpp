@@ -35,34 +35,44 @@ void Bounding_Polygon_Menu::initialize() {
   viewer->selected_data_index = mesh_overlay_id;
 
   int push_mesh_id = viewer->selected_data_index;
-
   viewer->selected_data_index = mesh_overlay_id;
-  viewer->data().clear();
-  Eigen::MatrixXi E;
-  igl::edges(state.extracted_volume.TF, E);
-  viewer->data().set_edges(state.extracted_volume.TV, E, Eigen::RowVector3d(0.75, 0.75, 0.75));
+  {
+    viewer->data().clear();
+    Eigen::MatrixXi E;
+    igl::edges(state.extracted_volume.TF, E);
+    viewer->data().set_edges(state.extracted_volume.TV, E, Eigen::RowVector3d(0.75, 0.75, 0.75));
 
-  Eigen::MatrixXd P1(state.cage.skeleton_vertices().rows()-1, 3), P2(state.cage.skeleton_vertices().rows()-1, 3);
-  for (int i = 0; i < state.cage.skeleton_vertices().rows()-1; i++) {
-    P1.row(i) = state.cage.skeleton_vertices().row(i);
-    P2.row(i) = state.cage.skeleton_vertices().row(i+1);
+    Eigen::MatrixXd P1(state.cage.skeleton_vertices().rows()-1, 3), P2(state.cage.skeleton_vertices().rows()-1, 3);
+    for (int i = 0; i < state.cage.skeleton_vertices().rows()-1; i++) {
+      P1.row(i) = state.cage.skeleton_vertices().row(i);
+      P2.row(i) = state.cage.skeleton_vertices().row(i+1);
+    }
+    viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
+    viewer->data().point_size = 10.0;
+    // viewer->data().add_points(state.bounding_cage.skeleton_vertices(), ColorRGB::GREEN);
+
+    for (int i = 0; i < state.cage.smooth_skeleton_vertices().rows()-1; i++) {
+      P1.row(i) = state.cage.smooth_skeleton_vertices().row(i);
+      P2.row(i) = state.cage.smooth_skeleton_vertices().row(i+1);
+    }
+    viewer->data().add_edges(P1, P2, ColorRGB::RED);
+    viewer->data().point_size = 20.0;
+    // viewer->data().add_points(state.bounding_cage.smooth_skeleton_vertices(), ColorRGB::RED);
+
+    viewer->selected_data_index = push_mesh_id;
   }
-  viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
-  viewer->data().point_size = 10.0;
-  // viewer->data().add_points(state.bounding_cage.skeleton_vertices(), ColorRGB::GREEN);
 
-  for (int i = 0; i < state.cage.smooth_skeleton_vertices().rows()-1; i++) {
-    P1.row(i) = state.cage.smooth_skeleton_vertices().row(i);
-    P2.row(i) = state.cage.smooth_skeleton_vertices().row(i+1);
+  // Draw the bounding cage mesh
+  viewer->append_mesh();
+  cage_mesh_overlay_id = viewer->selected_data_index;
+  {
+    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
+    viewer->selected_data_index = push_mesh_id;
   }
-  viewer->data().add_edges(P1, P2, ColorRGB::RED);
-  viewer->data().point_size = 20.0;
-  // viewer->data().add_points(state.bounding_cage.smooth_skeleton_vertices(), ColorRGB::RED);
-
-  viewer->selected_data_index = push_mesh_id;
 
   // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
+
   state.logger->trace("Done initializing bounding polygon plugin!");
 }
 
@@ -147,43 +157,55 @@ bool Bounding_Polygon_Menu::pre_draw() {
   int push_overlay_id = viewer->selected_data_index;
 
   viewer->selected_data_index = points_overlay_id;
-  viewer->data().clear();
+  {
+    viewer->data().clear();
 
-  for (const BoundingCage::Cell& cell : state.cage.cells) {
+    for (const BoundingCage::Cell& cell : state.cage.cells) {
+//      Eigen::MatrixXd P1, P2;
+//      edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
+//      viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+    }
+
+    for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
+//      Eigen::MatrixXd P1, P2;
+//      edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
+//      viewer->data().add_edges(P1, P2, ColorRGB::NAVY);
+    }
+
+    for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
+      viewer->data().add_points(kf.center(), ColorRGB::GREEN);
+    }
+
+    for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
+      Eigen::Matrix3d cf = kf->orientation();
+
+      viewer->data().line_width = 2.4;
+      viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(0), ColorRGB::RED);
+      viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(1), ColorRGB::GREEN);
+      viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(2), ColorRGB::BLUE);
+    }
+
+    viewer->data().point_size = 10.0;
+    viewer->data().add_points(state.cage.vertices(), ColorRGB::RED);
+    BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
     Eigen::MatrixXd P1, P2;
-    edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
+    edge_endpoints(state.cage.vertices(), state.cage.faces(), P1, P2);
     viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+    viewer->data().add_points(kf->center(), ColorRGB::RED);
+    viewer->data().add_points(kf->vertices_3d(), ColorRGB::LIGHT_GREEN);
+    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(0), ColorRGB::RED);
+    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(1), ColorRGB::GREEN);
+    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(2), ColorRGB::BLUE);
+    viewer->selected_data_index = push_overlay_id;
   }
 
-  for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
-    Eigen::MatrixXd P1, P2;
-    edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
-    viewer->data().add_edges(P1, P2, ColorRGB::NAVY);
-  }
 
-  for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-    viewer->data().add_points(kf.vertices_3d(), ColorRGB::RED);
-    viewer->data().add_points(kf.center(), ColorRGB::GREEN);
-  }
-
-  for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
-    viewer->data().add_points(kf->vertices_3d(), ColorRGB::GRAY);
-    Eigen::Matrix3d cf = kf->coordinate_system();
-
-    viewer->data().line_width = 2.4;
-    viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(0), ColorRGB::RED);
-    viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(1), ColorRGB::GREEN);
-    viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(2), ColorRGB::BLUE);
-  }
-
-  viewer->data().point_size = 10.0;
-  BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
-  viewer->data().add_points(kf->center(), ColorRGB::RED);
-  viewer->data().add_points(kf->vertices_3d(), ColorRGB::LIGHT_GREEN);
-  viewer->data().add_edges(kf->center(), kf->center() + 100*kf->coordinate_system().row(0), ColorRGB::RED);
-  viewer->data().add_edges(kf->center(), kf->center() + 100*kf->coordinate_system().row(1), ColorRGB::GREEN);
-  viewer->data().add_edges(kf->center(), kf->center() + 100*kf->coordinate_system().row(2), ColorRGB::BLUE);
-  viewer->selected_data_index = push_overlay_id;
+//  viewer->selected_data_index = cage_mesh_overlay_id;
+//  {
+//    viewer->data().clear();
+//    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
+//    viewer->selected_data_index = push_overlay_id;
+//  }
 
   return ret;
 }

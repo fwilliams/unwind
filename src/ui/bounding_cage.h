@@ -17,24 +17,11 @@ public:
   class Cell;
 
 private:
-  /// Fit the an initial BoundingCage to the skeleton. This will
-  /// attempt to construct a series of prisms which fully enclose the skeleton
-  /// vertices.
-  ///
-  /// If the resulting BoundingCage does not contain all the skeleton vertices,
-  /// this method returns false.
-  ///
-  bool fit_cage_r(std::shared_ptr<Cell> node);
 
   /// Return true if a Cell contains the skeleton vertices corresponding
   /// to its index range, and false otherwise.
   ///
   bool skeleton_in_cell(std::shared_ptr<Cell> node) const;
-
-  /// Find the Cell for a given index in the Cell tree.
-  /// If index is out of range, this method returns a null pointer.
-  ///
-  std::shared_ptr<Cell> find_cell_r(std::shared_ptr<Cell> node, double index) const;
 
   /// Core method to split the bounding cage using the keyframe.
   ///
@@ -79,12 +66,8 @@ public:
   class Cell {
     friend class BoundingCage;
 
-    /// Construct a new Cell wrapped in a shared_ptr. Internally, this method is used
-    /// to create Cells in lieu of the constructor.
-    static std::shared_ptr<Cell> make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
-                                           std::shared_ptr<BoundingCage::KeyFrame> right_kf,
-                                           std::shared_ptr<Cell> prev_cell=std::shared_ptr<Cell>(),
-                                           std::shared_ptr<Cell> next_cell=std::shared_ptr<Cell>());
+    /// Reference to the owning BoundingCage
+    const BoundingCage* cage;
 
     /// A Cell is a binary tree and can contain sub-Cells
     ///
@@ -107,8 +90,10 @@ public:
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
 
-    /// Indexes of faces in the BoundingCage mesh
-    Eigen::MatrixXi face_indexes;
+    /// Indices of the boundary triangles in the
+    /// mesh of the BoundingCage which owns this Cell
+    ///
+    Eigen::VectorXi mesh_face_indexes;
 
     /// Split the Cell into two cells divided by key_frame.
     /// If the index of key_frame is outside the cell, this method
@@ -133,16 +118,28 @@ public:
       return true;
     }
 
+    bool init_mesh();
+    bool update_mesh(Cell &parent);
+
     /// Construct a new Cell. Don't call this directly, instead use the factory
     /// function `make_cell()`.
     ///
     Cell(std::shared_ptr<KeyFrame> left_kf,
          std::shared_ptr<KeyFrame> right_kf,
          std::shared_ptr<Cell> prev,
-         std::shared_ptr<Cell> next) :
-      left_keyframe(left_kf), right_keyframe(right_kf),
+         std::shared_ptr<Cell> next,
+         const BoundingCage* cage) :
+      cage(cage), left_keyframe(left_kf), right_keyframe(right_kf),
       prev_cell(prev), next_cell(next),
       logger(spdlog::get(FISH_LOGGER_NAME)) {}
+
+    /// Construct a new Cell wrapped in a shared_ptr. Internally, this method is used
+    /// to create Cells in lieu of the constructor.
+    static std::shared_ptr<Cell> make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
+                                           std::shared_ptr<BoundingCage::KeyFrame> right_kf,
+                                           const BoundingCage* cage,
+                                           std::shared_ptr<Cell> prev_cell=std::shared_ptr<Cell>(),
+                                           std::shared_ptr<Cell> next_cell=std::shared_ptr<Cell>());
 
   public:
     const Eigen::MatrixXd& vertices() const { return V; }
@@ -223,30 +220,27 @@ public:
   class KeyFrame {
     friend class BoundingCage;
 
-    static Eigen::Matrix3d local_coordinate_system(const Eigen::RowVector3d& normal);
-
-    const BoundingCage* cage;
-
-    KeyFrame(const Eigen::RowVector3d& normal,
-             const Eigen::RowVector3d& center,
-             const KeyFrame& kf,
-             const Eigen::MatrixXd& pts,
-             double idx, const BoundingCage* cage);
-
-    KeyFrame(const Eigen::RowVector3d& center,
-             const Eigen::Matrix3d& coord_frame,
-             const Eigen::MatrixXd& pts,
-             double idx,
-             const BoundingCage *cage);
-
+    /// Parallel transport constructor:
+    /// The local coordinate frame in this KeyFrame is determined
+    /// by transporting the frame from from_kf
+    ///
     KeyFrame(const Eigen::RowVector3d& normal,
              const Eigen::RowVector3d& center,
              const KeyFrame& from_kf,
              const Eigen::MatrixXd& pts,
              std::shared_ptr<Cell> cell,
              double idx,
-             const BoundingCage* cage);
+             const BoundingCage* _cage);
 
+    /// Explicit constructor:
+    /// The local coordinate frame for this KeyFrame is provided explicitly
+    ///
+    KeyFrame(const Eigen::RowVector3d& center,
+             const Eigen::Matrix3d& coord_frame,
+             const Eigen::MatrixXd& pts,
+             std::shared_ptr<Cell> cell,
+             double idx,
+             const BoundingCage *_cage);
 
     /// When polygon vertex changes (via `set_point_2d()`), these methods
     /// validate that the change does not create self intersections.
@@ -257,23 +251,37 @@ public:
     bool validate_points_2d();
     bool validate_cage();
 
+    /// Called internally to initialize the BoundingCage mesh with this KeyFrame's data
+    /// If tesselate is true, the polygon for this KeyFrame will be triangulated and 
+    /// included in the BoundingCage mesh. We use this for the caps of the cage mesh.
+    ///
+    bool init_mesh(bool tesellate=false);
+
+    /// The BoundingCage which owns this KeyFrame
+    ///
+    const BoundingCage* _cage;
+
     /// State representing the plane for this KeyFrame.
     ///
-    Eigen::Matrix3d coord_system;
-    Eigen::RowVector3d plane_center;
+    Eigen::Matrix3d _orientation;
+    Eigen::RowVector3d _center;
 
-    /// Cached positions of the bounding polygon for this KeyFrame in 2d
-    /// and 3d.
-    Eigen::MatrixXd points2d;
-    Eigen::VectorXi point_indexes3d;
+    /// 2D positions of the boundary polygon of this KeyFrame
+    ///
+    Eigen::MatrixXd _vertices_2d;
+
+    /// Indices of the 3D positions of the boundary polygon in the
+    /// mesh of the BoundingCage which owns this KeyFrame
+    ///
+    Eigen::VectorXi _mesh_vertex_indices;
 
     /// The index of this KeyFrame.
-    double curve_index;
+    double _index;
 
     /// Pointers to the Cells bounidng this keyframe
     /// cells[0] is to the left, and cells[1] is to the right
     ///
-    std::array<std::weak_ptr<BoundingCage::Cell>, 2> cells;
+    std::array<std::weak_ptr<BoundingCage::Cell>, 2> _cells;
 
     /// Logger for this class
     ///
@@ -285,55 +293,66 @@ public:
     /// Returns true if this KeyFrame is part of the bounding cage
     ///
     bool in_bounding_cage() {
-      return point_indexes3d.rows() != 0;
+      return _mesh_vertex_indices.rows() != 0;
     }
 
     /// Get the normal of the plane of this KeyFrame.
     ///
     Eigen::RowVector3d normal() const {
-      return coord_system.row(2);
+      return _orientation.row(2);
     }
 
     /// Get the up basis vector of the coordinate system of this KeyFrame.
     ///
     Eigen::RowVector3d up() const {
-      return coord_system.row(1);
+      return _orientation.row(1);
     }
 
     /// Get the right basis vector of the coordinate system of this KeyFrame.
     ///
     Eigen::RowVector3d right() const {
-      return coord_system.row(0);
+      return _orientation.row(0);
     }
 
     /// Get the local coordinate system of this KeyFrame.
     /// 2d positions, (x, y), of this keyframe represent coefficients
     /// along the first and second rows of this system.
     ///
-    const Eigen::Matrix3d& coordinate_system() const {
-      return coord_system;
+    const Eigen::Matrix3d& orientation() const {
+      return _orientation;
     }
 
     /// Get the center of the KeyFrame.
     ///
     const Eigen::RowVector3d& center() const {
-      return plane_center;
+      return _center;
+    }
+
+    /// An affine transformation to map points to the local coordinates
+    /// this KeyFrame
+    ///
+    Eigen::Matrix4d transform() const {
+      Eigen::MatrixX4d ret;
+      ret.setZero();
+      ret.block<3, 3>(0, 0) = _orientation;
+      ret.block<3, 1>(0, 3) = _center.transpose();
+      ret(3, 3) = 1.0;
+      return ret;
     }
 
     /// Get the ordered 2d points of the KeyFrame polygon boundary.
     ///
     const Eigen::MatrixXd& vertices_2d() const {
-      return points2d;
+      return _vertices_2d;
     }
 
     /// Get the ordered 3d points of the keyframe polygon boundary.
     /// These points are just the 2d points projected onto the KeyFrame plane.
     ///
     Eigen::MatrixXd vertices_3d() const {
-      // TODO: Recomputing this every frame might be a bit slow but we'll optimize it if we need to
-      Eigen::MatrixXd points3d(points2d.rows(), 3);
-      for (int i = 0; i < points2d.rows(); i++) {
-        points3d.row(i) = plane_center + points2d(i, 0) *coord_system.row(0) + points2d(i, 1) *coord_system.row(1);
+      Eigen::MatrixXd points3d(_vertices_2d.rows(), 3);
+      for (int i = 0; i < _vertices_2d.rows(); i++) {
+        points3d.row(i) = _center + _vertices_2d(i, 0) *_orientation.row(0) + _vertices_2d(i, 1) *_orientation.row(1);
       }
       return points3d;
     }
@@ -341,7 +360,7 @@ public:
     /// Get the index value of this KeyFrame.
     ///
     const double index() const {
-      return curve_index;
+      return _index;
     }
 
     /// Move the i^th point on the polygon boundary to the 2d position newpos. To get the
@@ -369,7 +388,7 @@ public:
     KeyFrameIterator& operator=(const KeyFrameIterator& other) { keyframe = other.keyframe; }
 
     KeyFrameIterator operator++() {
-      std::shared_ptr<Cell> right_cell = keyframe->cells[1].lock();
+      std::shared_ptr<Cell> right_cell = keyframe->_cells[1].lock();
       if (keyframe && right_cell) {
         keyframe = right_cell->right_keyframe;
       } else if(!right_cell) {
@@ -383,7 +402,7 @@ public:
     }
 
     KeyFrameIterator operator--() {
-      std::shared_ptr<Cell> left_cell = keyframe->cells[0].lock();
+      std::shared_ptr<Cell> left_cell = keyframe->_cells[0].lock();
       if (keyframe && left_cell) {
         keyframe = left_cell->left_keyframe;
       } else if(!left_cell) {
@@ -452,6 +471,9 @@ public:
     keyframes.cage = this;
   }
 
+  friend class KeyFrame;
+  friend class Cell;
+
   /// Set the skeleton vertices to whatever the user provides.
   /// There must be at least two vertices, if not the method returns false.
   /// Upon setting the vertices, The
@@ -485,6 +507,11 @@ public:
   ///
   const Eigen::MatrixXd& skeleton_vertices() const { return SV; }
   const Eigen::MatrixXd& smooth_skeleton_vertices() const { return SV_smooth; }
+
+  /// Get the mesh bounding this cage
+  ///
+  Eigen::MatrixXd vertices() const { return CV.block(0, 0, num_mesh_vertices, 3); }
+  Eigen::MatrixXi faces() const { return CF.block(0, 0, num_mesh_faces, 3); }
 
   /// Get the minimum keyframe index
   ///
