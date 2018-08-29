@@ -105,21 +105,16 @@ public:
     ///
     std::shared_ptr<spdlog::logger> logger;
 
-    /// This method gets called when one of the "left" or "right" KeyFrame
-    /// changes. The update method propagates the change in state of the KeyFrame
-    /// to the cell.
+    /// This method initializes the BoundingCage mesh for this Cell, allocating new
+    /// storage for the face information
     ///
-    /// If the change in KeyFrame results in local self-intersections, this method
-    /// returns false and the cell remains unchanged. In this case, The calling
-    /// KeyFrame reverts its state to before the change.
-    ///
-    bool update() {
-      // TODO: Check that the edges in the two endplanes don't cross
-      return true;
-    }
-
     bool init_mesh();
-    bool update_mesh(Cell &parent);
+
+    /// This method initializes the BoundingCage mesh for this Cell. It uses the
+    /// storage of parent to store the face information, clearing out the parent's
+    /// data
+    ///
+    bool init_mesh(Cell &parent);
 
     /// Construct a new Cell. Don't call this directly, instead use the factory
     /// function `make_cell()`.
@@ -243,10 +238,7 @@ public:
              const BoundingCage *_cage);
 
     /// When polygon vertex changes (via `set_point_2d()`), these methods
-    /// validate that the change does not create self intersections.
-    ///
-    /// If the change is valid, then these methods propagate it to the rest
-    /// of the bounding cage.
+    /// validate that the change does not create *LOCAL* self intersections.
     ///
     bool validate_points_2d();
     bool validate_cage();
@@ -366,10 +358,12 @@ public:
     /// Move the i^th point on the polygon boundary to the 2d position newpos. To get the
     /// ordered polygon points, call `points_2d()`.
     ///
-    /// If the movement causes the bounding cage to self-intersect, no state gets changed,
-    /// and this method returns false.
+    /// If validate is set and the movement causes the bounding cage to self-intersect,
+    /// no state gets changed, and this method returns false.
     ///
-    bool move_point_2d(int i, Eigen::RowVector2d& newpos);
+    /// Otherwise, if validate is unset, this method always returns true
+    ///
+    bool move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate2d=true, bool validate_3d=false);
   };
 
   /// Bidirectional Iterator class used to traverse the linked list of KeyFrames

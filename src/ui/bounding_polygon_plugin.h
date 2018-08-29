@@ -33,6 +33,7 @@ private:
   int points_overlay_id;
 
   float current_cut_index = 0;
+  int current_vertex = 0;
 
   bool show_slice_view = false;
 

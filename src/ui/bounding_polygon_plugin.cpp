@@ -142,6 +142,37 @@ bool Bounding_Polygon_Menu::post_draw() {
   if (ImGui::Button("Split")) {
     state.cage.split(current_cut_index);
   }
+
+  BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+  if (ImGui::InputInt("vertex: ", &current_vertex, 1, 1)) {
+    if (current_vertex < 0) {
+      current_vertex = 0;
+    }
+    if (current_vertex >= it->vertices_2d().rows()) {
+      current_vertex = it->vertices_2d().rows()-1;
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("+x")) {
+    Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(1, 0);
+    it->move_point_2d(current_vertex, pt, true, false);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("-x")) {
+    Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(-1, 0);
+    it->move_point_2d(current_vertex, pt, true, false);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("+y")) {
+    Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, 1);
+    it->move_point_2d(current_vertex, pt, true, false);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("-y")) {
+    Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, -1);
+    it->move_point_2d(current_vertex, pt, true, false);
+  }
+
   ImGui::End();
   ImGui::Render();
 
@@ -200,12 +231,12 @@ bool Bounding_Polygon_Menu::pre_draw() {
   }
 
 
-//  viewer->selected_data_index = cage_mesh_overlay_id;
-//  {
-//    viewer->data().clear();
-//    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
-//    viewer->selected_data_index = push_overlay_id;
-//  }
+  viewer->selected_data_index = cage_mesh_overlay_id;
+  {
+    viewer->data().clear();
+    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
+    viewer->selected_data_index = push_overlay_id;
+  }
 
   return ret;
 }

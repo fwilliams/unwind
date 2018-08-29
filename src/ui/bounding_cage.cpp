@@ -6,6 +6,7 @@
 #include <igl/copyleft/cgal/convex_hull.h>
 #include <igl/per_face_normals.h>
 #include <igl/triangle/triangulate.h>
+#include <igl/segment_segment_intersect.h>
 
 // Parallel transport a coordinate system from a KeyFrame along a curve to a point with normal, to_n
 static Eigen::Matrix3d parallel_transport(const BoundingCage::KeyFrame& from_kf, Eigen::RowVector3d to_n) {
@@ -98,30 +99,58 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
   logger = spdlog::get(FISH_LOGGER_NAME);
 }
 
-bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos) {
+bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate_2d, bool validate_3d) {
   if (i < 0 || i >= _vertices_2d.rows()) {
     assert("i in move_vertex() was out of range" && false);
     logger->error("move_point_2d(i, newpos), index i={} was out of range, ({}, {})",
                   i, 0, _vertices_2d.rows()-1);
     return false;
   }
+
+  if (!in_bounding_cage()) {
+    logger->warn("Cannot move KeyFrame vertex if KeyFrame is not in bounding cage");
+    return false;
+  }
+
   Eigen::RowVector2d old_pt_2d = _vertices_2d.row(i);
   Eigen::RowVector3d old_pt_3d = _cage->CV.row(_mesh_vertex_indices[i]);
+
 
   _vertices_2d.row(i) = newpos;
   ((BoundingCage*) _cage)->CV.row(_mesh_vertex_indices[i]) = _center + newpos[0]*right()+ newpos[1]*up();
 
-  if (!(validate_points_2d() && validate_cage())) {
-    _vertices_2d.row(i) = old_pt_2d;
-    ((BoundingCage*) _cage)->CV.row(_mesh_vertex_indices[i]) = old_pt_3d;
-    logger->debug("move_point_2d() would have created invalid cage, reverting");
-    return false;
+  if (validate_2d && !validate_points_2d() || validate_3d && !validate_cage()) {
+      _vertices_2d.row(i) = old_pt_2d;
+      ((BoundingCage*) _cage)->CV.row(_mesh_vertex_indices[i]) = old_pt_3d;
+      logger->debug("move_point_2d() would have created invalid cage, reverting");
+      return false;
   }
+
   return true;
 }
 
 bool BoundingCage::KeyFrame::validate_points_2d() {
-  // TODO: Ensure there are no self intersections so we never get in a bad state
+  const int num_v = _vertices_2d.rows();
+  for (int i = 0; i < num_v; i++) {
+    for (int j = i+2; j < num_v; j++) {
+      double t, u;
+      const int next_i = (i+1)%num_v;
+      const int next_j = (j+1)%num_v;
+      if (i == next_j) { continue; }
+
+      Eigen::RowVector3d a1(_vertices_2d(i, 0), _vertices_2d(i, 1), 0);
+      Eigen::RowVector3d a2(_vertices_2d(next_i, 0), _vertices_2d(next_i, 1), 0);
+      Eigen::RowVector3d da = a2 - a1;
+
+      Eigen::RowVector3d b1(_vertices_2d(j, 0), _vertices_2d(j, 1), 0);
+      Eigen::RowVector3d b2(_vertices_2d(next_j, 0), _vertices_2d(next_j, 1), 0);
+      Eigen::RowVector3d db = b2 - b1;
+
+      if (igl::segments_intersect(a1, da, b1, db, t, u)) {
+        return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -131,10 +160,9 @@ bool BoundingCage::KeyFrame::validate_cage() {
   std::shared_ptr<Cell> right_cell = _cells[1].lock();
 
   if (left_cell) {
-    ret = ret && left_cell->update();
   }
+
   if(right_cell) {
-    ret = ret && right_cell->update();
   }
 
   return ret;
@@ -278,7 +306,7 @@ bool BoundingCage::Cell::init_mesh() {
   unconst->num_mesh_faces += num_new_faces;
 }
 
-bool BoundingCage::Cell::update_mesh(Cell& parent) {
+bool BoundingCage::Cell::init_mesh(Cell& parent) {
   assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
 
   BoundingCage* unconst = (BoundingCage*) cage;
@@ -357,7 +385,7 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
 
     // We've successfully inserted, update the BoundingCage mesh
     keyframe->init_mesh();
-    left_child->update_mesh(*this);
+    left_child->init_mesh(*this);
     right_child->init_mesh();
 
     return keyframe;
