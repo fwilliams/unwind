@@ -249,6 +249,11 @@ public:
     ///
     bool init_mesh(bool tesellate=false);
 
+    /// Update the BoundingCage mesh when the KeyFrame changes. This is a no-op if
+    /// the KeyFrame is not triangulated.
+    ///
+    bool update_mesh();
+
     /// The BoundingCage which owns this KeyFrame
     ///
     const BoundingCage* _cage;
@@ -265,7 +270,9 @@ public:
     /// Indices of the 3D positions of the boundary polygon in the
     /// mesh of the BoundingCage which owns this KeyFrame
     ///
-    Eigen::VectorXi _mesh_vertex_indices;
+    Eigen::VectorXi _mesh_boundary_indices;
+    Eigen::VectorXi _mesh_interior_indices;
+    Eigen::VectorXi _mesh_face_indices;
 
     /// The index of this KeyFrame.
     double _index;
@@ -279,13 +286,22 @@ public:
     ///
     std::shared_ptr<spdlog::logger> logger;
 
+    /// Set to true if this KeyFrame is triangulated
+    ///
+    bool _is_triangulated = false;
 
   public:
 
     /// Returns true if this KeyFrame is part of the bounding cage
     ///
     bool in_bounding_cage() {
-      return _mesh_vertex_indices.rows() != 0;
+      return _mesh_boundary_indices.rows() != 0;
+    }
+
+    /// True if this KeyFrame is at one of the endpoints of its BoundingCage
+    ///
+    bool is_endpoint() {
+      return _is_triangulated;
     }
 
     /// Get the normal of the plane of this KeyFrame.
