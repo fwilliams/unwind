@@ -174,7 +174,7 @@ bool Bounding_Polygon_Menu::post_draw() {
   }
   ImGui::SameLine();
   if (ImGui::Button("Subdiv")) {
-    state.cage.split_boundary(current_vertex, 0.5);
+    state.cage.add_boundary_vertex(current_vertex, 0.5);
   }
 
   ImGui::End();

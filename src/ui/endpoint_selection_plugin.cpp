@@ -327,7 +327,6 @@ void EndPoint_Selection_Menu::extract_skeleton() {
                       rad, -rad,
                       rad,  rad,
                      -rad,  rad;
-
     state.cage.set_skeleton_vertices(skeleton_vertices,
                                      50, // smoothing iterations
                                      poly_template);

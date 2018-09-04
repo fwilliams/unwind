@@ -294,26 +294,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   left_kf->_cells[1] = ret;
   right_kf->_cells[0] = ret;
 
-  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
-  Eigen::MatrixXd CHV(left_kf->vertices_2d().rows() + right_kf->vertices_2d().rows(), 3);
-  CHV.block(0, 0, left_kf->vertices_2d().rows(), 3) = left_kf->vertices_3d();
-  CHV.block(left_kf->vertices_2d().rows(), 0, right_kf->vertices_2d().rows(), 3) = right_kf->vertices_3d();
-
-  logger->trace("CHV size = {}, left size = {}, right size = {}",
-                CHV.rows(), left_kf->vertices_2d().rows(),
-                right_kf->vertices_2d().rows());
-
-  Eigen::MatrixXd V;
-  igl::copyleft::cgal::convex_hull(CHV, V, ret->F);
-  ret->V = V;
-  if (CHV.rows() != V.rows()) {
-    // TODO: Real self-intersection checks here
-    logger->warn("Convex Hull of keyframes for Cell does not enclose all its points. "
-                 "There were {} input points but the convex hull had {} points.",
-                 CHV.rows(), V.rows());
-//    ret.reset();
-//    return ret;
-  }
+  // TODO: Self intersection test
 
   return ret;
 }
@@ -512,7 +493,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     return false;
   }
 
-  { // Check that polygon template is convex
+  bool ccw_orientation = false;
+
+  { // Check that polygon template is convex and determine if its clockwise or counterclockwise
     Eigen::MatrixXd PTP(poly_template.rows(), 3);
     PTP.setZero();
     PTP.block(0, 0, poly_template.rows(), 2) = poly_template;
@@ -525,6 +508,15 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
                     "It needs to be a convex polygon of dimension 2.");
       return false;
     }
+    if (PTP_G.rows() <= 0) {
+      logger->error("Zero triangles when computing convex hull of polygon_template in set_skeleton_vertices.");
+      return false;
+    }
+    assert(PTP_W.rows() >= 3);
+    Eigen::RowVector3d v1 = PTP.row(1) - PTP.row(0);
+    Eigen::RowVector3d v2 = PTP.row(2) - PTP.row(1);
+    Eigen::RowVector3d n = v1.cross(v2);
+    if (n[2] > 0.0) { ccw_orientation = true; }
   }
 
   Eigen::RowVector3d front_normal = SV_smooth.row(1) - SV_smooth.row(0);
@@ -548,8 +540,8 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     return false;
   }
 
-  front_keyframe->init_mesh(true /*triangulate*/, false /*flip triangulation*/);
-  back_keyframe->init_mesh(true /*triangulate*/, true /*flip_triangulation*/);
+  front_keyframe->init_mesh(true /*triangulate*/, !ccw_orientation /*flip triangulation*/);
+  back_keyframe->init_mesh(true /*triangulate*/, ccw_orientation /*flip_triangulation*/);
   root->init_mesh();
 
   cells.head = root;
@@ -630,6 +622,25 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
 bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
   int start = cell->min_index();
   int end = cell->max_index();
+  std::shared_ptr<KeyFrame> left_kf = cell->left_keyframe, right_kf = cell->right_keyframe;
+
+  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
+  Eigen::MatrixXd CHV(left_kf->vertices_2d().rows() + right_kf->vertices_2d().rows(), 3);
+  CHV.block(0, 0, left_kf->vertices_2d().rows(), 3) = left_kf->vertices_3d();
+  CHV.block(left_kf->vertices_2d().rows(), 0, right_kf->vertices_2d().rows(), 3) = right_kf->vertices_3d();
+
+  logger->trace("CHV size = {}, left size = {}, right size = {}",
+                CHV.rows(), left_kf->vertices_2d().rows(),
+                right_kf->vertices_2d().rows());
+
+  Eigen::MatrixXd V;
+  Eigen::MatrixXi F;
+  igl::copyleft::cgal::convex_hull(CHV, V, F);
+  if (CHV.rows() != V.rows()) {
+    logger->warn("Convex Hull of keyframes for Cell does not enclose all its points. "
+                 "There were {} input points but the convex hull had {} points.",
+                 CHV.rows(), V.rows());
+  }
 
   assert(start < end);
   if ((end - start) <= 1) {
@@ -640,17 +651,15 @@ bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
       return (double(0) < val) - (val < double(0));
   };
 
-  Eigen::MatrixXd C(cell->F.rows(), 3);
-  for (int i = 0; i < cell->F.rows(); i++) {
-    C.row(i) = (cell->V.row(cell->F(i, 0)) +
-                cell->V.row(cell->F(i, 1)) +
-                cell->V.row(cell->F(i, 2))) / 3;
+  Eigen::MatrixXd C(F.rows(), 3);
+  for (int i = 0; i < F.rows(); i++) {
+    C.row(i) = (V.row(F(i, 0)) + V.row(F(i, 1)) + V.row(F(i, 2))) / 3;
   }
 
   // Computing the normals here is fine since this function only gets called
   // on construction when the cage is very simple
   Eigen::MatrixXd N;
-  igl::per_face_normals(cell->vertices(), cell->faces(), N);
+  igl::per_face_normals_stable(V, F, N);
   const int check_sign = sgn(N.row(0).dot(SV_smooth.row(start+1)-C.row(0)));
   for (int i = 0; i < end-start-1; i++) {
     const Eigen::RowVector3d V = SV_smooth.row(start+1+i);
@@ -786,7 +795,7 @@ bool BoundingCage::replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& V
   return true;
 }
 
-bool BoundingCage::split_boundary(unsigned idx, double t) {
+bool BoundingCage::add_boundary_vertex(unsigned idx, double t) {
   std::shared_ptr<KeyFrame> head_kf = cells.head->left_keyframe;
   if (idx >= head_kf->vertices_2d().rows()) {
     logger->error("split_boundary index {} out of bounds", idx);

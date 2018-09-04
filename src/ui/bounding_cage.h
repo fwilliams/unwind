@@ -89,11 +89,6 @@ public:
     std::shared_ptr<KeyFrame> left_keyframe;
     std::shared_ptr<KeyFrame> right_keyframe;
 
-    /// Cached mesh information about this Cell
-    ///
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
-
     /// Indices of the boundary triangles in the
     /// mesh of the BoundingCage which owns this Cell
     ///
@@ -136,8 +131,6 @@ public:
                                            std::shared_ptr<Cell> next_cell=std::shared_ptr<Cell>());
 
   public:
-    const Eigen::MatrixXd& vertices() const { return V; }
-    const Eigen::MatrixXi& faces() const { return F; }
     double min_index() const { return left_keyframe->index(); }
     double max_index() const { return right_keyframe->index(); }
   };
@@ -575,7 +568,7 @@ public:
     return root->max_index();
   }
 
-  bool split_boundary(unsigned i, double t);
+  bool add_boundary_vertex(unsigned i, double t);
 
   /// Get a KeyFrame at the specified index.
   /// The KeyFrame may not yet be inserted into the bounding cage.
