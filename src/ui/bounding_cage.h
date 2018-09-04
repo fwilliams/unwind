@@ -43,15 +43,13 @@ private:
   /// Mesh for the whole bounding cage
   ///
   Eigen::MatrixXd CV;
-  Eigen::MatrixXi CF;
   Eigen::VectorXi CV_refcount;
   std::vector<int> CV_free_list;
   int num_mesh_vertices = 0;
-  int num_mesh_faces = 0;
 
   bool update_vertex(int i, const Eigen::RowVector3d& v);
   bool add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
-  bool remove_vertices(const Eigen::VectorXi& VI);
+  bool replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
 
 public:
   /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
@@ -100,6 +98,7 @@ public:
     /// mesh of the BoundingCage which owns this Cell
     ///
     Eigen::VectorXi mesh_face_indexes;
+    Eigen::MatrixXi _mesh_faces;
 
     /// Split the Cell into two cells divided by key_frame.
     /// If the index of key_frame is outside the cell, this method
@@ -115,12 +114,6 @@ public:
     /// storage for the face information
     ///
     bool init_mesh();
-
-    /// This method initializes the BoundingCage mesh for this Cell. It uses the
-    /// storage of parent to store the face information, clearing out the parent's
-    /// data
-    ///
-    bool init_mesh(Cell &parent);
 
     /// Construct a new Cell. Don't call this directly, instead use the factory
     /// function `make_cell()`.
@@ -512,8 +505,6 @@ public:
     SV.resize(0, 0);
     SV_smooth.resize(0, 0);
     CV.resize(0, 0);
-    CF.resize(0, 0);
-    num_mesh_faces = 0;
     num_mesh_vertices = 0;
   }
 
@@ -532,7 +523,26 @@ public:
   /// Get the mesh bounding this cage
   ///
   Eigen::MatrixXd vertices() const { return CV.block(0, 0, num_mesh_vertices, 3); }
-  Eigen::MatrixXi faces() const { return CF.block(0, 0, num_mesh_faces, 3); }
+  Eigen::MatrixXi faces() const {
+    std::shared_ptr<KeyFrame> head_kf = cells.head->left_keyframe;
+    std::shared_ptr<KeyFrame> tail_kf = cells.tail->right_keyframe;
+
+    int num_faces = head_kf->_mesh_faces.rows() + tail_kf->_mesh_faces.rows();
+    for (auto cell : cells) {
+      num_faces += cell._mesh_faces.rows();
+    }
+    Eigen::MatrixXi CF(num_faces, 3);
+    int start_idx = 0;
+    CF.block(start_idx, 0, head_kf->_mesh_faces.rows(), 3) = head_kf->_mesh_faces;
+    start_idx += head_kf->_mesh_faces.rows();
+    for (auto cell : cells) {
+      CF.block(start_idx, 0, cell._mesh_faces.rows(), 3) = cell._mesh_faces;
+      start_idx += cell._mesh_faces.rows();
+    }
+    CF.block(start_idx, 0, tail_kf->_mesh_faces.rows(), 3) = tail_kf->_mesh_faces;
+
+    return CF;
+  }
 
   /// Get the minimum keyframe index
   ///

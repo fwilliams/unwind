@@ -173,72 +173,16 @@ bool BoundingCage::KeyFrame::validate_cage() {
 }
 
 bool BoundingCage::KeyFrame::init_mesh(bool tesellate) {
-  BoundingCage* unconst = (BoundingCage*) _cage;
+  BoundingCage* bc = (BoundingCage*) _cage;
 
+  // Insert the boundary vertices
+  bc->add_vertices(vertices_3d(), _mesh_boundary_indices);
+  _mesh_interior_indices.resize(0, 0);
+
+  // Triangulate the KeyFrame if we ask for it
   if (tesellate) {
-    logger->trace("Triangulating KeyFrame...");
-    Eigen::MatrixXi E(_vertices_2d.rows(), 2);
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
-    Eigen::MatrixXd H(0, 2);
-    Eigen::VectorXi VMin(_vertices_2d.rows()), VMout;
-    Eigen::VectorXi EMin, EMout;
-    std::string args("Q");
-
-    for (int i = 0; i < _vertices_2d.rows(); i++) {
-      E.row(i) = Eigen::RowVector2i(i, (i+1)%_vertices_2d.rows());
-      VMin[i] = i+1;
-    }
-
-    igl::triangle::triangulate(_vertices_2d, E, H, VMin, EMin, args, V, F, VMout, EMout);
-
-    while (unconst->CV.rows() < unconst->num_mesh_vertices + V.rows()) {
-      logger->trace("resizing CV!");
-      unconst->CV.conservativeResize(2*unconst->CV.rows(), 3);
-    }
-    while (unconst->CF.rows() < unconst->num_mesh_faces + F.rows()) {
-      logger->trace("resizing CF!");
-      unconst->CF.conservativeResize(2*unconst->CF.rows(), 3);
-    }
-
-    logger->trace("Triangle outputted {} vertices and {} faces", V.rows(), F.rows());
-    _mesh_boundary_indices.resize(_vertices_2d.rows());
-    _mesh_interior_indices.resize(V.rows());
-
-    int icount = 0;
-    for (int i = 0; i < V.rows(); i++) {
-      const int vidx = unconst->num_mesh_vertices + i;
-      if (VMout[i] != 0) {
-        _mesh_boundary_indices[VMout[i]-1] = vidx;
-      } else {
-        _mesh_interior_indices[icount++] = vidx;
-      }
-      unconst->CV.row(vidx) = V(i, 0)*right() + V(i, 1)*up() + center();
-    }
-    _mesh_interior_indices.conservativeResize(icount);
-
-    for (int i = 0; i < F.rows(); i++) {
-      unconst->CF.row(i + unconst->num_mesh_faces) = F.row(i) + Eigen::RowVector3i::Ones() * unconst->num_mesh_vertices;
-    }
-    _mesh_face_indices.resize(F.rows());
-    _mesh_face_indices.setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+F.rows()-1);
-
-    unconst->num_mesh_faces += F.rows();
-    unconst->num_mesh_vertices += V.rows();
     _is_triangulated = true;
-
-  } else {
-    int num_new_vertices = _vertices_2d.rows();
-    while (unconst->CV.rows() < unconst->num_mesh_vertices + num_new_vertices) {
-      logger->trace("resizing CV!");
-      unconst->CV.conservativeResize(2*unconst->CV.rows(), 3);
-    }
-    unconst->CV.block(unconst->num_mesh_vertices, 0, num_new_vertices, 3) = vertices_3d();
-    _mesh_interior_indices.resize(0, 0);
-    _mesh_boundary_indices.resize(num_new_vertices);
-    _mesh_boundary_indices.setLinSpaced(unconst->num_mesh_vertices,
-                                 unconst->num_mesh_vertices+num_new_vertices-1);
-    unconst->num_mesh_vertices += num_new_vertices;
+    return update_mesh();
   }
 
   return true;
@@ -286,9 +230,9 @@ bool BoundingCage::KeyFrame::update_mesh() {
     }
   }
   newV.conservativeResize(vcount, 3);
-  bc->remove_vertices(Eigen::Map<VectorXi>(_mesh_faces, _mesh_faces.size()));
-  bc->add_vertices(newV, _mesh_interior_indices);
+  bc->replace_vertices(newV, _mesh_interior_indices);
 
+  _mesh_faces.resize(F.rows(), 3);
   for (int i = 0; i < F.rows(); i++) {
     for (int j = 0; j < 3; j++) {
       const int vid = F(i, j);
@@ -335,6 +279,10 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   CHV.block(0, 0, left_kf->vertices_2d().rows(), 3) = left_kf->vertices_3d();
   CHV.block(left_kf->vertices_2d().rows(), 0, right_kf->vertices_2d().rows(), 3) = right_kf->vertices_3d();
 
+  logger->trace("CHV size = {}, left size = {}, right size = {}",
+                CHV.rows(), left_kf->vertices_2d().rows(),
+                right_kf->vertices_2d().rows());
+
   Eigen::MatrixXd V;
   igl::copyleft::cgal::convex_hull(CHV, V, ret->F);
   ret->V = V;
@@ -352,52 +300,23 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
 bool BoundingCage::Cell::init_mesh() {
   assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
 
-  BoundingCage* unconst = (BoundingCage*) cage;
-  int num_new_faces = 2 * left_keyframe->vertices_2d().rows();
-
-  while (unconst->CF.rows() < unconst->num_mesh_faces + num_new_faces) {
-    logger->trace("resizing CF!");
-    logger->trace("old size is {}", unconst->CF.rows());
-    unconst->CF.conservativeResize(2*unconst->CF.rows(), 3);
-    logger->trace("new size is {}", unconst->CF.rows());
-  }
-
-  int fcount = cage->num_mesh_faces;
-  for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
-    int next_i =(i+1) % right_keyframe->_mesh_boundary_indices.rows();
-    unconst->CF.row(fcount++) = Eigen::RowVector3i(
-          left_keyframe->_mesh_boundary_indices[i],
-          right_keyframe->_mesh_boundary_indices[i],
-          right_keyframe->_mesh_boundary_indices[next_i]);
-    unconst->CF.row(fcount++) = Eigen::RowVector3i(
-          left_keyframe->_mesh_boundary_indices[i],
-          right_keyframe->_mesh_boundary_indices[next_i],
-          left_keyframe->_mesh_boundary_indices[next_i]);
-  }
-  _mesh_faces.conservativeResize(num_new_faces);
-  _mesh_faces.setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+num_new_faces-1);
-  unconst->num_mesh_faces += num_new_faces;
-}
-
-bool BoundingCage::Cell::init_mesh(Cell& parent) {
-  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
-
-  BoundingCage* unconst = (BoundingCage*) cage;
+  const int num_new_faces = 2 * left_keyframe->vertices_2d().rows();
+  _mesh_faces.resize(num_new_faces, 3);
 
   int fcount = 0;
   for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
     int next_i =(i+1) % right_keyframe->_mesh_boundary_indices.rows();
-    unconst->CF.row(parent._mesh_faces[fcount++]) = Eigen::RowVector3i(
+    _mesh_faces.row(fcount++) = Eigen::RowVector3i(
           left_keyframe->_mesh_boundary_indices[i],
           right_keyframe->_mesh_boundary_indices[i],
           right_keyframe->_mesh_boundary_indices[next_i]);
-    unconst->CF.row(parent._mesh_faces[fcount++]) = Eigen::RowVector3i(
+    _mesh_faces.row(fcount++) = Eigen::RowVector3i(
           left_keyframe->_mesh_boundary_indices[i],
           right_keyframe->_mesh_boundary_indices[next_i],
           left_keyframe->_mesh_boundary_indices[next_i]);
   }
-  _mesh_faces = parent._mesh_faces;
-  parent._mesh_faces.conservativeResize(0, 0);
+
+  return true;
 }
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
@@ -458,7 +377,7 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
 
     // We've successfully inserted, update the BoundingCage mesh
     keyframe->init_mesh();
-    left_child->init_mesh(*this);
+    left_child->init_mesh();
     right_child->init_mesh();
 
     return keyframe;
@@ -551,8 +470,6 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   clear();
   CV.resize(poly_template.rows(), 3);
   CV_refcount.resize(CV.rows());
-
-  CF.resize(CV.rows(), 3);
 
   logger = spdlog::get(FISH_LOGGER_NAME);
 
@@ -774,9 +691,11 @@ bool BoundingCage::add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
   VI.conservativeResize(V.rows());
 
   if (CV_free_list.empty()) {
+    logger->trace("adding {} vertices with empty free list", V.rows());
     while(CV.rows() < num_mesh_vertices + V.rows()) {
       logger->trace("Resizing CV");
       CV.conservativeResize(2*CV.rows(), 3);
+      CV_refcount.conservativeResize(2*CV_refcount.rows());
     }
     CV.block(num_mesh_vertices, 0, V.rows(), 3) = V;
     CV_refcount.block(num_mesh_vertices, 0, V.rows(), 1).setZero();
@@ -797,6 +716,7 @@ bool BoundingCage::add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
     while(CV.rows() < num_mesh_vertices + num_overflow) {
       logger->trace("Resizing CV");
       CV.conservativeResize(2*CV.rows(), 3);
+      CV_refcount.conservativeResize(2*CV_refcount.rows());
     }
     CV.block(num_mesh_vertices, 0, num_overflow, 3) = V.block(vcount, 0, V.rows(), 3);
     CV_refcount.block(num_mesh_vertices, 0, num_overflow, 1).setZero();
@@ -807,7 +727,35 @@ bool BoundingCage::add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
   return true;
 }
 
-bool BoundingCage::remove_vertices(const Eigen::VectorXi& VI) {
+bool BoundingCage::replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
+  // 1) VI has fewer vertices than V
+  if (VI.rows() <= V.rows()) {
+    logger->trace("replace_vertices case 1: VI.rows() = {}, V.rows() = {}", VI.rows(), V.rows());
+    int num_vi = VI.rows();
+    int num_new_vertices = V.rows() - num_vi;
+
+    VI.conservativeResize(V.rows(), 3);
+    for (int i = 0; i < num_vi; i++) {
+      CV.row(VI[i]) = V.row(i);
+    }
+    Eigen::VectorXi newVI(num_new_vertices, 3);
+    add_vertices(V.block(num_vi, 0, num_new_vertices, 3), newVI);
+    VI.block(num_vi, 0, num_new_vertices, 3) = newVI;
+  }
+  // 2) VI has more vertices than V
+  else {
+    logger->trace("replace_vertices case 2: VI.rows() = {}, V.rows() = {}", VI.rows(), V.rows());
+    for (int i = 0; i < V.rows(); i++) {
+      CV.row(VI[i]) = V.row(i);
+    }
+    for (int i = V.rows(); i < VI.rows(); i++) {
+      CV_refcount[VI[i]] -= 1;
+      if (CV_refcount[VI[i]] <= 0) {
+        CV_free_list.push_back(VI[i]);
+      }
+    }
+    VI.conservativeResize(V.rows(), 3);
+  }
   return true;
 }
 
