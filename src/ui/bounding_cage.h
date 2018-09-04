@@ -256,7 +256,7 @@ public:
     /// Split the KeyFrame polygon along an edge starting at vertex i
     /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i])
     ///
-    bool insert_vertex(int i, double t);
+    bool insert_vertex(unsigned i, double t);
 
     /// The BoundingCage which owns this KeyFrame
     ///
@@ -402,6 +402,10 @@ public:
     KeyFrameIterator& operator=(const KeyFrameIterator& other) { keyframe = other.keyframe; }
 
     KeyFrameIterator operator++() {
+      if (!keyframe) {
+        return *this;
+      }
+
       std::shared_ptr<Cell> right_cell = keyframe->_cells[1].lock();
       if (keyframe && right_cell) {
         keyframe = right_cell->right_keyframe;
@@ -416,6 +420,10 @@ public:
     }
 
     KeyFrameIterator operator--() {
+      if (!keyframe) {
+        return *this;
+      }
+
       std::shared_ptr<Cell> left_cell = keyframe->_cells[0].lock();
       if (keyframe && left_cell) {
         keyframe = left_cell->left_keyframe;
@@ -564,6 +572,7 @@ public:
     return root->max_index();
   }
 
+  bool split_boundary(unsigned i, double t);
 
   /// Get a KeyFrame at the specified index.
   /// The KeyFrame may not yet be inserted into the bounding cage.

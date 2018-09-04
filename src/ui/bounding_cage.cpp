@@ -176,7 +176,7 @@ bool BoundingCage::KeyFrame::init_mesh(bool tesellate) {
   BoundingCage* bc = (BoundingCage*) _cage;
 
   // Insert the boundary vertices
-  bc->add_vertices(vertices_3d(), _mesh_boundary_indices);
+  bc->replace_vertices(vertices_3d(), _mesh_boundary_indices);
   _mesh_interior_indices.resize(0, 0);
 
   // Triangulate the KeyFrame if we ask for it
@@ -247,7 +247,26 @@ bool BoundingCage::KeyFrame::update_mesh() {
   return true;
 }
 
-
+bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
+  logger->trace("splitting keyframe at index {}", idx);
+  logger->trace("old:");
+  for (int i = 0; i < _vertices_2d.rows(); i++) {
+    logger->trace("  {}: {}, {}", i, _vertices_2d(i, 0), _vertices_2d(i, 1));
+  }
+  const int num_old_rows = _vertices_2d.rows();
+  const unsigned next_idx = (idx + 1) % vertices_2d().rows();
+  const Eigen::RowVector2d new_v = t*vertices_2d().row(idx) + (1.0-t)*vertices_2d().row(next_idx);
+  _vertices_2d.conservativeResize(num_old_rows+1, 2);
+  Eigen::MatrixXd cpy = _vertices_2d.block(idx+1, 0, num_old_rows-idx-1, 2);
+  _vertices_2d.row(idx+1) = new_v;
+  _vertices_2d.block(idx+2, 0, num_old_rows-idx-1, 2) = cpy;
+  logger->trace("new:");
+  for (int i = 0; i < _vertices_2d.rows(); i++) {
+    logger->trace("  {}: {}, {}", i, _vertices_2d(i, 0), _vertices_2d(i, 1));
+  }
+  init_mesh(_is_triangulated);
+  return true;
+}
 
 // |----------------------------| //
 // |                            | //
@@ -287,11 +306,12 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   igl::copyleft::cgal::convex_hull(CHV, V, ret->F);
   ret->V = V;
   if (CHV.rows() != V.rows()) {
+    // TODO: Real self-intersection checks here
     logger->warn("Convex Hull of keyframes for Cell does not enclose all its points. "
                  "There were {} input points but the convex hull had {} points.",
                  CHV.rows(), V.rows());
-    ret.reset();
-    return ret;
+//    ret.reset();
+//    return ret;
   }
 
   return ret;
@@ -301,6 +321,7 @@ bool BoundingCage::Cell::init_mesh() {
   assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
 
   const int num_new_faces = 2 * left_keyframe->vertices_2d().rows();
+  logger->trace("init_mesh adding 2*{} faces", left_keyframe->vertices_2d().rows());
   _mesh_faces.resize(num_new_faces, 3);
 
   int fcount = 0;
@@ -589,6 +610,11 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
   Eigen::MatrixXd A = V.rowwise() - ctr;
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
   Eigen::RowVector3d n = svd.matrixV().col(2).transpose();
+  double sign = 1.0;
+  if (n.dot(cell->left_keyframe->normal()) < 0.0 || n.dot(cell->right_keyframe->normal()) < 0.0) {
+    sign = -1.0;
+  }
+  n *= sign;
 
   Eigen::Matrix3d coord_frame = parallel_transport(*cell->left_keyframe, n);
 
@@ -698,7 +724,7 @@ bool BoundingCage::add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
       CV_refcount.conservativeResize(2*CV_refcount.rows());
     }
     CV.block(num_mesh_vertices, 0, V.rows(), 3) = V;
-    CV_refcount.block(num_mesh_vertices, 0, V.rows(), 1).setZero();
+    CV_refcount.block(num_mesh_vertices, 0, V.rows(), 1).setOnes();
     VI.setLinSpaced(num_mesh_vertices, num_mesh_vertices+V.rows()-1);
     num_mesh_vertices += V.rows();
     return true;
@@ -759,3 +785,21 @@ bool BoundingCage::replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& V
   return true;
 }
 
+bool BoundingCage::split_boundary(unsigned idx, double t) {
+  std::shared_ptr<KeyFrame> head_kf = cells.head->left_keyframe;
+  if (idx >= head_kf->vertices_2d().rows()) {
+    logger->error("split_boundary index {} out of bounds", idx);
+  }
+
+  for (KeyFrame& kf : keyframes) {
+    logger->trace("Splitting keyframe");
+    kf.insert_vertex(idx, t);
+  }
+
+  for (Cell& cell : cells) {
+    logger->trace("Updating cell");
+    cell.init_mesh();
+  }
+
+  return true;
+}
