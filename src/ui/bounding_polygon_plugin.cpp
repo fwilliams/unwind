@@ -62,13 +62,13 @@ void Bounding_Polygon_Menu::initialize() {
 
   // Draw the bounding cage mesh
   viewer->append_mesh();
-//  cage_mesh_overlay_id = viewer->selected_data_index;
-//  {
-//    viewer->data().clear();
-//    viewer->data().set_face_based(true);
-//    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
-//    viewer->selected_data_index = push_mesh_id;
-//  }
+  cage_mesh_overlay_id = viewer->selected_data_index;
+  {
+    viewer->data().clear();
+    viewer->data().set_face_based(true);
+    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
+    viewer->selected_data_index = push_mesh_id;
+  }
 
   // Initialize the 2d cross section widget
   widget_2d.initialize(viewer);
@@ -195,17 +195,6 @@ bool Bounding_Polygon_Menu::pre_draw() {
   {
     viewer->data().clear();
     viewer->data().line_width = 2.4;
-//    for (const BoundingCage::Cell& cell : state.cage.cells) {
-////      Eigen::MatrixXd P1, P2;
-////      edge_endpoints(cell.vertices(), cell.faces(), P1, P2);
-////      viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
-//    }
-
-//    for (auto cell = state.cage.cells.rbegin(); cell != state.cage.cells.rend(); --cell) {
-////      Eigen::MatrixXd P1, P2;
-////      edge_endpoints(cell->vertices(), cell->faces(), P1, P2);
-////      viewer->data().add_edges(P1, P2, ColorRGB::NAVY);
-//    }
 
     for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
       viewer->data().add_points(kf.center(), ColorRGB::GREEN);
@@ -239,13 +228,13 @@ bool Bounding_Polygon_Menu::pre_draw() {
   }
 
 
-//  viewer->selected_data_index = cage_mesh_overlay_id;
-//  {
-//    viewer->data().clear();
-//    viewer->data().set_face_based(true);
-//    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
-//    viewer->selected_data_index = push_overlay_id;
-//  }
+  viewer->selected_data_index = cage_mesh_overlay_id;
+  {
+    viewer->data().clear();
+    viewer->data().set_face_based(true);
+    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
+    viewer->selected_data_index = push_overlay_id;
+  }
 
   return ret;
 }

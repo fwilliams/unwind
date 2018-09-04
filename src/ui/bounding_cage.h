@@ -246,7 +246,7 @@ public:
     /// If tesselate is true, the polygon for this KeyFrame will be triangulated and 
     /// included in the BoundingCage mesh. We use this for the caps of the cage mesh.
     ///
-    bool init_mesh(bool tesellate=false);
+    bool init_mesh(bool tesellate=false, bool flip=false);
 
     /// Update the BoundingCage mesh when the KeyFrame changes. This is a no-op if
     /// the KeyFrame is not triangulated.
@@ -293,9 +293,12 @@ public:
     /// Set to true if this KeyFrame is triangulated
     ///
     bool _is_triangulated = false;
+    /// Set to true if we need to flip the triangulation of the KeyFrame
+    /// This is used to properly orient triangles on the front of the cage
+    ///
+    bool _is_triangulation_flipped = false;
 
   public:
-
     /// Returns true if this KeyFrame is part of the bounding cage
     ///
     bool in_bounding_cage() {

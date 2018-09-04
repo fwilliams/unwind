@@ -172,7 +172,7 @@ bool BoundingCage::KeyFrame::validate_cage() {
   return ret;
 }
 
-bool BoundingCage::KeyFrame::init_mesh(bool tesellate) {
+bool BoundingCage::KeyFrame::init_mesh(bool tessellate, bool flip) {
   BoundingCage* bc = (BoundingCage*) _cage;
 
   // Insert the boundary vertices
@@ -180,12 +180,9 @@ bool BoundingCage::KeyFrame::init_mesh(bool tesellate) {
   _mesh_interior_indices.resize(0, 0);
 
   // Triangulate the KeyFrame if we ask for it
-  if (tesellate) {
-    _is_triangulated = true;
-    return update_mesh();
-  }
-
-  return true;
+  _is_triangulated = tessellate;
+  _is_triangulation_flipped = flip;
+  return update_mesh();
 }
 
 bool BoundingCage::KeyFrame::update_mesh() {
@@ -244,6 +241,10 @@ bool BoundingCage::KeyFrame::update_mesh() {
     }
   }
 
+  if (_is_triangulation_flipped) {
+    _mesh_faces.col(2).swap(_mesh_faces.col(1));
+  }
+
   return true;
 }
 
@@ -264,7 +265,7 @@ bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
   for (int i = 0; i < _vertices_2d.rows(); i++) {
     logger->trace("  {}: {}, {}", i, _vertices_2d(i, 0), _vertices_2d(i, 1));
   }
-  init_mesh(_is_triangulated);
+  init_mesh(_is_triangulated, _is_triangulation_flipped);
   return true;
 }
 
@@ -547,8 +548,8 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     return false;
   }
 
-  front_keyframe->init_mesh(true);
-  back_keyframe->init_mesh(true);
+  front_keyframe->init_mesh(true /*triangulate*/, false /*flip triangulation*/);
+  back_keyframe->init_mesh(true /*triangulate*/, true /*flip_triangulation*/);
   root->init_mesh();
 
   cells.head = root;
