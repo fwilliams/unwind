@@ -265,97 +265,39 @@ bool BoundingCage::KeyFrame::update_mesh() {
   igl::triangle::triangulate(_vertices_2d, E, H, VMin, EMin, args, V, F, VMout, EMout);
 
 
-  // Its possible that the new triangulation creates new vertices, figure out how many additional
-  // vertices were created
-  const int num_v_overflow =
-      std::max((int)V.rows() - (int)_mesh_boundary_indices.rows() - (int)_mesh_interior_indices.rows(), 0);
-  Eigen::MatrixXd overflow_vertices(num_v_overflow, 3);
+  BoundingCage* bc = (BoundingCage*) _cage;
 
-  // Store the mapping between F and the vertex row in the cage mesh
-  Eigen::VectorXi face_lookup(V.rows());
-
-  // Updat the BoundingCage mesh vertices
-  BoundingCage* unconst = (BoundingCage*) _cage;
+  Eigen::MatrixXd newV(V.rows(), 3);
+  Eigen::VectorXi vmap(V.rows());
   int vcount = 0;
-  int overflow_vcount = 0;
   for (int i = 0; i < V.rows(); i++) {
     Eigen::RowVector3d v = V(i, 0)*right() + V(i, 1)*up() + center();
-    // If this is a boundary vertex, re-use the old slot for boundary vertices
-    if (VMout[i] != 0) {
-      const int vidx = _mesh_boundary_indices[VMout[i]-1];
-      unconst->CV.row(vidx) = v;
-      face_lookup[i] = vidx;
-    // If this is an interior vertex, and there are slots available use it
-    } else if (vcount < _mesh_interior_indices.rows()) {
-      const int vidx = _mesh_interior_indices[vcount++];
-      unconst->CV.row(vidx) = v;
-      face_lookup[i] = vidx;
-    // Otherwise, we're out of slots so put it on the overflow list
-    } else if (vcount >= _mesh_interior_indices.rows()) {
-      overflow_vertices.row(overflow_vcount) = v;
-      face_lookup[i] = unconst->num_mesh_vertices + overflow_vcount;
-      overflow_vcount += 1;
+    if (VMout[i] == 0) {
+      // If not a boundary vertex, then we'll add a new vertex
+      newV.row(vcount) = v;
+      vmap[i] = vcount;
+      vcount += 1;
     } else {
-      assert("This should never happen" && false);
+      // The number of boundary vertices should never change,
+      // so we can just update the vertex directly
+      const int vidx = _mesh_boundary_indices[VMout[i]-1];
+      bc->update_vertex(vidx, v);
+      vmap[i] = VMout[i]-1;
     }
   }
+  newV.conservativeResize(vcount, 3);
+  bc->remove_vertices(Eigen::Map<VectorXi>(_mesh_faces, _mesh_faces.size()));
+  bc->add_vertices(newV, _mesh_interior_indices);
 
-  // If there were overflow vertices, allocate new slots and insert them
-  if (num_v_overflow > 0) {
-    logger->debug("Re-Triangulation generated overflow vertices, inserting them now.");
-    // Possibly resize the mesh if there isn't enough room
-    while (unconst->CV.rows() < unconst->num_mesh_vertices + num_v_overflow) {
-      logger->trace("resizing CV!");
-      unconst->CV.conservativeResize(2*unconst->CV.rows(), 3);
+  for (int i = 0; i < F.rows(); i++) {
+    for (int j = 0; j < 3; j++) {
+      const int vid = F(i, j);
+      if (VMout[vid] == 0) {
+        _mesh_faces(i, j) = _mesh_interior_indices[vmap[vid]];
+      } else {
+        _mesh_faces(i, j) = _mesh_boundary_indices[vmap[vid]];
+      }
     }
-    unconst->CV.block(unconst->num_mesh_vertices, 0, num_v_overflow, 3) = overflow_vertices;
-
-    // Update the cached indexes of interior vertices
-    const int start_idx = _mesh_interior_indices.rows();
-    _mesh_interior_indices.conservativeResize(_mesh_interior_indices.rows()+num_v_overflow, 3);
-    _mesh_interior_indices.block(start_idx, 0, num_v_overflow, 3).
-        setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+num_v_overflow-1);
-
-    unconst->num_mesh_vertices += num_v_overflow;
-  }
-
-
-  // Its possible that the new triangulation creates new faces, figure out how many additional
-  // faces were created
-  const int num_f_overflow = std::max((int)F.rows() - (int)_mesh_face_indices.rows(), 0);
-
-  // Update the BoundingCage mesh faces.
-  // face_lookup stores a map between the index into V and index into the BoundingCage mesh
-  for (int i = 0; i < F.rows()-num_f_overflow; i++) {
-    Eigen::RowVector3i f(face_lookup[F(i, 0)], face_lookup[F(i, 1)], face_lookup[F(i, 2)]);
-    unconst->CF.row(_mesh_face_indices[i]) = f;
-  }
-
-  // Store the overflow faces
-  Eigen::MatrixXi overflow_faces(num_f_overflow, 3);
-  for (int i = 0; i < num_f_overflow; i++) {
-    const int fidx = F.rows()-num_f_overflow + i;
-    Eigen::RowVector3i f(face_lookup[F(fidx, 0)], face_lookup[F(fidx, 1)], face_lookup[F(fidx, 2)]);
-    overflow_faces.row(i) = f;
-  }
-
-  // If there were overflow faces, allocate new slots and insert them
-  if (num_f_overflow > 0) {
-    logger->debug("Re-Triangulation generated overflow faces, inserting them now.");
-    // Possibly resize the mesh if there isn't enough room
-    while (unconst->CF.rows() < unconst->num_mesh_faces + num_f_overflow) {
-      logger->trace("resizing CF!");
-      unconst->CF.conservativeResize(2*unconst->CF.rows(), 3);
-    }
-    unconst->CF.block(unconst->num_mesh_faces, 0, num_f_overflow, 3) = overflow_faces;
-
-    // Update the cached faces
-    const int start_idx = _mesh_face_indices.rows();
-    _mesh_face_indices.conservativeResize(F.rows(), 3);
-    _mesh_face_indices.block(start_idx, 0, num_f_overflow, 3).
-        setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+num_f_overflow-1);
-
-    unconst->num_mesh_faces += num_f_overflow;
   }
 
   return true;
@@ -432,8 +374,8 @@ bool BoundingCage::Cell::init_mesh() {
           right_keyframe->_mesh_boundary_indices[next_i],
           left_keyframe->_mesh_boundary_indices[next_i]);
   }
-  mesh_face_indexes.conservativeResize(num_new_faces);
-  mesh_face_indexes.setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+num_new_faces-1);
+  _mesh_faces.conservativeResize(num_new_faces);
+  _mesh_faces.setLinSpaced(unconst->num_mesh_faces, unconst->num_mesh_faces+num_new_faces-1);
   unconst->num_mesh_faces += num_new_faces;
 }
 
@@ -445,17 +387,17 @@ bool BoundingCage::Cell::init_mesh(Cell& parent) {
   int fcount = 0;
   for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
     int next_i =(i+1) % right_keyframe->_mesh_boundary_indices.rows();
-    unconst->CF.row(parent.mesh_face_indexes[fcount++]) = Eigen::RowVector3i(
+    unconst->CF.row(parent._mesh_faces[fcount++]) = Eigen::RowVector3i(
           left_keyframe->_mesh_boundary_indices[i],
           right_keyframe->_mesh_boundary_indices[i],
           right_keyframe->_mesh_boundary_indices[next_i]);
-    unconst->CF.row(parent.mesh_face_indexes[fcount++]) = Eigen::RowVector3i(
+    unconst->CF.row(parent._mesh_faces[fcount++]) = Eigen::RowVector3i(
           left_keyframe->_mesh_boundary_indices[i],
           right_keyframe->_mesh_boundary_indices[next_i],
           left_keyframe->_mesh_boundary_indices[next_i]);
   }
-  mesh_face_indexes = parent.mesh_face_indexes;
-  parent.mesh_face_indexes.conservativeResize(0, 0);
+  _mesh_faces = parent._mesh_faces;
+  parent._mesh_faces.conservativeResize(0, 0);
 }
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
@@ -608,6 +550,8 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
   clear();
   CV.resize(poly_template.rows(), 3);
+  CV_refcount.resize(CV.rows());
+
   CF.resize(CV.rows(), 3);
 
   logger = spdlog::get(FISH_LOGGER_NAME);
@@ -821,3 +765,49 @@ BoundingCage::KeyFrameIterator BoundingCage::split(double index) {
 BoundingCage::KeyFrameIterator BoundingCage::split(BoundingCage::KeyFrameIterator& split_kf) {
   return KeyFrameIterator(split_internal(split_kf.keyframe));
 }
+
+bool BoundingCage::update_vertex(int i, const Eigen::RowVector3d& v) {
+  CV.row(i) = v;
+}
+
+bool BoundingCage::add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
+  VI.conservativeResize(V.rows());
+
+  if (CV_free_list.empty()) {
+    while(CV.rows() < num_mesh_vertices + V.rows()) {
+      logger->trace("Resizing CV");
+      CV.conservativeResize(2*CV.rows(), 3);
+    }
+    CV.block(num_mesh_vertices, 0, V.rows(), 3) = V;
+    CV_refcount.block(num_mesh_vertices, 0, V.rows(), 1).setZero();
+    VI.setLinSpaced(num_mesh_vertices, num_mesh_vertices+V.rows()-1);
+    num_mesh_vertices += V.rows();
+    return true;
+  }
+
+  int vcount = 0;
+  for (int i = 0; i < std::min((int)V.rows(), (int)CV_free_list.size()); i++) {
+    int next_free = CV_free_list.back();
+    CV_free_list.pop_back();
+    VI[vcount] = next_free;
+    CV.row(next_free) = V.row(vcount++);
+  }
+  const int num_overflow = V.rows()-vcount;
+  if (num_overflow > 0) {
+    while(CV.rows() < num_mesh_vertices + num_overflow) {
+      logger->trace("Resizing CV");
+      CV.conservativeResize(2*CV.rows(), 3);
+    }
+    CV.block(num_mesh_vertices, 0, num_overflow, 3) = V.block(vcount, 0, V.rows(), 3);
+    CV_refcount.block(num_mesh_vertices, 0, num_overflow, 1).setZero();
+    VI.block(vcount, 0, V.rows()-1, 1).setLinSpaced(num_mesh_vertices, num_mesh_vertices+num_overflow-1);
+    num_mesh_vertices += num_overflow;
+  }
+
+  return true;
+}
+
+bool BoundingCage::remove_vertices(const Eigen::VectorXi& VI) {
+  return true;
+}
+

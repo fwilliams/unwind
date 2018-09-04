@@ -44,8 +44,14 @@ private:
   ///
   Eigen::MatrixXd CV;
   Eigen::MatrixXi CF;
+  Eigen::VectorXi CV_refcount;
+  std::vector<int> CV_free_list;
   int num_mesh_vertices = 0;
   int num_mesh_faces = 0;
+
+  bool update_vertex(int i, const Eigen::RowVector3d& v);
+  bool add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
+  bool remove_vertices(const Eigen::VectorXi& VI);
 
 public:
   /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
@@ -254,6 +260,11 @@ public:
     ///
     bool update_mesh();
 
+    /// Split the KeyFrame polygon along an edge starting at vertex i
+    /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i])
+    ///
+    bool insert_vertex(int i, double t);
+
     /// The BoundingCage which owns this KeyFrame
     ///
     const BoundingCage* _cage;
@@ -272,7 +283,7 @@ public:
     ///
     Eigen::VectorXi _mesh_boundary_indices;
     Eigen::VectorXi _mesh_interior_indices;
-    Eigen::VectorXi _mesh_face_indices;
+    Eigen::MatrixXi _mesh_faces;
 
     /// The index of this KeyFrame.
     double _index;

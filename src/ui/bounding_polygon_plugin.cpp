@@ -217,7 +217,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
     }
 
     viewer->data().point_size = 10.0;
-    viewer->data().add_points(state.cage.vertices(), ColorRGB::RED);
+//    viewer->data().add_points(state.cage.vertices(), ColorRGB::RED);
     BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
     Eigen::MatrixXd P1, P2;
     edge_endpoints(state.cage.vertices(), state.cage.faces(), P1, P2);
