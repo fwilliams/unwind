@@ -275,16 +275,16 @@ bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
 // |                            | //
 // |============================| //
 
-std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
-                                                                  std::shared_ptr<BoundingCage::KeyFrame> right_kf,
+std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_ptr<KeyFrame> left_kf,
+                                                                  std::shared_ptr<KeyFrame> right_kf,
                                                                   const BoundingCage* cage,
-                                                                  std::shared_ptr<BoundingCage::Cell> prev,
-                                                                  std::shared_ptr<BoundingCage::Cell> next) {
-  std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, prev, next, cage));
-
-  std::shared_ptr<spdlog::logger> logger = ret->logger;
+                                                                  std::weak_ptr<Cell> parent,
+                                                                  std::shared_ptr<Cell> prev,
+                                                                  std::shared_ptr<Cell> next) {
+  std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, parent, prev, next, cage));
 
   if (!left_kf || !right_kf) {
+    std::shared_ptr<spdlog::logger> logger = ret->logger;
     logger->warn("Cell::make_cell failed to construct Cell. "
                  "One or both of left_kf or right_kf was null.");
     ret.reset();
@@ -341,15 +341,14 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
   }
 
   // This node is a leaf node, so split it
-  if (!left_child && !right_child) {
-
+  if (is_leaf()) {
     // Initialize new Cells for the left and right children
-    left_child = Cell::make_cell(left_keyframe, keyframe, cage);
+    left_child = Cell::make_cell(left_keyframe, keyframe, cage, shared_from_this() /* parent */);
     if (!left_child) {
       logger->warn("Cell::split() failed to construct left child.");
       return std::shared_ptr<KeyFrame>();
     }
-    right_child = Cell::make_cell(keyframe, right_keyframe, cage);
+    right_child = Cell::make_cell(keyframe, right_keyframe, cage, shared_from_this() /* parent */);
     if (!right_child) {
       logger->warn("Cell::split() failed to construct right child.");
       left_child.reset();
@@ -404,7 +403,59 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
   assert(false);
 }
 
+bool BoundingCage::Cell::merge() {
+  std::shared_ptr<Cell> search = shared_from_this();
+  while(search->left_child) {
+    search = search->left_child;
+  }
+  assert(search->is_leaf());
 
+  if (search->prev_cell) {
+    search->prev_cell->next_cell = shared_from_this();
+    prev_cell = search->prev_cell;
+  } else {
+    prev_cell.reset();
+  }
+  search->left_keyframe->_cells[1] = shared_from_this();
+  left_keyframe = search->left_keyframe;
+
+  search = shared_from_this();
+  while(search->right_child) {
+    search = search->right_child;
+  }
+  assert(search->is_leaf());
+  if (search->next_cell) {
+    search->next_cell->prev_cell = shared_from_this();
+    next_cell = search->next_cell;
+  } else {
+    next_cell.reset();
+  }
+  search->right_keyframe->_cells[0] = shared_from_this();
+  right_keyframe = search->right_keyframe;
+
+  right_child.reset();
+  left_child.reset();
+
+  return true;
+}
+
+std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::find(double index) {
+  if (index < min_index() || index > max_index()) {
+    logger->error("find_cell_r(cell, index) index, {} was out of range ({}, {})",
+                  index, min_index(), max_index());
+    return std::shared_ptr<Cell>();
+  } else if (is_leaf()) {
+    return shared_from_this();
+  } else if (left_child && index >= left_child->min_index() && index <= left_child->max_index()) {
+    return left_child->find(index);
+  } else if (right_child && index >= right_child->min_index() && index <= right_child->max_index()) {
+    return right_child->find(index);
+  } else {
+    logger->error("BUG!!! This branch in find_cell_r should never execute.");
+    assert("This should never happen" && false);
+    return std::shared_ptr<Cell>();
+  }
+}
 
 
 
@@ -558,31 +609,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 }
 
 BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) const {
-  // Recursively find the Cell for a given index in the Cell tree.
-  // If index is out of range, this method returns a null pointer.
-  std::function<std::shared_ptr<Cell>(std::shared_ptr<Cell>, double)> find_cell_rec =
-      [&] (std::shared_ptr<Cell> cell, double index) ->std::shared_ptr<Cell> {
-    if (!cell) {
-      logger->error("find_cell_r(cell, index): cell is null.");
-    } else if (cell && (index < cell->min_index() || index > cell->max_index())) {
-      logger->error("find_cell_r(cell, index) index, {} was out of range ({}, {})",
-                    index, cell->min_index(), cell->max_index());
-      return std::shared_ptr<Cell>();
-    } else if (!cell->left_child && !cell->right_child) {
-      return cell;
-    } else if (cell->left_child && index >= cell->left_child->min_index() && index <= cell->left_child->max_index()) {
-      return find_cell_rec(cell->left_child, index);
-    } else if (cell->right_child && index >= cell->right_child->min_index() && index <= cell->right_child->max_index()) {
-      return find_cell_rec(cell->right_child, index);
-    } else {
-      logger->error("BUG!!! This branch in find_cell_r should never execute.");
-      assert("This should never happen" && false);
-      return std::shared_ptr<Cell>();
-    }
-  };
-
-
-  auto cell = find_cell_rec(root, index);
+  std::shared_ptr<Cell> cell = root->find(index);
 
   if (!cell) {
     logger->error("vertices_2d_for_index() could not find cell at index {}", index);
@@ -685,16 +712,16 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared
     return std::shared_ptr<KeyFrame>();
   }
 
-  // If a KeyFrame's left and right Cell pointers don't match, it
-  // is already part of the cage, then don't match so we can just return it
-  if (left_cell != right_cell) {
+  // If a KeyFrame is already part of the cage, we can just return it
+  if (split_kf->in_bounding_cage()) {
     return split_kf;
   }
 
-  // Otherwise, the KeyFrame's Cell pointers match and the KeyFrame has not been inserted
+  // Otherwise, the KeyFrame has not been inserted
   // into the BoundingCage, so insert it.
   assert("KeyFrame cells not equal" && split_kf->_cells[0] == split_kf->_cells[1]);
-  if (!left_cell->split(split_kf)) {
+  std::shared_ptr<Cell> cell(left_cell);
+  if (!cell->split(split_kf)) {
     logger->error("Failed to split Cell with KeyFrame.");
     assert(false);
     return std::shared_ptr<KeyFrame>();
@@ -711,12 +738,40 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared
   return split_kf;
 }
 
-BoundingCage::KeyFrameIterator BoundingCage::split(double index) {
+BoundingCage::KeyFrameIterator BoundingCage::insert_keyframe(double index) {
   return KeyFrameIterator(split_internal(keyframe_for_index(index).keyframe));
 }
 
-BoundingCage::KeyFrameIterator BoundingCage::split(BoundingCage::KeyFrameIterator& split_kf) {
+BoundingCage::KeyFrameIterator BoundingCage::insert_keyframe(BoundingCage::KeyFrameIterator& split_kf) {
   return KeyFrameIterator(split_internal(split_kf.keyframe));
+}
+
+bool BoundingCage::remove_keyframe(KeyFrameIterator& it) {
+ std::shared_ptr<KeyFrame> kf = it.keyframe;
+ if (!kf->in_bounding_cage()) {
+   logger->warn("Cannot remove keyframe at index {} which is not contained in BoundingCage", kf->index());
+   return false;
+ }
+
+ // Find parent cell
+ std::shared_ptr<Cell> cell = root->find(kf->index());
+ if (!cell) {
+   logger->error("Could not find KeyFrame at index {} even though it should be in the BoundingCage.", kf->index());
+   assert(false);
+   return false;
+ }
+ if (cell == root) {
+   logger->warn("Cannot delete first and last KeyFrame");
+   return false;
+ }
+
+ std::shared_ptr<Cell> parent = cell->parent_cell.lock();
+ if(!parent) {
+  logger->warn("Parent Cell is null.");
+  return false;
+ }
+
+ return parent->merge();
 }
 
 bool BoundingCage::update_vertex(int i, const Eigen::RowVector3d& v) {

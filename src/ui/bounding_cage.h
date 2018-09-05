@@ -67,7 +67,7 @@ public:
   /// Cells do not expose any public methods which can mutate the class and thus, can be
   /// considered immutable.
   ///
-  class Cell {
+  class Cell : public std::enable_shared_from_this<Cell> {
     friend class BoundingCage;
 
     /// Reference to the owning BoundingCage
@@ -83,6 +83,11 @@ public:
     ///
     std::shared_ptr<Cell> next_cell;
     std::shared_ptr<Cell> prev_cell;
+
+    /// Parent cell in the tree
+    ///
+    std::weak_ptr<Cell> parent_cell;
+
 
     /// The "left" and "right" KeyFrames. The left has a smaller index than the right.
     ///
@@ -101,6 +106,18 @@ public:
     ///
     std::shared_ptr<KeyFrame> split(std::shared_ptr<KeyFrame> key_frame);
 
+    /// Merge all the children of this cell into one cell
+    ///
+    bool merge();
+
+    /// Find the cell for the given index
+    ///
+    std::shared_ptr<Cell> find(double index);
+
+    /// Returns true if the cell is a leaf node
+    ///
+    bool is_leaf() const { return !left_child && !right_child; }
+
     /// Logger for this class
     ///
     std::shared_ptr<spdlog::logger> logger;
@@ -115,11 +132,12 @@ public:
     ///
     Cell(std::shared_ptr<KeyFrame> left_kf,
          std::shared_ptr<KeyFrame> right_kf,
+         std::weak_ptr<Cell> parent,
          std::shared_ptr<Cell> prev,
          std::shared_ptr<Cell> next,
          const BoundingCage* cage) :
       cage(cage), left_keyframe(left_kf), right_keyframe(right_kf),
-      prev_cell(prev), next_cell(next),
+      prev_cell(prev), next_cell(next), parent_cell(parent),
       logger(spdlog::get(FISH_LOGGER_NAME)) {}
 
     /// Construct a new Cell wrapped in a shared_ptr. Internally, this method is used
@@ -127,6 +145,7 @@ public:
     static std::shared_ptr<Cell> make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
                                            std::shared_ptr<BoundingCage::KeyFrame> right_kf,
                                            const BoundingCage* cage,
+                                           std::weak_ptr<Cell> parent_cell=std::shared_ptr<Cell>(),
                                            std::shared_ptr<Cell> prev_cell=std::shared_ptr<Cell>(),
                                            std::shared_ptr<Cell> next_cell=std::shared_ptr<Cell>());
 
@@ -516,8 +535,13 @@ public:
   /// The new KeyFrame will have a shape which linearly interpolates the
   /// base KeyFrames of the Cell containing its index.
   ///
-  KeyFrameIterator split(double index);
-  KeyFrameIterator split(KeyFrameIterator& it);
+  KeyFrameIterator insert_keyframe(double index);
+  KeyFrameIterator insert_keyframe(KeyFrameIterator& it);
+
+  /// Delete a KeyFrame in the BoundingCage.
+  /// If the KeyFrame is not inserted, this method returns false
+  ///
+  bool remove_keyframe(KeyFrameIterator& it);
 
   /// Get the skeleton vertex positions
   ///

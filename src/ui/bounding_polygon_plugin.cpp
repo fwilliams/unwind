@@ -139,10 +139,13 @@ bool Bounding_Polygon_Menu::post_draw() {
     widget_2d.post_draw(PV, current_cut_index);
   }
 
-  if (ImGui::Button("Split")) {
-    state.cage.split(current_cut_index);
+  if (ImGui::Button("Insert KF")) {
+    state.cage.insert_keyframe(current_cut_index);
   }
-
+  if (ImGui::Button("Remove KF")) {
+    BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+    state.cage.remove_keyframe(it);
+  }
   BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
   if (ImGui::InputInt("vertex: ", &current_vertex, 1, 1)) {
     if (current_vertex < 0) {
