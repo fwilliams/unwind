@@ -15,6 +15,8 @@ class BoundingCage {
 public:
   class KeyFrame;
   class Cell;
+  class KeyFrameIterator;
+  class CellIterator;
 
 private:
 
@@ -71,22 +73,22 @@ public:
     friend class BoundingCage;
 
     /// Reference to the owning BoundingCage
-    const BoundingCage* cage;
+    const BoundingCage* _cage;
 
     /// A Cell is a binary tree and can contain sub-Cells
     ///
-    std::shared_ptr<Cell> left_child;
-    std::shared_ptr<Cell> right_child;
+    std::shared_ptr<Cell> _left_child;
+    std::shared_ptr<Cell> _right_child;
 
     /// Parent cell in the tree
     ///
-    std::weak_ptr<Cell> parent_cell;
+    std::weak_ptr<Cell> _parent_cell;
 
 
     /// The "left" and "right" KeyFrames. The left has a smaller index than the right.
     ///
-    std::shared_ptr<KeyFrame> left_keyframe;
-    std::shared_ptr<KeyFrame> right_keyframe;
+    std::shared_ptr<KeyFrame> _left_keyframe;
+    std::shared_ptr<KeyFrame> _right_keyframe;
 
     /// Indices of the boundary triangles in the
     /// mesh of the BoundingCage which owns this Cell
@@ -104,7 +106,7 @@ public:
 
     /// Returns true if the cell is a leaf node
     ///
-    bool is_leaf() const { return !left_child && !right_child; }
+    bool is_leaf() const { return !_left_child && !_right_child; }
 
     /// Logger for this class
     ///
@@ -122,19 +124,22 @@ public:
          std::shared_ptr<KeyFrame> right_kf,
          std::weak_ptr<Cell> parent,
          const BoundingCage* cage) :
-      cage(cage), left_keyframe(left_kf), right_keyframe(right_kf), parent_cell(parent),
+      _cage(cage), _left_keyframe(left_kf), _right_keyframe(right_kf), _parent_cell(parent),
       logger(spdlog::get(FISH_LOGGER_NAME)) {}
 
     /// Construct a new Cell wrapped in a shared_ptr. Internally, this method is used
     /// to create Cells in lieu of the constructor.
     static std::shared_ptr<Cell> make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
                                            std::shared_ptr<BoundingCage::KeyFrame> right_kf,
-                                           const BoundingCage* cage,
-                                           std::weak_ptr<Cell> parent_cell=std::shared_ptr<Cell>());
+                                           const BoundingCage* _cage,
+                                           std::weak_ptr<Cell> _parent_cell=std::shared_ptr<Cell>());
 
   public:
-    double min_index() const { return left_keyframe->index(); }
-    double max_index() const { return right_keyframe->index(); }
+    const Eigen::MatrixXi& mesh_faces() const { return  _mesh_faces; }
+    const KeyFrameIterator left_keyframe() const { return KeyFrameIterator(_left_keyframe); }
+    const KeyFrameIterator right_keyframe() const { return KeyFrameIterator(_right_keyframe); }
+    double min_index() const { return _left_keyframe->index(); }
+    double max_index() const { return _right_keyframe->index(); }
   };
 
   /// Bidirectional Iterator class used to traverse the linked list of leaf Cells
@@ -153,8 +158,8 @@ public:
     CellIterator& operator=(const CellIterator& other) { cell = other.cell; }
 
     CellIterator operator++() {
-      if (cell && cell->right_keyframe) {
-        cell = cell->right_keyframe->_right_cell.lock();
+      if (cell && cell->_right_keyframe) {
+        cell = cell->_right_keyframe->_right_cell.lock();
       }
       return *this;
     }
@@ -164,8 +169,8 @@ public:
     }
 
     CellIterator operator--() {
-      if (cell && cell->left_keyframe) {
-        cell = cell->left_keyframe->_left_cell.lock();
+      if (cell && cell->_left_keyframe) {
+        cell = cell->_left_keyframe->_left_cell.lock();
       }
       return *this;
     }
@@ -218,7 +223,7 @@ public:
              const Eigen::MatrixXd& pts,
              std::shared_ptr<Cell> cell,
              double idx,
-             const BoundingCage* _cage);
+             BoundingCage *_cage);
 
     /// Explicit constructor:
     /// The local coordinate frame for this KeyFrame is provided explicitly
@@ -228,7 +233,7 @@ public:
              const Eigen::MatrixXd& pts,
              std::shared_ptr<Cell> cell,
              double idx,
-             const BoundingCage *_cage);
+             BoundingCage *_cage);
 
     /// When polygon vertex changes (via `set_point_2d()`), these methods
     /// validate that the change does not create *LOCAL* self intersections.
@@ -240,16 +245,24 @@ public:
     /// If tesselate is true, the polygon for this KeyFrame will be triangulated and 
     /// included in the BoundingCage mesh. We use this for the caps of the cage mesh.
     ///
-    bool init_mesh(bool tesellate=false, bool flip=false);
+    bool init_mesh();
 
     /// Split the KeyFrame polygon along an edge starting at vertex i
     /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i])
     ///
     bool insert_vertex(unsigned i, double t);
 
+    /// If the KeyFrame is an endpoint, then triangulate the bounding polygon, inserting
+    /// whatever necessary vertices in the BoundinCage vertex buffer. The output, faces,
+    /// is an index buffer of the faces of the triangulated polygon indexing into the
+    /// BoundingCage vertex buffer.
+    ///
+    bool triangulate(Eigen::MatrixXi& faces);
+
+
     /// The BoundingCage which owns this KeyFrame
     ///
-    const BoundingCage* _cage;
+    BoundingCage* _cage;
 
     /// State representing the plane for this KeyFrame.
     ///
@@ -267,8 +280,6 @@ public:
     Eigen::VectorXi _mesh_interior_indices;
     Eigen::MatrixXi _mesh_faces;
 
-    bool triangulate(Eigen::MatrixXi& faces);
-
     /// The index of this KeyFrame.
     double _index;
 
@@ -282,14 +293,6 @@ public:
     ///
     std::shared_ptr<spdlog::logger> logger;
 
-    /// Set to true if this KeyFrame is triangulated
-    ///
-    bool _is_triangulated = false;
-    /// Set to true if we need to flip the triangulation of the KeyFrame
-    /// This is used to properly orient triangles on the front of the cage
-    ///
-    bool _is_triangulation_flipped = false;
-
   public:
     /// Returns true if this KeyFrame is part of the bounding cage
     ///
@@ -300,7 +303,7 @@ public:
     /// True if this KeyFrame is at one of the endpoints of its BoundingCage
     ///
     bool is_endpoint() {
-      return _is_triangulated;
+      return in_bounding_cage() && (!left_cell() || !right_cell());
     }
 
     /// Get the normal of the plane of this KeyFrame.
@@ -403,7 +406,7 @@ public:
 
       std::shared_ptr<Cell> right_cell = keyframe->_right_cell.lock();
       if (keyframe && right_cell) {
-        keyframe = right_cell->right_keyframe;
+        keyframe = right_cell->_right_keyframe;
       } else if(!right_cell) {
         keyframe.reset();
       }
@@ -421,7 +424,7 @@ public:
 
       std::shared_ptr<Cell> left_cell = keyframe->_left_cell.lock();
       if (keyframe && left_cell) {
-        keyframe = left_cell->left_keyframe;
+        keyframe = left_cell->_left_keyframe;
       } else if(!left_cell) {
         keyframe.reset();
       }
@@ -460,7 +463,7 @@ public:
   public:
     KeyFrameIterator begin() {
       if(cage->cells.head) {
-        return KeyFrameIterator(cage->cells.head->left_keyframe);
+        return KeyFrameIterator(cage->cells.head->_left_keyframe);
       } else {
         return KeyFrameIterator();
       }
@@ -472,7 +475,7 @@ public:
 
     KeyFrameIterator rbegin() {
       if(cage->cells.tail) {
-        return KeyFrameIterator(cage->cells.tail->right_keyframe);
+        return KeyFrameIterator(cage->cells.tail->_right_keyframe);
       } else {
         return KeyFrameIterator();
       }
@@ -528,22 +531,11 @@ public:
   const Eigen::MatrixXd& skeleton_vertices() const { return SV; }
   const Eigen::MatrixXd& smooth_skeleton_vertices() const { return SV_smooth; }
 
-  /// Get the mesh bounding this cage
+  /// Get a buffer of vertices for the mesh of the BoundingCage
+  /// To get the faces, iterate over the cells and call mesh_faces for each cell.
+  /// Each cell's face buffer indexes into mesh_vertices()
   ///
-  Eigen::MatrixXd vertices() const { return CV.block(0, 0, num_mesh_vertices, 3); }
-  Eigen::MatrixXi faces() const {
-    int num_faces = 0;
-    for (auto cell : cells) {
-      num_faces += cell._mesh_faces.rows();
-    }
-    Eigen::MatrixXi CF(num_faces, 3);
-    int start_idx = 0;
-    for (auto cell : cells) {
-      CF.block(start_idx, 0, cell._mesh_faces.rows(), 3) = cell._mesh_faces;
-      start_idx += cell._mesh_faces.rows();
-    }
-    return CF;
-  }
+  const Eigen::MatrixXd& mesh_vertices() const { return CV; }
 
   /// Get the minimum keyframe index
   ///

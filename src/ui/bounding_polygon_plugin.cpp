@@ -66,8 +66,13 @@ void Bounding_Polygon_Menu::initialize() {
   {
     viewer->data().clear();
     viewer->data().set_face_based(true);
-    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
-    viewer->selected_data_index = push_mesh_id;
+    Eigen::MatrixXi faces(0, 3);
+    for (auto cell : state.cage.cells) {
+      int idx = faces.rows();
+      faces.conservativeResize(faces.rows()+cell.mesh_faces().rows(), 3);
+      faces.block(idx, 0, cell.mesh_faces().rows(), 3) = cell.mesh_faces();
+    }
+    viewer->data().set_mesh(state.cage.mesh_vertices(), faces);
   }
 
   // Initialize the 2d cross section widget
@@ -120,8 +125,6 @@ bool Bounding_Polygon_Menu::post_draw() {
                ImGuiWindowFlags_AlwaysAutoResize |
                ImGuiWindowFlags_NoTitleBar);
 
-  const double delta = (state.cage.max_index() - state.cage.min_index()) / (2*state.cage.skeleton_vertices().rows());
-
   if (ImGui::Button("< Prev")) {
     BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
     it--;
@@ -147,10 +150,12 @@ bool Bounding_Polygon_Menu::post_draw() {
 
   if (ImGui::Button("Insert KF")) {
     state.cage.insert_keyframe(current_cut_index);
+    glfwPostEmptyEvent();
   }
   if (ImGui::Button("Remove KF")) {
     BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
     state.cage.remove_keyframe(it);
+    glfwPostEmptyEvent();
   }
   BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
   if (ImGui::InputInt("vertex: ", &current_vertex, 1, 1)) {
@@ -165,25 +170,30 @@ bool Bounding_Polygon_Menu::post_draw() {
   if (ImGui::Button("+x")) {
     Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(1, 0);
     it->move_point_2d(current_vertex, pt, true, false);
+    glfwPostEmptyEvent();
   }
   ImGui::SameLine();
   if (ImGui::Button("-x")) {
     Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(-1, 0);
     it->move_point_2d(current_vertex, pt, true, false);
+    glfwPostEmptyEvent();
   }
   ImGui::SameLine();
   if (ImGui::Button("+y")) {
     Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, 1);
     it->move_point_2d(current_vertex, pt, true, false);
+    glfwPostEmptyEvent();
   }
   ImGui::SameLine();
   if (ImGui::Button("-y")) {
     Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, -1);
     it->move_point_2d(current_vertex, pt, true, false);
+    glfwPostEmptyEvent();
   }
   ImGui::SameLine();
   if (ImGui::Button("Subdiv")) {
     state.cage.add_boundary_vertex(current_vertex, 0.5);
+    glfwPostEmptyEvent();
   }
 
   ImGui::End();
@@ -208,31 +218,40 @@ bool Bounding_Polygon_Menu::pre_draw() {
     for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
       viewer->data().add_points(kf.center(), ColorRGB::GREEN);
       Eigen::MatrixXd V3d = kf.vertices_3d();
+      Eigen::RowVector3d clr = kf.index() == current_cut_index ? ColorRGB::ORANGERED : ColorRGB::RED;
       for (int i = 0; i < V3d.rows(); i++) {
-        Eigen::RowVector3d c = (i == current_vertex ? ColorRGB::AQUA : ColorRGB::RED);
+        Eigen::RowVector3d c = (i == current_vertex ? ColorRGB::CYAN : clr);
         viewer->data().add_points(V3d.row(i), c);
       }
     }
 
     for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
       Eigen::Matrix3d cf = kf->orientation();
-
-      viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(0), ColorRGB::RED);
-      viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(1), ColorRGB::GREEN);
-      viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(2), ColorRGB::BLUE);
+      if (kf->index() != current_cut_index) {
+        viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(0), ColorRGB::RED);
+        viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(1), ColorRGB::GREEN);
+        viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(2), ColorRGB::BLUE);
+      } else {
+        viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(0), ColorRGB::CYAN);
+        viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(1), ColorRGB::YELLOW);
+        viewer->data().add_edges(kf->center(), kf->center() + 100.0*cf.row(2), ColorRGB::MAGENTA);
+      }
     }
 
     viewer->data().point_size = 10.0;
-//    viewer->data().add_points(state.cage.vertices(), ColorRGB::RED);
     BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
-    Eigen::MatrixXd P1, P2;
-    edge_endpoints(state.cage.vertices(), state.cage.faces(), P1, P2);
-    viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+
+    for (auto cell : state.cage.cells) {
+      Eigen::MatrixXd P1, P2;
+      edge_endpoints(state.cage.mesh_vertices(), cell.mesh_faces(), P1, P2);
+      viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
+    }
+
     viewer->data().add_points(kf->center(), ColorRGB::RED);
-    viewer->data().add_points(kf->vertices_3d(), ColorRGB::LIGHT_GREEN);
-    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(0), ColorRGB::RED);
-    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(1), ColorRGB::GREEN);
-    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(2), ColorRGB::BLUE);
+    viewer->data().add_points(kf->vertices_3d(), ColorRGB::ORANGERED);
+    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(0), ColorRGB::CYAN);
+    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(1), ColorRGB::YELLOW);
+    viewer->data().add_edges(kf->center(), kf->center() + 100*kf->orientation().row(2), ColorRGB::MAGENTA);
     viewer->selected_data_index = push_overlay_id;
   }
 
@@ -241,7 +260,13 @@ bool Bounding_Polygon_Menu::pre_draw() {
   {
     viewer->data().clear();
     viewer->data().set_face_based(true);
-    viewer->data().set_mesh(state.cage.vertices(), state.cage.faces());
+    Eigen::MatrixXi faces(0, 3);
+    for (auto cell : state.cage.cells) {
+      int idx = faces.rows();
+      faces.conservativeResize(faces.rows()+cell.mesh_faces().rows(), 3);
+      faces.block(idx, 0, cell.mesh_faces().rows(), 3) = cell.mesh_faces();
+    }
+    viewer->data().set_mesh(state.cage.mesh_vertices(), faces);
     viewer->selected_data_index = push_overlay_id;
   }
 
