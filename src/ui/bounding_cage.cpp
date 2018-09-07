@@ -764,7 +764,7 @@ bool BoundingCage::update_vertex(int i, const Eigen::RowVector3d& v) {
   CV.row(i) = v;
 }
 
-bool BoundingCage::add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
+bool BoundingCage::insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
   VI.conservativeResize(V.rows());
 
   if (CV_free_list.empty()) {
@@ -812,7 +812,7 @@ bool BoundingCage::replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& V
       CV.row(VI[i]) = V.row(i);
     }
     Eigen::VectorXi newVI(num_new_vertices, 3);
-    add_vertices(V.block(num_vi, 0, num_new_vertices, 3), newVI);
+    insert_vertices(V.block(num_vi, 0, num_new_vertices, 3), newVI);
     VI.block(num_vi, 0, num_new_vertices, 3) = newVI;
   }
   // 2) VI has more vertices than V
