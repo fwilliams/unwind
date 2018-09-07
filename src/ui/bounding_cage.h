@@ -78,12 +78,6 @@ public:
     std::shared_ptr<Cell> left_child;
     std::shared_ptr<Cell> right_child;
 
-    /// Cells which are leaves of the tree are linked together in KeyFrame index order.
-    /// This linked list of leaf nodes is used to construct the mesh of the bounding cage
-    ///
-    std::shared_ptr<Cell> next_cell;
-    std::shared_ptr<Cell> prev_cell;
-
     /// Parent cell in the tree
     ///
     std::weak_ptr<Cell> parent_cell;
@@ -127,17 +121,18 @@ public:
     ///
     bool init_mesh();
 
+    /// Update the mesh for this cell when the cell changes
+    ///
+    bool update_mesh();
+
     /// Construct a new Cell. Don't call this directly, instead use the factory
     /// function `make_cell()`.
     ///
     Cell(std::shared_ptr<KeyFrame> left_kf,
          std::shared_ptr<KeyFrame> right_kf,
          std::weak_ptr<Cell> parent,
-         std::shared_ptr<Cell> prev,
-         std::shared_ptr<Cell> next,
          const BoundingCage* cage) :
-      cage(cage), left_keyframe(left_kf), right_keyframe(right_kf),
-      prev_cell(prev), next_cell(next), parent_cell(parent),
+      cage(cage), left_keyframe(left_kf), right_keyframe(right_kf), parent_cell(parent),
       logger(spdlog::get(FISH_LOGGER_NAME)) {}
 
     /// Construct a new Cell wrapped in a shared_ptr. Internally, this method is used
@@ -145,9 +140,7 @@ public:
     static std::shared_ptr<Cell> make_cell(std::shared_ptr<BoundingCage::KeyFrame> left_kf,
                                            std::shared_ptr<BoundingCage::KeyFrame> right_kf,
                                            const BoundingCage* cage,
-                                           std::weak_ptr<Cell> parent_cell=std::shared_ptr<Cell>(),
-                                           std::shared_ptr<Cell> prev_cell=std::shared_ptr<Cell>(),
-                                           std::shared_ptr<Cell> next_cell=std::shared_ptr<Cell>());
+                                           std::weak_ptr<Cell> parent_cell=std::shared_ptr<Cell>());
 
   public:
     double min_index() const { return left_keyframe->index(); }
@@ -170,8 +163,8 @@ public:
     CellIterator& operator=(const CellIterator& other) { cell = other.cell; }
 
     CellIterator operator++() {
-      if (cell) {
-        cell = cell->next_cell;
+      if (cell && cell->right_keyframe) {
+        cell = cell->right_keyframe->_right_cell.lock();
       }
       return *this;
     }
@@ -181,8 +174,8 @@ public:
     }
 
     CellIterator operator--() {
-      if (cell) {
-        cell = cell->prev_cell;
+      if (cell && cell->left_keyframe) {
+        cell = cell->left_keyframe->_left_cell.lock();
       }
       return *this;
     }
@@ -198,7 +191,6 @@ public:
     bool operator!=(const CellIterator& other) const {
       return cell != other.cell;
     }
-
     std::shared_ptr<Cell> operator->() {
       return cell;
     }
@@ -294,10 +286,11 @@ public:
     double _index;
 
     /// Pointers to the Cells bounidng this keyframe
-    /// cells[0] is to the left, and cells[1] is to the right
     ///
-    std::array<std::weak_ptr<BoundingCage::Cell>, 2> _cells;
-
+    std::weak_ptr<Cell> _left_cell;
+    std::weak_ptr<Cell> _right_cell;
+    std::shared_ptr<Cell> left_cell() { return _left_cell.lock(); }
+    std::shared_ptr<Cell> right_cell() { return _right_cell.lock(); }
     /// Logger for this class
     ///
     std::shared_ptr<spdlog::logger> logger;
@@ -421,7 +414,7 @@ public:
         return *this;
       }
 
-      std::shared_ptr<Cell> right_cell = keyframe->_cells[1].lock();
+      std::shared_ptr<Cell> right_cell = keyframe->_right_cell.lock();
       if (keyframe && right_cell) {
         keyframe = right_cell->right_keyframe;
       } else if(!right_cell) {
@@ -439,7 +432,7 @@ public:
         return *this;
       }
 
-      std::shared_ptr<Cell> left_cell = keyframe->_cells[0].lock();
+      std::shared_ptr<Cell> left_cell = keyframe->_left_cell.lock();
       if (keyframe && left_cell) {
         keyframe = left_cell->left_keyframe;
       } else if(!left_cell) {

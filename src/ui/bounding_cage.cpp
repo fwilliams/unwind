@@ -75,8 +75,8 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
   _center = center;
   _vertices_2d = pts;
 
-  _cells[0] = cell;
-  _cells[1] = cell;
+  _left_cell = cell;
+  _right_cell = cell;
 
   logger = spdlog::get(FISH_LOGGER_NAME);
 }
@@ -93,8 +93,8 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
   _center = center;
   _vertices_2d = pts;
 
-  _cells[0] = cell;
-  _cells[1] = cell;
+  _left_cell = cell;
+  _right_cell = cell;
 
   logger = spdlog::get(FISH_LOGGER_NAME);
 }
@@ -160,13 +160,12 @@ bool BoundingCage::KeyFrame::validate_points_2d() {
 
 bool BoundingCage::KeyFrame::validate_cage() {
   bool ret = true;
-  std::shared_ptr<Cell> left_cell = _cells[0].lock();
-  std::shared_ptr<Cell> right_cell = _cells[1].lock();
+  // TODO: Validation code
 
-  if (left_cell) {
+  if (left_cell()) {
   }
 
-  if(right_cell) {
+  if(right_cell()) {
   }
 
   return ret;
@@ -278,10 +277,8 @@ bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
 std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_ptr<KeyFrame> left_kf,
                                                                   std::shared_ptr<KeyFrame> right_kf,
                                                                   const BoundingCage* cage,
-                                                                  std::weak_ptr<Cell> parent,
-                                                                  std::shared_ptr<Cell> prev,
-                                                                  std::shared_ptr<Cell> next) {
-  std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, parent, prev, next, cage));
+                                                                  std::weak_ptr<Cell> parent) {
+  std::shared_ptr<Cell> ret(new Cell(left_kf, right_kf, parent, cage));
 
   if (!left_kf || !right_kf) {
     std::shared_ptr<spdlog::logger> logger = ret->logger;
@@ -291,8 +288,8 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
     return ret;
   }
 
-  left_kf->_cells[1] = ret;
-  right_kf->_cells[0] = ret;
+  left_kf->_right_cell = ret;
+  right_kf->_left_cell = ret;
 
   // TODO: Self intersection test
 
@@ -304,7 +301,7 @@ bool BoundingCage::Cell::init_mesh() {
 
   const int num_new_faces = 2 * left_keyframe->vertices_2d().rows();
   logger->trace("init_mesh adding 2*{} faces", left_keyframe->vertices_2d().rows());
-  _mesh_faces.resize(num_new_faces, 3);
+  _mesh_faces.conservativeResize(num_new_faces, 3);
 
   int fcount = 0;
   for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
@@ -321,6 +318,11 @@ bool BoundingCage::Cell::init_mesh() {
 
   return true;
 }
+
+bool BoundingCage::Cell::update_mesh() {
+  return init_mesh();
+}
+
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
   // The index of the keyframe is out of range, since this method is called, internally,
@@ -355,27 +357,16 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
       return std::shared_ptr<KeyFrame>();
     }
 
-    // Fix the indices of the children to keep the leaf-list valid
-    left_child->prev_cell = prev_cell;
-    left_child->next_cell = right_child;
-    right_child->prev_cell = left_child;
-    right_child->next_cell = next_cell;
-    if (next_cell) { next_cell->prev_cell = right_child; }
-    if (prev_cell) { prev_cell->next_cell = left_child; }
 
     // Fix the cell pointers in the new keyframe
-    left_keyframe->_cells[1] = left_child;
-    right_keyframe->_cells[0] = right_child;
-    keyframe->_cells[0] = left_child;
-    keyframe->_cells[1] = right_child;
+    left_keyframe->_right_cell = left_child;
+    right_keyframe->_left_cell = right_child;
+    keyframe->_left_cell = left_child;
+    keyframe->_right_cell = right_child;
 
     // If we added a cell with a different normal than the left key-frame, we need to recompute the
     // the local coordinate frame of the right keyframe
     right_keyframe->_orientation = parallel_transport(*right_child->left_keyframe, right_keyframe->normal());
-
-    // This cell is no longer a leaf, so clear its linked list pointers
-    next_cell.reset();
-    prev_cell.reset();
 
     // We've successfully inserted, update the BoundingCage mesh
     keyframe->init_mesh();
@@ -404,38 +395,6 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
 }
 
 bool BoundingCage::Cell::merge() {
-  std::shared_ptr<Cell> search = shared_from_this();
-  while(search->left_child) {
-    search = search->left_child;
-  }
-  assert(search->is_leaf());
-
-  if (search->prev_cell) {
-    search->prev_cell->next_cell = shared_from_this();
-    prev_cell = search->prev_cell;
-  } else {
-    prev_cell.reset();
-  }
-  search->left_keyframe->_cells[1] = shared_from_this();
-  left_keyframe = search->left_keyframe;
-
-  search = shared_from_this();
-  while(search->right_child) {
-    search = search->right_child;
-  }
-  assert(search->is_leaf());
-  if (search->next_cell) {
-    search->next_cell->prev_cell = shared_from_this();
-    next_cell = search->next_cell;
-  } else {
-    next_cell.reset();
-  }
-  search->right_keyframe->_cells[0] = shared_from_this();
-  right_keyframe = search->right_keyframe;
-
-  right_child.reset();
-  left_child.reset();
-
   return true;
 }
 
@@ -702,8 +661,8 @@ bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
 }
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared_ptr<BoundingCage::KeyFrame> split_kf) {
-  std::shared_ptr<Cell> left_cell = split_kf->_cells[0].lock();
-  std::shared_ptr<Cell> right_cell = split_kf->_cells[1].lock();
+  std::shared_ptr<Cell> left_cell = split_kf->left_cell();
+  std::shared_ptr<Cell> right_cell = split_kf->right_cell();
 
   // A KeyFrame should never have both left and right Cell pointers set to null
   if(!left_cell && !right_cell) {
@@ -719,7 +678,7 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared
 
   // Otherwise, the KeyFrame has not been inserted
   // into the BoundingCage, so insert it.
-  assert("KeyFrame cells not equal" && split_kf->_cells[0] == split_kf->_cells[1]);
+  assert("KeyFrame cells not equal" && split_kf->left_cell() == split_kf->right_cell());
   std::shared_ptr<Cell> cell(left_cell);
   if (!cell->split(split_kf)) {
     logger->error("Failed to split Cell with KeyFrame.");
@@ -753,25 +712,43 @@ bool BoundingCage::remove_keyframe(KeyFrameIterator& it) {
    return false;
  }
 
- // Find parent cell
- std::shared_ptr<Cell> cell = root->find(kf->index());
- if (!cell) {
-   logger->error("Could not find KeyFrame at index {} even though it should be in the BoundingCage.", kf->index());
-   assert(false);
-   return false;
- }
- if (cell == root) {
-   logger->warn("Cannot delete first and last KeyFrame");
+ if (kf->is_endpoint()) {
+   logger->warn("Cannot remove enpoint KeyFrame");
    return false;
  }
 
- std::shared_ptr<Cell> parent = cell->parent_cell.lock();
- if(!parent) {
-  logger->warn("Parent Cell is null.");
-  return false;
+ std::shared_ptr<Cell> next_cell = kf->right_cell();
+ std::shared_ptr<Cell> prev_cell = kf->left_cell();
+ if (!next_cell || !prev_cell) {
+   logger->error("next cell or prev cell was null");
+   return false;
  }
 
- return parent->merge();
+ std::shared_ptr<KeyFrame> next_keyframe = next_cell->right_keyframe;
+ assert(next_cell);
+ assert(prev_cell);
+
+ prev_cell->right_keyframe = next_keyframe;
+ next_keyframe->_left_cell = prev_cell;
+
+ next_cell->update_mesh();
+ prev_cell->update_mesh();
+
+ std::shared_ptr<Cell> next_parent = next_cell->parent_cell.lock();
+
+ std::shared_ptr<Cell> update = next_parent;
+ while (update && update->left_keyframe == kf) {
+   update->left_keyframe = next_keyframe;
+   update = update->parent_cell.lock();
+ }
+
+ update = prev_cell->parent_cell.lock();
+ while(update && update->right_keyframe == kf) {
+   update->right_keyframe = next_keyframe;
+   update = update->parent_cell.lock();
+ }
+
+ return true;
 }
 
 bool BoundingCage::update_vertex(int i, const Eigen::RowVector3d& v) {

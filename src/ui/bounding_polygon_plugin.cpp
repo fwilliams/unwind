@@ -123,7 +123,10 @@ bool Bounding_Polygon_Menu::post_draw() {
   const double delta = (state.cage.max_index() - state.cage.min_index()) / (2*state.cage.skeleton_vertices().rows());
 
   if (ImGui::Button("< Prev")) {
-    current_cut_index = std::max(current_cut_index - delta, 0.0);
+    BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+    it--;
+    if (it == state.cage.keyframes.end()) { it = state.cage.keyframes.begin(); }
+    current_cut_index = it->index();
   }
   ImGui::SameLine();
   if (ImGui::SliderFloat("#vertexid", &current_cut_index, (float)state.cage.min_index(), (float)state.cage.max_index())) {
@@ -131,7 +134,10 @@ bool Bounding_Polygon_Menu::post_draw() {
   }
   ImGui::SameLine();
   if (ImGui::Button("Next >")) {
-    current_cut_index = std::min(current_cut_index + delta, state.cage.max_index());
+    BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+    it++;
+    if (it == state.cage.keyframes.end()) { it = state.cage.keyframes.rbegin(); }
+    current_cut_index = it->index();
   }
 
   ImGui::Checkbox("Show slice view", &show_slice_view);
