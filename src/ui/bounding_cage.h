@@ -113,10 +113,6 @@ public:
     /// This method initializes the BoundingCage mesh for this Cell, allocating new
     /// storage for the face information
     ///
-    bool init_mesh();
-
-    /// Update the mesh for this cell when the cell changes
-    ///
     bool update_mesh();
 
     /// Construct a new Cell. Don't call this directly, instead use the factory
@@ -246,11 +242,6 @@ public:
     ///
     bool init_mesh(bool tesellate=false, bool flip=false);
 
-    /// Update the BoundingCage mesh when the KeyFrame changes. This is a no-op if
-    /// the KeyFrame is not triangulated.
-    ///
-    bool update_mesh();
-
     /// Split the KeyFrame polygon along an edge starting at vertex i
     /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i])
     ///
@@ -275,6 +266,8 @@ public:
     Eigen::VectorXi _mesh_boundary_indices;
     Eigen::VectorXi _mesh_interior_indices;
     Eigen::MatrixXi _mesh_faces;
+
+    bool triangulate(Eigen::MatrixXi& faces);
 
     /// The index of this KeyFrame.
     double _index;
@@ -539,23 +532,16 @@ public:
   ///
   Eigen::MatrixXd vertices() const { return CV.block(0, 0, num_mesh_vertices, 3); }
   Eigen::MatrixXi faces() const {
-    std::shared_ptr<KeyFrame> head_kf = cells.head->left_keyframe;
-    std::shared_ptr<KeyFrame> tail_kf = cells.tail->right_keyframe;
-
-    int num_faces = head_kf->_mesh_faces.rows() + tail_kf->_mesh_faces.rows();
+    int num_faces = 0;
     for (auto cell : cells) {
       num_faces += cell._mesh_faces.rows();
     }
     Eigen::MatrixXi CF(num_faces, 3);
     int start_idx = 0;
-    CF.block(start_idx, 0, head_kf->_mesh_faces.rows(), 3) = head_kf->_mesh_faces;
-    start_idx += head_kf->_mesh_faces.rows();
     for (auto cell : cells) {
       CF.block(start_idx, 0, cell._mesh_faces.rows(), 3) = cell._mesh_faces;
       start_idx += cell._mesh_faces.rows();
     }
-    CF.block(start_idx, 0, tail_kf->_mesh_faces.rows(), 3) = tail_kf->_mesh_faces;
-
     return CF;
   }
 

@@ -126,7 +126,7 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bo
       return false;
   }
 
-  return update_mesh();
+  return left_cell()->update_mesh() && right_cell()->update_mesh();
 }
 
 bool BoundingCage::KeyFrame::validate_points_2d() {
@@ -180,14 +180,9 @@ bool BoundingCage::KeyFrame::init_mesh(bool tessellate, bool flip) {
   // Triangulate the KeyFrame if we ask for it
   _is_triangulated = tessellate;
   _is_triangulation_flipped = flip;
-  return update_mesh();
 }
 
-bool BoundingCage::KeyFrame::update_mesh() {
-  if (!_is_triangulated) {
-    return true;
-  }
-
+bool BoundingCage::KeyFrame::triangulate(Eigen::MatrixXi &faces) {
   // Compute a new triangulation of the KeyFrame boundary
   logger->trace("Re-triangulating KeyFrame...");
   Eigen::MatrixXi E(_vertices_2d.rows(), 2);
@@ -206,6 +201,7 @@ bool BoundingCage::KeyFrame::update_mesh() {
 
   BoundingCage* bc = (BoundingCage*) _cage;
 
+  // New Vertex positions added by the triangulation
   Eigen::MatrixXd newV(V.rows(), 3);
   Eigen::VectorXi vmap(V.rows());
   int vcount = 0;
@@ -227,24 +223,25 @@ bool BoundingCage::KeyFrame::update_mesh() {
   newV.conservativeResize(vcount, 3);
   bc->replace_vertices(newV, _mesh_interior_indices);
 
-  _mesh_faces.resize(F.rows(), 3);
+  faces.resize(F.rows(), 3);
   for (int i = 0; i < F.rows(); i++) {
     for (int j = 0; j < 3; j++) {
       const int vid = F(i, j);
       if (VMout[vid] == 0) {
-        _mesh_faces(i, j) = _mesh_interior_indices[vmap[vid]];
+        faces(i, j) = _mesh_interior_indices[vmap[vid]];
       } else {
-        _mesh_faces(i, j) = _mesh_boundary_indices[vmap[vid]];
+        faces(i, j) = _mesh_boundary_indices[vmap[vid]];
       }
     }
   }
 
   if (_is_triangulation_flipped) {
-    _mesh_faces.col(2).swap(_mesh_faces.col(1));
+    faces.col(2).swap(faces.col(1));
   }
 
   return true;
 }
+
 
 bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
   logger->trace("splitting keyframe at index {}", idx);
@@ -295,12 +292,15 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   return ret;
 }
 
-bool BoundingCage::Cell::init_mesh() {
+bool BoundingCage::Cell::update_mesh() {
   assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
 
-  const int num_new_faces = 2 * left_keyframe->vertices_2d().rows();
-  logger->trace("init_mesh adding 2*{} faces", left_keyframe->vertices_2d().rows());
-  _mesh_faces.conservativeResize(num_new_faces, 3);
+  Eigen::MatrixXi left_kf_faces, right_kf_faces;
+  left_keyframe->triangulate(left_kf_faces);
+  right_keyframe->triangulate(right_kf_faces);
+
+  const int num_new_faces = 2 * left_keyframe->vertices_2d().rows() + left_kf_faces.rows() + right_kf_faces.rows();
+  _mesh_faces.resize(num_new_faces, 3);
 
   int fcount = 0;
   for (int i = 0; i < left_keyframe->vertices_2d().rows(); i++) {
@@ -314,12 +314,11 @@ bool BoundingCage::Cell::init_mesh() {
           right_keyframe->_mesh_boundary_indices[next_i],
           left_keyframe->_mesh_boundary_indices[next_i]);
   }
+  _mesh_faces.block(fcount, 0, left_kf_faces.rows(), 3) = left_kf_faces;
+  fcount += left_kf_faces.rows();
+  _mesh_faces.block(fcount, 0, right_kf_faces.rows(), 3) = right_kf_faces;
 
   return true;
-}
-
-bool BoundingCage::Cell::update_mesh() {
-  return init_mesh();
 }
 
 
@@ -369,8 +368,8 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
 
     // We've successfully inserted, update the BoundingCage mesh
     keyframe->init_mesh();
-    left_child->init_mesh();
-    right_child->init_mesh();
+    left_child->update_mesh();
+    right_child->update_mesh();
 
     return keyframe;
 
@@ -547,7 +546,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
   front_keyframe->init_mesh(true /*triangulate*/, !ccw_orientation /*flip triangulation*/);
   back_keyframe->init_mesh(true /*triangulate*/, ccw_orientation /*flip_triangulation*/);
-  root->init_mesh();
+  root->update_mesh();
 
   cells.head = root;
   cells.tail = cells.head;
@@ -835,7 +834,7 @@ bool BoundingCage::add_boundary_vertex(unsigned idx, double t) {
 
   for (Cell& cell : cells) {
     logger->trace("Updating cell");
-    cell.init_mesh();
+    cell.update_mesh();
   }
 
   return true;
