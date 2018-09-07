@@ -91,7 +91,6 @@ public:
     /// Indices of the boundary triangles in the
     /// mesh of the BoundingCage which owns this Cell
     ///
-    Eigen::VectorXi mesh_face_indexes;
     Eigen::MatrixXi _mesh_faces;
 
     /// Split the Cell into two cells divided by key_frame.
@@ -99,11 +98,6 @@ public:
     /// returns false and the Cell remains unchanged.
     ///
     std::shared_ptr<KeyFrame> split(std::shared_ptr<KeyFrame> key_frame);
-
-    /// Merge all the children of this cell into one cell
-    ///
-    bool merge();
-
     /// Find the cell for the given index
     ///
     std::shared_ptr<Cell> find(double index);

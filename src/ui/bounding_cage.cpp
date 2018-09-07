@@ -126,7 +126,6 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bo
       return false;
   }
 
-
   return update_mesh();
 }
 
@@ -392,10 +391,6 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
     return std::shared_ptr<KeyFrame>();;
   }
   assert(false);
-}
-
-bool BoundingCage::Cell::merge() {
-  return true;
 }
 
 std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::find(double index) {
