@@ -50,7 +50,7 @@ private:
   int num_mesh_vertices = 0;
 
   bool update_vertex(int i, const Eigen::RowVector3d& v);
-  bool add_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
+  bool insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
   bool replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
 
 public:
@@ -251,6 +251,11 @@ public:
     /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i])
     ///
     bool insert_vertex(unsigned i, double t);
+
+    /// Delete the vertex at position i. If the deletion causes the BoundingCage to become invalid, then this
+    /// method returns false.
+    ///
+    bool delete_vertex(unsigned i, bool validate_2d=true, bool validate_3d=true);
 
     /// If the KeyFrame is an endpoint, then triangulate the bounding polygon, inserting
     /// whatever necessary vertices in the BoundinCage vertex buffer. The output, faces,
@@ -524,7 +529,7 @@ public:
   /// Delete a KeyFrame in the BoundingCage.
   /// If the KeyFrame is not inserted, this method returns false
   ///
-  bool remove_keyframe(KeyFrameIterator& it);
+  bool delete_keyframe(KeyFrameIterator& it);
 
   /// Get the skeleton vertex positions
   ///
@@ -557,7 +562,8 @@ public:
     return root->max_index();
   }
 
-  bool add_boundary_vertex(unsigned i, double t);
+  bool insert_boundary_vertex(unsigned i, double t);
+  bool delete_boundary_vertex(unsigned i);
 
   /// Get a KeyFrame at the specified index.
   /// The KeyFrame may not yet be inserted into the bounding cage.

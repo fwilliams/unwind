@@ -154,7 +154,7 @@ bool Bounding_Polygon_Menu::post_draw() {
   }
   if (ImGui::Button("Remove KF")) {
     BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
-    state.cage.remove_keyframe(it);
+    state.cage.delete_keyframe(it);
     glfwPostEmptyEvent();
   }
   BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
@@ -191,8 +191,13 @@ bool Bounding_Polygon_Menu::post_draw() {
     glfwPostEmptyEvent();
   }
   ImGui::SameLine();
-  if (ImGui::Button("Subdiv")) {
-    state.cage.add_boundary_vertex(current_vertex, 0.5);
+  if (ImGui::Button("Add Vertex")) {
+    state.cage.insert_boundary_vertex(current_vertex, 0.5);
+    glfwPostEmptyEvent();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Rmv Vertex")) {
+    state.cage.delete_boundary_vertex(current_vertex);
     glfwPostEmptyEvent();
   }
 
