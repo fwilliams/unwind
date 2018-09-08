@@ -1,350 +1,354 @@
 #include "meshing_plugin.h"
 
-#include <igl/copyleft/marching_cubes.h>
-#include <igl/writeOBJ.h>
-#include <igl/readOBJ.h>
-#include <igl/boundary_facets.h>
-#include <igl/components.h>
-
-#include <imgui/imgui.h>
-#include <imgui/imgui_internal.h>
+#include "make_tet_mesh.h"
+#include "make_signed_distance.h"
+#include "state.h"
+#include "trimesh.h"
 
 #include <Eigen/Core>
-
-#include <vector>
-#include <thread>
-#include <type_traits>
-#include <cstdlib>
-
 #include <GLFW/glfw3.h>
-
+#include <igl/boundary_facets.h>
+#include <igl/components.h>
+#include <igl/readOBJ.h>
+#include <igl/writeOBJ.h>
+#include <igl/copyleft/marching_cubes.h>
+#include <imgui/imgui.h>
+#include <vector>
 #include <vor3d/CompressedVolume.h>
 #include <vor3d/VoronoiVorPower.h>
 
-#include "make_tet_mesh.h"
-#include "make_signed_distance.h"
-#include "trimesh.h"
+namespace {
 
+void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d,
+                      vor3d::CompressedVolume& dexels)
+{
+    dexels = vor3d::CompressedVolume(Eigen::Vector3d(0.0, 0.0, 0.0),
+        Eigen::Vector3d(d, h, w), 1.0, 0);
 
-static void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d, vor3d::CompressedVolume& dexels) {
-  dexels = vor3d::CompressedVolume(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(d, h, w), 1.0, 0.0);
-
-  int start_idx = 0;
-  for (int z = 0; z < d; z++) {
-    for (int y = 0; y < h; y++) {
-      bool outside = true;
-      int seg_entry = 0;
-      for (int x = 0; x < w; x++) {
-        if (outside && scalars[start_idx] > 0.0) {
-          seg_entry = x;
-          outside = false;
-        } else if (!outside && scalars[start_idx] <= 0.0) {
-          dexels.appendSegment(z, y, seg_entry, x, -1);
-          outside = true;
+    int start_idx = 0;
+    for (int z = 0; z < d; z++) {
+        for (int y = 0; y < h; y++) {
+            bool outside = true;
+            int seg_entry = 0;
+            for (int x = 0; x < w; x++) {
+                if (outside && scalars[start_idx] > 0.0) {
+                    seg_entry = x;
+                    outside = false;
+                }
+                else if (!outside && scalars[start_idx] <= 0.0) {
+                    dexels.appendSegment(z, y, seg_entry, x, -1);
+                    outside = true;
+                }
+                start_idx += 1;
+            }
         }
-        start_idx += 1;
-      }
     }
-  }
 
 }
 
-static void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume &dexels,
+void dexels_to_mesh(int n_samples, const vor3d::CompressedVolume& dexels,
                     Eigen::MatrixXd& V, Eigen::MatrixXi& F)
 {
-  std::vector<Eigen::Vector3d> grid_pts;
-  std::vector<double> grid_vals;
+    std::vector<Eigen::Vector3d> grid_pts;
+    std::vector<double> grid_vals;
 
-  for (int x = -1; x < dexels.gridSize()[0]+1; ++x) { // z axis
-    for (int y = -1; y < dexels.gridSize()[1]+1; ++y) {   // y axis
-      for (int z = -1; z < n_samples+1; ++z) {                // x axis
-        if (x == -1 || y == -1 || z == -1 || x == dexels.gridSize()[0] || y == dexels.gridSize()[1] || z == n_samples) {
-          Eigen::Vector3d grid_ctr;
-          grid_ctr[0] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
-          grid_ctr[1] = dexels.origin()[1] + (y+0.5) * (dexels.extent()[1]/dexels.gridSize()[1]);
-          grid_ctr[2] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
-          grid_pts.push_back(grid_ctr);
-          grid_vals.push_back(1);
-          continue;
+    for (int x = -1; x < dexels.gridSize()[0] + 1; ++x) { // z axis
+        for (int y = -1; y < dexels.gridSize()[1] + 1; ++y) {   // y axis
+            for (int z = -1; z < n_samples + 1; ++z) {                // x axis
+                if (x == -1 || y == -1 || z == -1 || x == dexels.gridSize()[0] || y == dexels.gridSize()[1] || z == n_samples) {
+                    Eigen::Vector3d grid_ctr;
+                    grid_ctr[0] = dexels.origin()[2] + (z + 0.5) * (dexels.extent()[2] / n_samples);
+                    grid_ctr[1] = dexels.origin()[1] + (y + 0.5) * (dexels.extent()[1] / dexels.gridSize()[1]);
+                    grid_ctr[2] = dexels.origin()[0] + (x + 0.5) * (dexels.extent()[0] / dexels.gridSize()[0]);
+                    grid_pts.push_back(grid_ctr);
+                    grid_vals.push_back(1);
+                    continue;
+                }
+                Eigen::Vector3d grid_ctr;
+                grid_ctr[0] = dexels.origin()[2] + (z + 0.5) * (dexels.extent()[2] / n_samples);
+                grid_ctr[1] = dexels.origin()[1] + (y + 0.5) * (dexels.extent()[1] / dexels.gridSize()[1]);
+                grid_ctr[2] = dexels.origin()[0] + (x + 0.5) * (dexels.extent()[0] / dexels.gridSize()[0]);
+
+                grid_pts.push_back(grid_ctr);
+
+                const std::vector<vor3d::Scalar>& d = dexels.at(x, y);
+                int idx = -1;
+                for (int i = 0; i < d.size(); i++) {
+                    if (grid_ctr[0] < d[i]) {
+                        idx = i - 1;
+                        break;
+                    }
+                }
+
+                if (idx < 0) {
+                    grid_vals.push_back(1);
+                    continue;
+                }
+
+                if (idx % 2 == 0) {
+                    grid_vals.push_back(-1);
+                }
+                else {
+                    grid_vals.push_back(1);
+                }
+            }
         }
-        Eigen::Vector3d grid_ctr;
-        grid_ctr[0] = dexels.origin()[2] + (z+0.5) * (dexels.extent()[2]/n_samples);
-        grid_ctr[1] = dexels.origin()[1] + (y+0.5) * (dexels.extent()[1]/dexels.gridSize()[1]);
-        grid_ctr[2] = dexels.origin()[0] + (x+0.5) * (dexels.extent()[0]/dexels.gridSize()[0]);
-
-        grid_pts.push_back(grid_ctr);
-
-        const std::vector<vor3d::Scalar>& d = dexels.at(x, y);
-        int idx = -1;
-        for (int i = 0; i < d.size(); i++) {
-          if (grid_ctr[0] < d[i]) {
-            idx = i-1;
-            break;
-          }
-        }
-
-        if (idx < 0) {
-          grid_vals.push_back(1);
-          continue;
-        }
-
-        if (idx % 2 == 0) {
-          grid_vals.push_back(-1);
-        } else {
-          grid_vals.push_back(1);
-        }
-      }
     }
-  }
 
-  Eigen::MatrixXd pts(grid_vals.size(), 3);
-  Eigen::VectorXd vals(grid_vals.size());
-  for (int i = 0; i < grid_vals.size(); i++) {
-    pts.row(i) = grid_pts[i];
-    vals[i] = grid_vals[i];
-  }
+    Eigen::MatrixXd pts(grid_vals.size(), 3);
+    Eigen::VectorXd vals(grid_vals.size());
+    for (int i = 0; i < grid_vals.size(); i++) {
+        pts.row(i) = grid_pts[i];
+        vals[i] = grid_vals[i];
+    }
 
-  igl::copyleft::marching_cubes(vals, pts, n_samples+2, dexels.gridSize()[1]+2, dexels.gridSize()[0]+2, V, F);
+    igl::copyleft::marching_cubes(vals, pts, n_samples + 2, dexels.gridSize()[1] + 2,
+        dexels.gridSize()[0] + 2, V, F);
 }
 
+} // namespace
 
-Meshing_Menu::Meshing_Menu(State& state)
-  : _state(state)
-{}
+
+Meshing_Menu::Meshing_Menu(State& state) : _state(state) {}
 
 
 void Meshing_Menu::initialize() {
-  _done_meshing = false;
+    done_meshing = false;
 
-  auto thread_fun = [&]() {
-    _is_meshing = true;
-    glfwPostEmptyEvent();
+    auto thread_fun = [&]() {
+        is_meshing = true;
+        glfwPostEmptyEvent();
 
-    std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
-    // The feature list used in export_selected_volume uses a zero-based indexing, we use
-    // 0 for the non-feature, so we have to convert into the zero-based indexing here
-    std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(), [](uint32_t v) { return v - 1; });
-    _state.skeleton_masking_volume = export_selected_volume(feature_list);
+        std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
+        // The feature list used in export_selected_volume uses a zero-based indexing, we use
+        // 0 for the non-feature, so we have to convert into the zero-based indexing here
+        std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(),
+            [](uint32_t v) { return v - 1; });
+        _state.skeleton_masking_volume = export_selected_volume(feature_list);
 
-    dilate_volume();
-    if (extracted_surface.V_fat.rows() == 0) {
-      _state.logger->error("Extracted empty mesh after dilation! Something went wrong!");
-      abort();
-    }
-    tetrahedralize_surface_mesh();
-    igl::components(_state.extracted_volume.TT, _state.extracted_volume.connected_components);
+        dilate_volume();
+        if (extracted_surface.V_fat.rows() == 0) {
+            _state.logger->error("Extracted empty mesh after dilation! Something went wrong!");
+            abort();
+        }
+        tetrahedralize_surface_mesh();
+        igl::components(_state.extracted_volume.TT, _state.extracted_volume.connected_components);
 
-    _is_meshing = false;
-    _done_meshing = true;
+        is_meshing = false;
+        done_meshing = true;
 
-    _state.logger->info("Done meshing background thread.");
-    glfwPostEmptyEvent();
-  };
+        _state.logger->info("Done meshing background thread.");
+        glfwPostEmptyEvent();
+    };
 
-  extracted_surface.V_thin.resize(0, 0);
-  extracted_surface.F_thin.resize(0, 0);
-  extracted_surface.V_fat.resize(0, 0);
-  extracted_surface.F_fat.resize(0, 0);
+    extracted_surface.V_thin.resize(0, 0);
+    extracted_surface.F_thin.resize(0, 0);
+    extracted_surface.V_fat.resize(0, 0);
+    extracted_surface.F_fat.resize(0, 0);
 
-  _state.logger->info("Starting meshing background thread...");
-  bg_thread = std::thread(thread_fun);
-  bg_thread.detach();
-}
-
-
-bool Meshing_Menu::pre_draw() {
-  bool ret = FishUIViewerPlugin::pre_draw();
-
-  return ret;
+    _state.logger->info("Starting meshing background thread...");
+    bg_thread = std::thread(thread_fun);
+    bg_thread.detach();
 }
 
 
 bool Meshing_Menu::post_draw() {
-  bool ret = FishUIViewerPlugin::post_draw();
+    bool ret = FishUIViewerPlugin::post_draw();
 
-  if(_is_meshing) {
-    int width;
-    int height;
-    glfwGetWindowSize(viewer->window, &width, &height);
-    ImGui::SetNextWindowPos(ImVec2(.0f, .0f), ImGuiSetCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiSetCond_Always);
-    bool _menu_visible = true;
-    ImGui::Begin("", &_menu_visible,
-                 ImGuiWindowFlags_NoResize |
-                 ImGuiWindowFlags_NoMove |
-                 ImGuiWindowFlags_NoCollapse |
-                 ImGuiWindowFlags_NoTitleBar);
+    if (is_meshing) {
+        int width;
+        int height;
+        glfwGetWindowSize(viewer->window, &width, &height);
+        ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiSetCond_Always);
+        float w = static_cast<float>(width);
+        float h = static_cast<float>(height);
+        ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiSetCond_Always);
+        ImGui::Begin("", nullptr,
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoTitleBar);
 
-    ImGui::OpenPopup("Processing Fish Segments");
-    ImGui::BeginPopupModal("Processing Fish Segments");
-    ImGui::Text("Processing Fish Segments. Please wait as this can take a few minutes.");
-    ImGui::NewLine();
-    ImGui::Separator();
-    if (ImGui::Button("Cancel")) {
-      // TODO: Cancel button
+        ImGui::OpenPopup("Processing Fish Segments");
+        ImGui::BeginPopupModal("Processing Fish Segments");
+        ImGui::Text("Processing Fish Segments. Please wait as this can take a few minutes.");
+        ImGui::NewLine();
+        ImGui::Separator();
+        if (ImGui::Button("Cancel")) {
+            // TODO: Cancel button
+        }
+        ImGui::EndPopup();
+        ImGui::End();
     }
-    ImGui::EndPopup();
-    ImGui::End();
-  }
 
-  if (_done_meshing) {
-    _state.set_application_state(Application_State::EndPointSelection);
-    _done_meshing = false;
+    if (done_meshing) {
+        _state.set_application_state(Application_State::EndPointSelection);
+        done_meshing = false;
 
-    glfwPostEmptyEvent();
-  }
+        glfwPostEmptyEvent();
+    }
 
-  ImGui::Render();
-  return ret;
+    ImGui::Render();
+    return ret;
 }
 
 
 void Meshing_Menu::dilate_volume() {
-  vor3d::CompressedVolume input;
-  volume_to_dexels(_state.skeleton_masking_volume, _state.volume_file.w, _state.volume_file.h, _state.volume_file.d, input);
+    vor3d::CompressedVolume input;
+    volume_to_dexels(_state.skeleton_masking_volume, _state.volume_file.w,
+        _state.volume_file.h, _state.volume_file.d, input);
 
-  vor3d::CompressedVolume output;
+    vor3d::VoronoiMorphoVorPower op = vor3d::VoronoiMorphoVorPower();
+    double time_1;
+    double time_2;
+    vor3d::CompressedVolume output;
+    op.dilation(input, output, 3, time_1, time_2);
 
-  vor3d::VoronoiMorphoVorPower op = vor3d::VoronoiMorphoVorPower();
-  double time_1, time_2;
-  op.dilation(input, output, 3, time_1, time_2);
-
-  dexels_to_mesh(2*_state.volume_file.w, output, extracted_surface.V_fat, extracted_surface.F_fat);
+    dexels_to_mesh(2 * _state.volume_file.w, output, extracted_surface.V_fat,
+        extracted_surface.F_fat);
 }
 
 
 void Meshing_Menu::tetrahedralize_surface_mesh() {
-  using namespace std;
+    const Eigen::MatrixXd& V = extracted_surface.V_fat;
+    const Eigen::MatrixXi& F = extracted_surface.F_fat;
 
-  const Eigen::MatrixXd& V = extracted_surface.V_fat;
-  const Eigen::MatrixXi& F = extracted_surface.F_fat;
+    std::vector<Vec3i> surf_tri(F.rows());
+    for (int i = 0; i < F.rows(); i++) {
+        surf_tri[i] = Vec3i(F.row(i)[0], F.row(i)[1], F.row(i)[2]);
+    }
 
-  std::vector<Vec3i> surf_tri;
-  std::vector<Vec3f> surf_x;
+    std::vector<Vec3f> surf_x(V.rows());
+    for (int i = 0; i < V.rows(); i++) {
+        surf_x[i] = Vec3f(
+            static_cast<float>(V.row(i)[0]),
+            static_cast<float>(V.row(i)[1]),
+            static_cast<float>(V.row(i)[2]));
+    }
 
-  for (int i = 0; i < F.rows(); i++) {
-    surf_tri.push_back(Vec3i(F.row(i)[0], F.row(i)[1], F.row(i)[2]));
-  }
+    // Compute the bounding box of the mesh
+    const Eigen::RowVector3d v_min = V.colwise().minCoeff();
+    Vec3f xmin(static_cast<float>(v_min[0]), static_cast<float>(v_min[1]),
+        static_cast<float>(v_min[2]));
 
-  for (int i = 0; i < V.rows(); i++) {
-    surf_x.push_back(Vec3f(V.row(i)[0], V.row(i)[1], V.row(i)[2]));
-  }
+    const Eigen::RowVector3d v_max = V.colwise().maxCoeff();
+    Vec3f xmax(static_cast<float>(v_max[0]), static_cast<float>(v_max[1]),
+        static_cast<float>(v_max[2]));
 
-  const float dx = 0.8; // TODO: Play with this a little bit
+    // Build triangle mesh data structure
+    TriMesh trimesh(surf_x, surf_tri);
 
-  const Eigen::RowVector3d v_min = V.colwise().minCoeff();
-  const Eigen::RowVector3d v_max = V.colwise().maxCoeff();
+    // Make the level set
 
-  // Compute the bounding box of the mesh
-  Vec3f xmin(v_min[0], v_min[1], v_min[2]);
-  Vec3f xmax(v_max[0], v_max[1], v_max[2]);
+    // Determining dimensions of voxel grid.
+    // Round up to ensure voxel grid completely contains bounding box.
+    // Also add padding of 2 grid points around the bounding box.
+    // NOTE: We add 5 here so as to add 4 grid points of padding, as well as
+    // 1 grid point at the maximal boundary of the bounding box
+    // ie: (xmax-xmin)/dx + 1 grid points to cover one axis of the bounding box
+    constexpr float dx = 0.8f; // TODO: Play with this a little bit
+    Vec3f origin = xmin - Vec3f(2 * dx);
+    int ni = static_cast<int>(std::ceil((xmax[0] - xmin[0]) / dx) + 5);
+    int nj = static_cast<int>(std::ceil((xmax[1] - xmin[1]) / dx) + 5);
+    int nk = static_cast<int>(std::ceil((xmax[2] - xmin[2]) / dx) + 5);
 
-  // Build triangle mesh data structure
-  TriMesh trimesh(surf_x, surf_tri);
+    SDF sdf(origin, dx, ni, nj, nk); // Initialize signed distance field.
+    
+    _state.logger->info("making {}x{}x{} level set", ni, nj, nk);
+    make_signed_distance(surf_tri, surf_x, sdf);
 
-  // Make the level set
+    // Then the tet mesh
+    TetMesh mesh;
 
-  // Determining dimensions of voxel grid.
-  // Round up to ensure voxel grid completely contains bounding box.
-  // Also add padding of 2 grid points around the bounding box.
-  // NOTE: We add 5 here so as to add 4 grid points of padding, as well as
-  // 1 grid point at the maximal boundary of the bounding box
-  // ie: (xmax-xmin)/dx + 1 grid points to cover one axis of the bounding box
-  Vec3f origin=xmin-Vec3f(2*dx);
-  int ni = (int)std::ceil((xmax[0]-xmin[0])/dx)+5,
-      nj = (int)std::ceil((xmax[1]-xmin[1])/dx)+5,
-      nk = (int)std::ceil((xmax[2]-xmin[2])/dx)+5;
+    // Make tet mesh without features
+    const bool optimize = false;
+    const bool intermediate = false;
+    const bool unsafe = false;
+    make_tet_mesh(mesh, sdf, optimize, intermediate, unsafe);
 
-  SDF sdf(origin, dx, ni, nj, nk); // Initialize signed distance field.
-  std::printf("making %dx%dx%d level set\n", ni, nj, nk);
-  make_signed_distance(surf_tri, surf_x, sdf);
+    _state.extracted_volume.TV.resize(mesh.verts().size(), 3);
+    for (int i = 0; i < mesh.verts().size(); i++) {
+        _state.extracted_volume.TV.row(i) =
+            Eigen::Vector3d(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
+    }
+    _state.extracted_volume.TT.resize(mesh.tets().size(), 4);
+    for (int i = 0; i < mesh.tets().size(); i++) {
+        _state.extracted_volume.TT.row(i) =
+            Eigen::Vector4i(mesh.tets()[i][0], mesh.tets()[i][2], mesh.tets()[i][1], mesh.tets()[i][3]);
+    }
 
-  // Then the tet mesh
-  TetMesh mesh;
-
-  // Make tet mesh without features
-  make_tet_mesh(mesh, sdf, false /* optimize */, false /* intermediate */, false /* unsafe */);
-
-  _state.extracted_volume.TV.resize(mesh.verts().size(), 3);
-  for (int i = 0; i < mesh.verts().size(); i++) {
-    _state.extracted_volume.TV.row(i) =
-        Eigen::Vector3d(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
-  }
-  _state.extracted_volume.TT.resize(mesh.tets().size(), 4);
-  for (int i = 0; i < mesh.tets().size(); i++) {
-    _state.extracted_volume.TT.row(i) =
-        Eigen::Vector4i(mesh.tets()[i][0], mesh.tets()[i][2], mesh.tets()[i][1], mesh.tets()[i][3]);
-  }
-
-  igl::boundary_facets(_state.extracted_volume.TT, _state.extracted_volume.TF);
+    igl::boundary_facets(_state.extracted_volume.TT, _state.extracted_volume.TF);
 }
-
 
 
 void Meshing_Menu::extract_surface_mesh() {
-  const int w = _state.volume_file.w;
-  const int h = _state.volume_file.h;
-  const int d = _state.volume_file.d;
+    const int w = _state.volume_file.w;
+    const int h = _state.volume_file.h;
+    const int d = _state.volume_file.d;
 
-  // Grid positions and scalar values
-  Eigen::MatrixXd GP((w+2)*(h+2)*(d+2), 3);
-  Eigen::VectorXd SV(GP.rows());
+    // Grid positions and scalar values
+    Eigen::MatrixXd GP((w + 2)*(h + 2)*(d + 2), 3);
+    Eigen::VectorXd SV(GP.rows());
 
-  int readcount = 0;
-  int appendcount = 0;
-  for (int zi = 0; zi < d+2; zi++) {
-    for (int yi = 0; yi < h+2; yi++) {
-      for (int xi = 0; xi < w+2; xi++) {
-        if (xi == 0 || yi == 0 || zi == 0 ||
-            xi == (w+1) || yi == (h+1) || zi == (d+1)) {
-          SV[readcount] = -1.0;
-        } else {
-          SV[readcount] = _state.skeleton_masking_volume[appendcount];
-          appendcount += 1;
+    int readcount = 0;
+    int appendcount = 0;
+    for (int zi = 0; zi < d + 2; zi++) {
+        for (int yi = 0; yi < h + 2; yi++) {
+            for (int xi = 0; xi < w + 2; xi++) {
+                if (xi == 0 || yi == 0 || zi == 0 ||
+                    xi == (w + 1) || yi == (h + 1) || zi == (d + 1)) {
+                    SV[readcount] = -1.0;
+                }
+                else {
+                    SV[readcount] = _state.skeleton_masking_volume[appendcount];
+                    appendcount += 1;
+                }
+                GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
+                readcount += 1;
+            }
         }
-        GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
-        readcount += 1;
-      }
     }
-  }
 
-  igl::copyleft::marching_cubes(SV, GP, w+2, h+2, d+2,
-                                extracted_surface.V_thin,
-                                extracted_surface.F_thin);
+    igl::copyleft::marching_cubes(SV, GP, w + 2, h + 2, d + 2,
+        extracted_surface.V_thin,
+        extracted_surface.F_thin);
 
 
-  if (extracted_surface.V_thin.rows() < 4 || extracted_surface.F_thin.rows() < 4) {
-    // TODO: Raise an error
-  }
-  //  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
-  //  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
+    if (extracted_surface.V_thin.rows() < 4 || extracted_surface.F_thin.rows() < 4) {
+        // TODO: Raise an error
+    }
+    //  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
+    //  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
 }
 
 
-Eigen::VectorXd Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list) {
-  using namespace std;
-  _state.logger->debug("Feature list size: {}", feature_list.size());
-  Eigen::VectorXd data = _state.volume_data;
+Eigen::VectorXd Meshing_Menu::export_selected_volume(
+                                                const std::vector<uint32_t>& feature_list)
+{
+    _state.logger->debug("Feature list size: {}", feature_list.size());
+    Eigen::VectorXd data = _state.volume_data;
 
-  std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_features, 0.f);
+    std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(
+        _state.num_features, 0.f);
 
-  std::vector<uint32_t> good_arcs;
-  for (uint32_t f : feature_list) {
-    _state.logger->debug("Feature: {}", f);
-    _state.logger->debug("Feature arcs size: {}", features[f].arcs.size());
-    good_arcs.insert(good_arcs.end(), features[f].arcs.begin(), features[f].arcs.end());
-    _state.logger->debug("Good arcs size: {}", good_arcs.size());
-  }
-  std::sort(good_arcs.begin(), good_arcs.end());
-
-  for (int i = 0; i < data.size(); ++i) {
-    unsigned int idx = _state.index_volume_data[i];
-    if (std::binary_search(good_arcs.begin(), good_arcs.end(), idx)) {
-      data[i] = 1.0;
-    } else {
-      data[i] = -1.0;
+    std::vector<uint32_t> good_arcs;
+    for (uint32_t f : feature_list) {
+        _state.logger->debug("Feature: {}", f);
+        _state.logger->debug("Feature arcs size: {}", features[f].arcs.size());
+        good_arcs.insert(good_arcs.end(), features[f].arcs.begin(), features[f].arcs.end());
+        _state.logger->debug("Good arcs size: {}", good_arcs.size());
     }
-  }
+    std::sort(good_arcs.begin(), good_arcs.end());
 
-  return data;
+    for (int i = 0; i < data.size(); ++i) {
+        unsigned int idx = _state.index_volume_data[i];
+        if (std::binary_search(good_arcs.begin(), good_arcs.end(), idx)) {
+            data[i] = 1.0;
+        }
+        else {
+            data[i] = -1.0;
+        }
+    }
+
+    return data;
 }

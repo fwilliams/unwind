@@ -1,9 +1,9 @@
-#include "fish_ui_viewer_plugin.h"
-#include "state.h"
-
 #ifndef __FISH_DEFORMATION_SELECTION_MENU__
 #define __FISH_DEFORMATION_SELECTION_MENU__
 
+#include "fish_ui_viewer_plugin.h"
+
+struct State;
 
 class Selection_Menu : public FishUIViewerPlugin {
 public:
@@ -43,9 +43,8 @@ private:
     float highlight_factor = 0.05f;
 
     bool show_error_popup = false;
-    std::string error_title = "";
-    std::string error_message = "";
+    std::string error_title;
+    std::string error_message;
 };
-
 
 #endif // __FISH_DEFORMATION_SELECTION_MENU__

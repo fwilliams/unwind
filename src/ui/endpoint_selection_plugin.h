@@ -1,13 +1,13 @@
 #ifndef __FISH_DEFORMATION_ENDPOINT_SELECTION_STATE__
 #define __FISH_DEFORMATION_ENDPOINT_SELECTION_STATE__
 
-#include <vector>
+#include "fish_ui_viewer_plugin.h"
+
 #include <array>
 #include <atomic>
 #include <thread>
 
-#include "state.h"
-#include "fish_ui_viewer_plugin.h"
+struct State;
 
 class EndPoint_Selection_Menu : public FishUIViewerPlugin {
 public:
@@ -19,17 +19,17 @@ public:
     void initialize();
 
 private:
-
-    bool selecting_endpoints;
     State& state;
 
-    std::atomic_bool extracting_skeleton;
-    std::atomic_bool done_extracting_skeleton;
+    bool selecting_endpoints = false;
+
+    std::atomic_bool extracting_skeleton = false;
+    std::atomic_bool done_extracting_skeleton = false;
     std::thread extract_skeleton_thread;
 
 
     bool bad_selection = false; // Flag set to true if user selects invalid endpoint pair
-    std::string bad_selection_error_message = "";
+    std::string bad_selection_error_message;
 
     unsigned current_endpoint_idx = 0;
     std::array<int, 2> current_endpoints = { -1, -1 };

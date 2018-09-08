@@ -2,12 +2,11 @@
 #define __FISH_DEFORMATION_INITIAL_FILE_SELECTION_STATE__
 
 #include "fish_ui_viewer_plugin.h"
-#include "state.h"
 
 #include <atomic>
 #include <thread>
-#include <cstdlib>
 
+struct State;
 
 class Initial_File_Selection_Menu : public FishUIViewerPlugin {
 public:
@@ -19,20 +18,22 @@ private:
     State& _state;
 
 #ifdef WIN32
-    static const int Buffer_Size = 4096;
+    static constexpr int BufferSize = 4096;
 #else
-    static const int Buffer_Size = PATH_MAX;
+    static const int BufferSize = PATH_MAX;
 #endif
 
-    char folder_name[Buffer_Size] = {};
-    char file_prefix[Buffer_Size] = {};
-    char extension[Buffer_Size] = {};
-    int start_index = 0;
-    int end_index = 0;
-    char output_folder[Buffer_Size] = {};
-    char output_prefix[Buffer_Size] = {};
-    int downsample_factor = 4;
-    bool write_original = true;
+    struct {
+        char folder_name[BufferSize] = {};
+        char file_prefix[BufferSize] = {};
+        char extension[BufferSize] = {};
+        int start_index = 0;
+        int end_index = 0;
+        char output_folder[BufferSize] = {};
+        char output_prefix[BufferSize] = {};
+        int downsample_factor = 2;
+        bool write_original = true;
+    } ui;
 
     std::atomic_bool done_loading;
     std::atomic_bool is_loading;

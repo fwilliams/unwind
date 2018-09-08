@@ -1,15 +1,12 @@
+#ifndef BOUNDING_CAGE_H
+#define BOUNDING_CAGE_H
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
 #include <memory>
 
 #include <spdlog/spdlog.h>
-
-
-#ifndef BOUNDING_CAGE_H
-#define BOUNDING_CAGE_H
-
-extern const char* FISH_LOGGER_NAME;
 
 class BoundingCage {
 public:
@@ -120,12 +117,8 @@ public:
     /// Construct a new Cell. Don't call this directly, instead use the factory
     /// function `make_cell()`.
     ///
-    Cell(std::shared_ptr<KeyFrame> left_kf,
-         std::shared_ptr<KeyFrame> right_kf,
-         std::weak_ptr<Cell> parent,
-         const BoundingCage* cage) :
-      _cage(cage), _left_keyframe(left_kf), _right_keyframe(right_kf), _parent_cell(parent),
-      logger(spdlog::get(FISH_LOGGER_NAME)) {}
+    Cell(std::shared_ptr<KeyFrame> left_kf, std::shared_ptr<KeyFrame> right_kf,
+        std::weak_ptr<Cell> parent, const BoundingCage* cage);
 
     /// Construct a new Cell wrapped in a shared_ptr. Internally, this method is used
     /// to create Cells in lieu of the constructor.

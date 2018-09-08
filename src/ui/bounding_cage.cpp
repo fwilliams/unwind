@@ -8,6 +8,8 @@
 #include <igl/triangle/triangulate.h>
 #include <igl/segment_segment_intersect.h>
 
+#include "state.h"
+
 // Parallel transport a coordinate system from a KeyFrame along a curve to a point with normal, to_n
 static Eigen::Matrix3d parallel_transport(const BoundingCage::KeyFrame& from_kf, Eigen::RowVector3d to_n) {
   Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(from_kf.normal().normalized(), to_n.normalized()).matrix();
@@ -78,7 +80,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
   _left_cell = cell;
   _right_cell = cell;
 
-  logger = spdlog::get(FISH_LOGGER_NAME);
+  logger = spdlog::get(FishLoggerName);
 }
 
 BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
@@ -96,7 +98,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
   _left_cell = cell;
   _right_cell = cell;
 
-  logger = spdlog::get(FISH_LOGGER_NAME);
+  logger = spdlog::get(FishLoggerName);
 }
 
 bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate_2d, bool validate_3d) {
@@ -278,6 +280,16 @@ bool BoundingCage::KeyFrame::delete_vertex(unsigned idx, bool validate_2d, bool 
 // | BoundingCage::Cell methods | //
 // |                            | //
 // |============================| //
+
+BoundingCage::Cell::Cell(std::shared_ptr<KeyFrame> left_kf,
+                         std::shared_ptr<KeyFrame> right_kf, std::weak_ptr<Cell> parent,
+                         const BoundingCage* cage)
+    : _cage(cage)
+    , _left_keyframe(left_kf)
+    , _right_keyframe(right_kf)
+    , _parent_cell(parent)
+    , logger(spdlog::get(FishLoggerName))
+{}
 
 std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_ptr<KeyFrame> left_kf,
                                                                   std::shared_ptr<KeyFrame> right_kf,
@@ -503,7 +515,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
   CV.resize(poly_template.rows(), 3);
   CV_refcount.resize(CV.rows());
 
-  logger = spdlog::get(FISH_LOGGER_NAME);
+  logger = spdlog::get(FishLoggerName);
 
   logger->info("Constructing intial bounding cage for skeleton.");
   SV = new_SV;
