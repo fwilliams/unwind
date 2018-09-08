@@ -302,7 +302,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
 }
 
 bool BoundingCage::Cell::update_mesh() {
-  assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
+  //assert(left_keyframe->vertices_2d().rows() == right_keyframe->vertices_2d().rows());
 
   Eigen::MatrixXi left_kf_faces, right_kf_faces;
   _left_keyframe->triangulate(left_kf_faces);
