@@ -762,6 +762,7 @@ bool BoundingCage::delete_keyframe(KeyFrameIterator& it) {
 
 bool BoundingCage::update_vertex(int i, const Eigen::RowVector3d& v) {
   CV.row(i) = v;
+  return true;
 }
 
 bool BoundingCage::insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {

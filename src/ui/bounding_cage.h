@@ -402,7 +402,7 @@ public:
   public:
     KeyFrameIterator(const KeyFrameIterator& other) : keyframe(other.keyframe) {}
     KeyFrameIterator() : keyframe(std::shared_ptr<KeyFrame>()) {}
-    KeyFrameIterator& operator=(const KeyFrameIterator& other) { keyframe = other.keyframe; }
+    KeyFrameIterator& operator=(const KeyFrameIterator& other) { if (&other != this) { keyframe = other.keyframe; } return *this; }
 
     KeyFrameIterator operator++() {
       if (!keyframe) {

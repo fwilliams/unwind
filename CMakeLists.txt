@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.8)
 project(fish_deformation)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -14,9 +14,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/
 option(BUILD_TESTS                   "Build test binaries" OFF)
 option(RELEASE_WITH_SYMBOLS          "Build in release mode but with debug symbols" OFF)
 
-if (RELEASE_WITH_SYMBOLS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCHOLMOD")
-endif()
+#if (RELEASE_WITH_SYMBOLS)
+#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCHOLMOD")
+#endif()
 
 
 
@@ -27,10 +27,10 @@ endif()
 
 # Find Suitesparse
 if (WIN32)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOLMOD")
-  include_directories("C:/Development/SuiteSparse/include")
-  include_directories("C:/Development/SuiteSparse/CHOLMOD/include/include")
-  include_directories("C:/Development/OpenBLAS-v0.2.19-Win64-int32/include")
+  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCHOLMOD")
+  include_directories("C:/ab7512/SuiteSparse/include")
+  include_directories("C:/ab7512/SuiteSparse/CHOLMOD/include/include")
+  include_directories("C:/ab7512/OpenBLAS-v0.2.19-Win64-int32/include")
 else ()
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()

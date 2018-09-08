@@ -1,10 +1,9 @@
-
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-DNDEBUG -g")
+#set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-DNDEBUG -g")
 
 # Main application binary
 file(GLOB UI_SRCS ui/*.cpp)
-add_executable(fish_deformation main.cpp ${UI_SRCS})
-set_target_properties(fish_deformation PROPERTIES CXX_STANDARD 14)
+add_executable(fish_deformation main.cpp ${UI_SRCS} ".editorconfig")
+set_target_properties(fish_deformation PROPERTIES CXX_STANDARD 17)
 set_target_properties(fish_deformation PROPERTIES CXX_STANDARD_REQUIRED ON)
 target_link_libraries(fish_deformation quartet contourtree utils vor3d spdlog
   igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal igl::triangle)
