@@ -3,7 +3,11 @@
 #include <igl/opengl/create_shader_program.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <imgui/imgui.h>
+#include <utils/glm_conversion.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <vector>
+
 #pragma optimize ("", off)
 
 namespace {
@@ -71,8 +75,14 @@ uniform sampler3D tex;
 uniform sampler1D tf;
 
 void main() {
-    float v = texture(tex, uv).r;
-    out_color = vec4(vec3(v * 1.5), 1.0);
+    // All areas outside the actual texture area should be black
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    else {
+        float v = texture(tex, uv).r;
+        out_color = vec4(vec3(v * 1.5), 1.0);
+    }
 }
 )";
 
@@ -214,26 +224,20 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glBindVertexArray(plane.vao);
 
     glUniform2f(plane.window_size_location, w, h);
-    glm::vec3 dim = state.volume_rendering.parameters.volume_dimensions_rcp;
 
-    const Eigen::Matrix3d orientation = kf->orientation();
+    glm::vec3 x_axis = glm::vec3(G3f(kf->orientation().row(0)));
+    glm::vec3 y_axis = glm::vec3(G3f(kf->orientation().row(1)));
+    glm::vec3 center = glm::vec3(G3f(kf->center())) / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
-    Eigen::Vector3d ll_v = orientation * Eigen::Vector3d(0.f, 0.f, 0.f);
-    std::array<float, 3> ll = { ll_v.x(), ll_v.y(), ll_v.z() };
+    glm::vec3 ll = center + -1.f * x_axis + -1.f * y_axis;
+    glm::vec3 ul = center +  1.f * x_axis + -1.f * y_axis;
+    glm::vec3 lr = center + -1.f * x_axis +  1.f * y_axis;
+    glm::vec3 ur = center +  1.f * x_axis +  1.f * y_axis;
 
-    Eigen::Vector3d ul_v = orientation * Eigen::Vector3d(1.f, 0.f, 0.f);
-    std::array<float, 3> ul = { ul_v.x(), ul_v.y(), ul_v.z() };
-
-    Eigen::Vector3d lr_v = orientation * Eigen::Vector3d(0.f, 1.f, 0.f);
-    std::array<float, 3> lr = { lr_v.x(), lr_v.y(), lr_v.z() };
-
-    Eigen::Vector3d ur_v = orientation * Eigen::Vector3d(1.f, 1.f, 0.f);
-    std::array<float, 3> ur = { ur_v.x(), ur_v.y(), ur_v.z() };
-
-    glUniform3f(plane.ll_location, ll[0] * dim[0], ll[1] * dim[1], ll[2] * dim[2]);
-    glUniform3f(plane.lr_location, lr[0] * dim[0], lr[1] * dim[1], lr[2] * dim[2]);
-    glUniform3f(plane.ul_location, ul[0] * dim[0], ul[1] * dim[1], ul[2] * dim[2]);
-    glUniform3f(plane.ur_location, ur[0] * dim[0], ur[1] * dim[1], ur[2] * dim[2]);
+    glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
+    glUniform3fv(plane.lr_location, 1, glm::value_ptr(lr));
+    glUniform3fv(plane.ul_location, 1, glm::value_ptr(ul));
+    glUniform3fv(plane.ur_location, 1, glm::value_ptr(ur));
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, state.volume_rendering.volume_texture);
