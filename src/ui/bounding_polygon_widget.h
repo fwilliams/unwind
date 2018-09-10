@@ -20,12 +20,15 @@ public:
     bool post_draw(BoundingCage::KeyFrameIterator it, int current_vertex_id);
 
 private:
+    static constexpr const int NoElement = -1;
+
     State& state;
 
-    Eigen::Vector2f* current_edit_element = nullptr;
+    BoundingCage::KeyFrameIterator current_active_keyframe;
+    int current_edit_element = NoElement;
 
-    bool is_currently_on_slice = false;
-    int current_slice_id = 0;
+    //bool is_currently_on_slice = false;
+    //int current_slice_id = 0;
 
     igl::opengl::glfw::Viewer* viewer;
     struct {

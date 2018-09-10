@@ -113,6 +113,14 @@ void main() {
 }
 )";
 
+std::vector<glm::vec2> convert_vertices(const Eigen::MatrixXd& vertices) {
+    std::vector<glm::vec2> result(vertices.rows());
+    for (int i = 0; i < vertices.rows(); ++i) {
+        result[i] = G2f(vertices.row(i));
+    }
+    return result;
+}
+
 } // namespace
 
 Bounding_Polygon_Widget::Bounding_Polygon_Widget(State& state) : state(state) {}
@@ -151,24 +159,26 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
 }
 
 bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
-    int width;
-    int height;
-    glfwGetWindowSize(viewer->window, &width, &height);
-    float w = static_cast<float>(width);
-    float h = static_cast<float>(height);
+    glm::ivec2 size;
+    glfwGetWindowSize(viewer->window, &size.x, &size.y);
 
     bool left_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
 
-    float normalized_mouse_x = ((mouse_x / w) - 0.5f) * 2.f;
-    float normalized_mouse_y = -(((mouse_y / h) - 0.5f) * 2.f);
+    if (left_mouse && current_edit_element != NoElement) {
+        glm::vec2 current_mouse = { mouse_x, mouse_y };
+        glm::vec2 normalized_mouse = (current_mouse / glm::vec2(size) - 0.5f) * 2.f;
+        glm::vec2 mapped_mouse = normalized_mouse / (500.f / glm::vec2(size));
+        mapped_mouse = glm::clamp(mapped_mouse, glm::vec2(-1.f), glm::vec2(1.f));
+        mapped_mouse.y *= -1.f;
 
-    if (left_mouse && is_currently_on_slice && current_edit_element) {
-        // map to rendering window
-        float mapped_mouse_x = normalized_mouse_x / (500.f / w);
-        float mapped_mouse_y = normalized_mouse_y / (500.f / h);
+        const bool validate_2d = true;
+        const bool validate_3d = false;
+        bool success = current_active_keyframe->move_point_2d(current_edit_element,
+            Eigen::RowVector2d(mapped_mouse.x, mapped_mouse.y), validate_2d, validate_3d);
 
-        current_edit_element->x() = std::max(std::min(mapped_mouse_x, 1.f), -1.f);
-        current_edit_element->y() = std::max(std::min(mapped_mouse_y, 1.f), -1.f);
+        if (!success) {
+            current_edit_element = NoElement;
+        }
         return true;
     }
 
@@ -176,42 +186,40 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 }
 
 bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
-    int width;
-    int height;
-    glfwGetWindowSize(viewer->window, &width, &height);
-    float w = static_cast<float>(width);
-    float h = static_cast<float>(height);
+    glm::ivec2 size;
+    glfwGetWindowSize(viewer->window, &size.x, &size.y);
 
     bool left_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
 
-    float normalized_mouse_x = ((viewer->current_mouse_x / w) - 0.5f) * 2.f;
-    float normalized_mouse_y = -(((viewer->current_mouse_y / h) - 0.5f) * 2.f);
 
-    if (left_mouse && is_currently_on_slice) {
-        // map to rendering window
-        float mapped_mouse_x = normalized_mouse_x / (500.f / w);
-        float mapped_mouse_y = normalized_mouse_y / (500.f / h);
+    if (left_mouse) {
+        glm::vec2 current_mouse = { viewer->current_mouse_x, viewer->current_mouse_y };
+        glm::vec2 normalized_mouse = (current_mouse / glm::vec2(size) - 0.5f) * 2.f;
+        glm::vec2 mapped_mouse = normalized_mouse / (500.f / glm::vec2(size));
+        mapped_mouse.y *= -1.f;
 
-        //for (Eigen::Vector2f& p : state.bounding_polygon.polygon_slices[current_slice_id].polygon) {
-        //    float d = sqrt((p.x() - mapped_mouse_x) * (p.x() - mapped_mouse_x) +
-        //                   (p.y() - mapped_mouse_y) * (p.y() - mapped_mouse_y));
+        std::vector<glm::vec2> vertices = convert_vertices(current_active_keyframe->vertices_2d());
 
-        //    if (d < SelectionRadius) {
-        //        current_edit_element = &p;
-        //        return true;
-        //    }
-        //}
+        for (int i = 0; i < vertices.size(); ++i) {
+            float d = glm::distance(vertices[i], mapped_mouse);
+            if (d < SelectionRadius) {
+                current_edit_element = i;
+                break;
+            }
+        }
     }
 
     return false;
 }
 
 bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
-    current_edit_element = nullptr;
+    current_edit_element = NoElement;
     return false;
 }
 
 bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int current_vertex_id) {
+    current_active_keyframe = kf;
+
     int width;
     int height;
     glfwGetWindowSize(viewer->window, &width, &height);
@@ -249,72 +257,65 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
     glPopDebugGroup();
 
-    if (is_currently_on_slice) {
-        const Eigen::MatrixXd PV = kf->vertices_2d();
-        glDisable(GL_DEPTH_TEST);
+    const Eigen::MatrixXd PV = kf->vertices_2d();
+    glDisable(GL_DEPTH_TEST);
 
-        glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render overlay");
-        glUseProgram(polygon.program);
-        glBindVertexArray(polygon.vao);
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render overlay");
+    glUseProgram(polygon.program);
+    glBindVertexArray(polygon.vao);
 
-        //std::vector<GLfloat> data;
-        //data.reserve(state.bounding_polygon.nPoints * 2);
-        //const std::vector<Eigen::Vector2f>& p = state.bounding_polygon.polygon_slices[current_slice_id].polygon;
-        //for (const Eigen::Vector2f& v : p) {
-        //    data.push_back(v[0]);
-        //    data.push_back(v[1]);
-        //}
-
-        glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
-        //glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(GLfloat),
-        //    data.data(), GL_STATIC_DRAW);
-
-        glPointSize(8.f);
-        glLineWidth(3.f);
-
-
-        glUniform2f(polygon.window_size_location, static_cast<float>(width), static_cast<float>(height));
-        glUniform4f(polygon.color, 0.85f, 0.85f, 0.f, 1.f);
-
-        //glDrawArrays(GL_LINE_LOOP, 0, state.bounding_polygon.nPoints);
-        //glDrawArrays(GL_POINTS, 0, state.bounding_polygon.nPoints);
-
-        glPopDebugGroup();
-
-        bool left_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
-        float mouse_x = ((viewer->current_mouse_x / w) - 0.5f) * 2.f;
-        float mouse_y = -(((viewer->current_mouse_y / h) - 0.5f) * 2.f);
-
-        // map to rendering window
-        float mapped_mouse_x = mouse_x / (500.f / w);
-        float mapped_mouse_y = mouse_y / (500.f / h);
-
-        // mouse
-        GLfloat data_mouse[2] = { mapped_mouse_x, mapped_mouse_y };
-        glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLfloat), data_mouse, GL_STATIC_DRAW);
-        glPointSize(12.f);
-        glUniform4f(polygon.color, 0.15f, 0.85f, 0.15f, 1.f);
-        glDrawArrays(GL_POINTS, 0, 1);
-
-        //for (const Eigen::Vector2f& p : state.bounding_polygon.polygon_slices[current_slice_id].polygon) {
-        //    float d = sqrt((p.x() - mapped_mouse_x) * (p.x() - mapped_mouse_x) +
-        //                   (p.y() - mapped_mouse_y) * (p.y() - mapped_mouse_y));
-
-        //    if (d < SelectionRadius) {
-        //        glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render overlay highlight");
-        //        GLfloat data[2] = { p.x(), p.y() };
-        //        glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLfloat), data, GL_STATIC_DRAW);
-        //        glPointSize(12.f);
-        //        glUniform4f(polygon.color, 0.f, 0.25f, 0.75f, 1.f);
-        //        glDrawArrays(GL_POINTS, 0, 1);
-        //        glPopDebugGroup();
-        //    }
-        //}
-
-        glBindVertexArray(0);
-        glUseProgram(0);
-        glEnable(GL_DEPTH_TEST);
+    std::vector<glm::vec2> vertex_data = convert_vertices(current_active_keyframe->vertices_2d());
+    for (glm::vec2& v : vertex_data) {
+        //v *= state.volume_rendering.parameters.volume_dimensions_rcp;
     }
+
+    glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(glm::vec2),
+        vertex_data.data(), GL_STATIC_DRAW);
+
+    glPointSize(8.f);
+    glLineWidth(3.f);
+
+
+    glUniform2f(polygon.window_size_location, static_cast<float>(width), static_cast<float>(height));
+    glUniform4f(polygon.color, 0.85f, 0.85f, 0.f, 1.f);
+
+    glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
+    glDrawArrays(GL_POINTS, 0, vertex_data.size());
+
+    glPopDebugGroup();
+
+    bool left_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
+    glm::vec2 mouse = { viewer->current_mouse_x / w, viewer->current_mouse_y / h };
+    mouse -= 0.5f;
+    mouse *= 2.f;
+
+    // map to rendering window
+    glm::vec2 mapped_mouse = mouse / (500.f / glm::vec2(w, h));
+    mapped_mouse.y *= -1.f;
+
+    // mouse
+    glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLfloat), glm::value_ptr(mapped_mouse), GL_STATIC_DRAW);
+    glPointSize(12.f);
+    glUniform4f(polygon.color, 0.15f, 0.85f, 0.15f, 1.f);
+    glDrawArrays(GL_POINTS, 0, 1);
+
+    for (const glm::vec2& p : vertex_data) {
+        const float d = glm::distance(p, mapped_mouse);
+
+        if (d < SelectionRadius) {
+            glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render overlay highlight");
+            glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(GLfloat), glm::value_ptr(p), GL_STATIC_DRAW);
+            glPointSize(12.f);
+            glUniform4f(polygon.color, 0.f, 0.25f, 0.75f, 1.f);
+            glDrawArrays(GL_POINTS, 0, 1);
+            glPopDebugGroup();
+        }
+    }
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+    glEnable(GL_DEPTH_TEST);
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render slice UI");
 
