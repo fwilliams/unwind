@@ -114,7 +114,7 @@ void Selection_Menu::draw_setup() {
     if (viewer->core.viewport != _state.target_viewport_size) {
         resize_framebuffer_textures(
             glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
-        _state.target_viewport_size = G4(viewer->core.viewport);
+        _state.target_viewport_size = G4f(viewer->core.viewport);
     }
 
     if (number_features_is_dirty) {
@@ -179,8 +179,8 @@ void Selection_Menu::draw() {
     }
 
 
-    render_bounding_box(_state.volume_rendering, GM4(viewer->core.model),
-        GM4(viewer->core.view), GM4(viewer->core.proj));
+    render_bounding_box(_state.volume_rendering, GM4f(viewer->core.model),
+        GM4f(viewer->core.view), GM4f(viewer->core.proj));
 
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -206,7 +206,7 @@ void Selection_Menu::draw() {
 
     glUniform1f(_state.uniform_locations_rendering.highlight_factor, highlight_factor);
 
-    render_volume(_state.volume_rendering, G3(viewer->core.light_position));
+    render_volume(_state.volume_rendering, G3f(viewer->core.light_position));
 
     glUseProgram(_state.volume_rendering.picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
