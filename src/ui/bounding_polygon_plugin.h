@@ -15,8 +15,8 @@ public:
     bool mouse_up(int button, int modifier) override;
 
 
-    virtual bool post_draw() override;
-    virtual bool pre_draw() override;
+    bool post_draw() override;
+    bool pre_draw() override;
     void initialize();
 
 private:
@@ -24,7 +24,7 @@ private:
     State& state;
 
     // Vertices of the current plane
-    Eigen::MatrixXd PV;
+    //Eigen::MatrixXd PV;
 
     int mesh_overlay_id = 0;
     size_t cage_mesh_overlay_id = size_t(-1);

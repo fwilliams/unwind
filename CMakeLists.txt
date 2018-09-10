@@ -91,11 +91,16 @@ target_include_directories(contourtree PUBLIC ${CT_INCLUDE_DIRS})
 
 # Utils static library
 set(UTILS_INCLUDE_DIRS src src/utils)
-file(GLOB UTILS_SRCS src/utils/*.cpp )
+file(GLOB UTILS_SRCS src/utils/*.cpp)
+file(GLOB UTILS_HEADER src/utils/*.h)
 list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
-add_library(utils STATIC ${UTILS_SRCS})
+list(FILTER UTILS_HEADER EXCLUDE REGEX cgal*)
+add_library(utils STATIC ${UTILS_SRCS} ${UTILS_HEADER})
+set_property(TARGET utils PROPERTY CXX_STANDARD 17)
+set_property(TARGET utils PROPERTY CXX_STANDARD_REQUIRED ON)
 target_link_libraries(utils igl::core igl::opengl)
 target_include_directories(utils PUBLIC ${UTILS_INCLUDE_DIRS})
+target_include_directories(utils SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/external/glm")
 
 
 # Eigen library

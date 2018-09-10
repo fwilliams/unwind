@@ -10,6 +10,10 @@
 #include <array>
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <utility>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 constexpr const char* FishLoggerName = "fish_deformation_logger";
 
@@ -74,7 +78,7 @@ struct State {
 
     Eigen::VectorXd skeleton_masking_volume;
 
-    Eigen::Vector4f target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
+    glm::vec4 target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
     uint64_t frame_counter = 0;
     const int Delta_Frame_Count_Until_Resize = 10;
 
@@ -87,19 +91,19 @@ struct State {
     } extracted_volume;
 
     // Selected pairs of endpoints
-    std::vector<std::array<int, 2>> endpoint_pairs;
+    std::vector<std::pair<int, int>> endpoint_pairs;
 
-    struct BoundingPolygon {
-        int nPoints = 6;
+    //struct BoundingPolygon {
+    //    int nPoints = 6;
 
-        struct Slice {
-            int vertex_id;
-            std::vector<Eigen::Vector2f> polygon;
-        };
-        std::vector<Slice> polygon_slices;
-    };
+    //    struct Slice {
+    //        int vertex_id;
+    //        std::vector<Eigen::Vector2f> polygon;
+    //    };
+    //    std::vector<Slice> polygon_slices;
+    //};
 
-    BoundingPolygon bounding_polygon;
+    //BoundingPolygon bounding_polygon;
 
     BoundingCage cage;
 

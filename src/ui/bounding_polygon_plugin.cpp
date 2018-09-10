@@ -35,8 +35,8 @@ void Bounding_Polygon_Menu::initialize() {
         viewer->data().clear();
         Eigen::MatrixXi E;
         igl::edges(state.extracted_volume.TF, E);
-        viewer->data().set_edges(state.extracted_volume.TV, E,
-            Eigen::RowVector3d(0.75, 0.75, 0.75));
+        const Eigen::RowVector3d color(0.75, 0.75, 0.75);
+        viewer->data().set_edges(state.extracted_volume.TV, E, color);
 
         Eigen::MatrixXd P1(state.cage.skeleton_vertices().rows() - 1, 3),
             P2(state.cage.skeleton_vertices().rows() - 1, 3);
@@ -156,7 +156,8 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     ImGui::Checkbox("Show slice view", &show_slice_view);
     if (show_slice_view) {
-        widget_2d.post_draw(PV, static_cast<int>(current_cut_index));
+        BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+        widget_2d.post_draw(it, static_cast<int>(current_cut_index));
     }
 
     if (ImGui::Button("Insert KF")) {
@@ -267,7 +268,8 @@ bool Bounding_Polygon_Menu::pre_draw() {
         BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
 
         for (const BoundingCage::Cell& cell : state.cage.cells) {
-            Eigen::MatrixXd P1, P2;
+            Eigen::MatrixXd P1;
+            Eigen::MatrixXd P2;
             edge_endpoints(state.cage.mesh_vertices(), cell.mesh_faces(), P1, P2);
             viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
         }

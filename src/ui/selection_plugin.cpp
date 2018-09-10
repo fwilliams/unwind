@@ -11,12 +11,17 @@
 #include "volume_fragment_shader.h"
 #include "picking_fragment_shader.h"
 
+#include "utils/glm_conversion.h"
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/component_wise.hpp>
+
 #pragma optimize ("", off)
 
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::initialize() {
-    volumerendering::initialize(_state.volume_rendering, viewer->core.viewport,
+    volumerendering::initialize(_state.volume_rendering, G4(viewer->core.viewport),
         ContourTreeFragmentShader, ContourTreePickingFragmentShader);
 
     _state.uniform_locations_rendering.index_volume = glGetUniformLocation(
@@ -39,9 +44,6 @@ void Selection_Menu::initialize() {
     glGenBuffers(1, &_state.contour_information_ssbo);
     glGenBuffers(1, &_state.selection_list_ssbo);
 
-    Eigen::RowVector3i dims = {
-        _state.volume_file.w, _state.volume_file.h, _state.volume_file.d
-    };
     _state.volume_rendering.parameters.volume_dimensions = {
         _state.volume_file.w, _state.volume_file.h, _state.volume_file.d
     };
@@ -50,19 +52,21 @@ void Selection_Menu::initialize() {
       1.f / _state.volume_rendering.parameters.volume_dimensions[1],
       1.f / _state.volume_rendering.parameters.volume_dimensions[2]
     };
-    float maxDim = static_cast<float>(*std::max_element(
-        _state.volume_rendering.parameters.volume_dimensions.begin(),
-        _state.volume_rendering.parameters.volume_dimensions.end()));
+
+    int maxDim = glm::compMax(_state.volume_rendering.parameters.volume_dimensions);
+    float md = static_cast<float>(maxDim);
 
     _state.volume_rendering.parameters.normalized_volume_dimensions = {
-      _state.volume_rendering.parameters.volume_dimensions[0] / maxDim,
-      _state.volume_rendering.parameters.volume_dimensions[1] / maxDim,
-      _state.volume_rendering.parameters.volume_dimensions[2] / maxDim
+      _state.volume_rendering.parameters.volume_dimensions[0] / md,
+      _state.volume_rendering.parameters.volume_dimensions[1] / md,
+      _state.volume_rendering.parameters.volume_dimensions[2] / md
     };
 
-    load_rawfile(_state.volume_base_name + ".raw", dims, _state.volume_data, true);
-    volumerendering::upload_volume_data(_state.volume_rendering.volume_texture, dims,
-        _state.volume_data);
+    load_rawfile(_state.volume_base_name + ".raw",
+        E3i(_state.volume_rendering.parameters.volume_dimensions), _state.volume_data, true);
+    volumerendering::upload_volume_data(_state.volume_rendering.volume_texture,
+        _state.volume_rendering.parameters.volume_dimensions,
+        _state.volume_data.data(), _state.volume_data.size());
 
     // Index volume
     glGenTextures(1, &_state.index_volume);
@@ -110,7 +114,7 @@ void Selection_Menu::resize_framebuffer_textures(igl::opengl::ViewerCore& core) 
 void Selection_Menu::draw_setup() {
     if (viewer->core.viewport != _state.target_viewport_size) {
         resize_framebuffer_textures(viewer->core);
-        _state.target_viewport_size = viewer->core.viewport;
+        _state.target_viewport_size = G4(viewer->core.viewport);
     }
 
     if (number_features_is_dirty) {
@@ -175,8 +179,8 @@ void Selection_Menu::draw() {
     }
 
 
-    render_bounding_box(_state.volume_rendering, viewer->core.model, viewer->core.view,
-        viewer->core.proj);
+    render_bounding_box(_state.volume_rendering, GM4(viewer->core.model),
+        GM4(viewer->core.view), GM4(viewer->core.proj));
 
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -202,21 +206,19 @@ void Selection_Menu::draw() {
 
     glUniform1f(_state.uniform_locations_rendering.highlight_factor, highlight_factor);
 
-    render_volume(_state.volume_rendering, viewer->core.model, viewer->core.view,
-        viewer->core.proj, viewer->core.light_position);
+    render_volume(_state.volume_rendering, G3(viewer->core.light_position));
 
     glUseProgram(_state.volume_rendering.picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, _state.index_volume);
     glUniform1i(_state.uniform_locations_picking.index_volume, 4);
 
-    Eigen::Vector3f picking = pick_volume_location(_state.volume_rendering,
-        viewer->core.model, viewer->core.view, viewer->core.proj,
+    glm::vec3 picking = pick_volume_location(_state.volume_rendering,
         { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y });
 
     glUseProgram(0);
 
-    current_selected_feature = static_cast<int>(picking[0]);
+    current_selected_feature = static_cast<int>(picking.x);
 
     if (_state.should_select) {
         if (current_selected_feature != 0) {
@@ -585,7 +587,7 @@ bool Selection_Menu::post_draw() {
         if (current_interaction_index >= 1 &&
             current_interaction_index <= tf.nodes.size() - 1)
         {
-            float* rgba = tf.nodes[current_interaction_index].rgba;
+            float* rgba = glm::value_ptr(tf.nodes[current_interaction_index].rgba);
             if (ImGui::ColorPicker4("Change Color", rgba)) {
                 tf.is_dirty = true;
             }

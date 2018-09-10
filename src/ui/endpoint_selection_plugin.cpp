@@ -12,14 +12,16 @@
 
 namespace {
 
-bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints,
+bool validate_endpoint_pairs(const std::vector<std::pair<int, int>>& endpoints,
                              const Eigen::VectorXi& components) {
     bool success = true;
     std::unordered_set<int> computed_components;
 
     for (int i = 0; i < endpoints.size(); i++) {
-        const int c1 = components[endpoints[i][0]];
-        const int c2 = components[endpoints[i][0]];
+        const int c1 = components[endpoints[i].first];
+
+        // abock(2018-09-10): c2 was the same as c1 before, I think in error
+        const int c2 = components[endpoints[i].second];
         if (c1 != c2) {
             success = false;
             break;
@@ -39,7 +41,7 @@ bool validate_endpoint_pairs(const std::vector<std::array<int, 2>>& endpoints,
 
 void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
                       const Eigen::VectorXd normalized_distances,
-                      const std::vector<std::array<int, 2>>& endpoint_pairs,
+                      const std::vector<std::pair<int, int>>& endpoint_pairs,
                       const Eigen::VectorXi& connected_components,
                       int num_skeleton_vertices,
                       Eigen::MatrixXd& skeleton_vertices)
@@ -54,15 +56,15 @@ void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
     skeleton_vertices.resize(num_skeleton_vertices, 3);
 
     for (int ep_i = 0; ep_i < endpoint_pairs.size(); ep_i++) {
-        const int component = connected_components[endpoint_pairs[ep_i][0]];
-        skeleton_vertices.row(vertex_count) = TV.row(endpoint_pairs[ep_i][0]);
+        const int component = connected_components[endpoint_pairs[ep_i].first];
+        skeleton_vertices.row(vertex_count) = TV.row(endpoint_pairs[ep_i].first);
         vertex_count++;
 
-        const double nd_ep0 = normalized_distances[endpoint_pairs[ep_i][0]];
-        const double nd_ep1 = normalized_distances[endpoint_pairs[ep_i][1]];
+        const double nd_ep0 = normalized_distances[endpoint_pairs[ep_i].first];
+        const double nd_ep1 = normalized_distances[endpoint_pairs[ep_i].second];
         const double isoval_incr = (nd_ep1 - nd_ep0) / num_skeleton_vertices;
 
-        double isovalue = normalized_distances[endpoint_pairs[ep_i][0]] + isoval_incr;
+        double isovalue = normalized_distances[endpoint_pairs[ep_i].first] + isoval_incr;
         for (int i = 0; i < num_skeleton_vertices - 2; i++) {
             igl::marching_tets(TV, TT_comps[component], normalized_distances, isovalue, LV, LF);
             if (LV.rows() == 0) {
@@ -75,7 +77,7 @@ void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
             isovalue += isoval_incr;
         }
 
-        skeleton_vertices.row(vertex_count) = TV.row(endpoint_pairs[ep_i][1]);
+        skeleton_vertices.row(vertex_count) = TV.row(endpoint_pairs[ep_i].second);
         vertex_count += 1;
     }
 
@@ -135,9 +137,9 @@ bool EndPoint_Selection_Menu::pre_draw() {
     }
 
     for (int i = 0; i < state.endpoint_pairs.size(); i++) {
-        std::array<int, 2> ep = state.endpoint_pairs[i];
-        viewer->data().add_points(TV.row(ep[0]), ColorRGB::GREEN);
-        viewer->data().add_points(TV.row(ep[1]), ColorRGB::RED);
+        std::pair<int, int> ep = state.endpoint_pairs[i];
+        viewer->data().add_points(TV.row(ep.first), ColorRGB::GREEN);
+        viewer->data().add_points(TV.row(ep.second), ColorRGB::RED);
     }
 
     viewer->selected_data_index = push_mesh_id;
@@ -292,7 +294,8 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
         current_endpoint_idx += 1;
 
         if (current_endpoint_idx >= 2) { // We've selected 2 endpoints
-            state.endpoint_pairs.push_back(current_endpoints);
+            state.endpoint_pairs.push_back(
+                std::make_pair(current_endpoints[0], current_endpoints[1]));
 
             if (current_endpoints[0] == current_endpoints[1]) {
                 bad_selection = true;

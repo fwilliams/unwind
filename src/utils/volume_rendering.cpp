@@ -6,6 +6,8 @@
 #include <igl/opengl/load_shader.h>
 #include <igl/opengl/create_shader_program.h>
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "utils/utils.h"
 
 
@@ -252,7 +254,7 @@ using namespace igl::opengl;
 
 namespace volumerendering {
 
-void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_size,
+void initialize(Volume_Rendering& volume_rendering, const glm::vec4& viewport_size,
                 const char* fragment_shader, const char* picking_shader)
 {
     //
@@ -389,8 +391,8 @@ void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_siz
     // Entry point texture and frame buffer
     glGenTextures(1, &volume_rendering.bounding_box.entry_texture);
     glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.entry_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size[2],
-        viewport_size[3], 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(viewport_size[2]),
+        static_cast<GLsizei>(viewport_size[3]), 0, GL_RGB, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -403,8 +405,8 @@ void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_siz
     // Exit point texture and frame buffer
     glGenTextures(1, &volume_rendering.bounding_box.exit_texture);
     glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.exit_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size[2],
-        viewport_size[3], 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(viewport_size[2]),
+        static_cast<GLsizei>(viewport_size[3]), 0, GL_RGB, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -426,8 +428,8 @@ void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_siz
     // Picking texture and framebuffer
     glGenTextures(1, &volume_rendering.picking_texture);
     glBindTexture(GL_TEXTURE_2D, volume_rendering.picking_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size[2],
-        viewport_size[3], 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(viewport_size[2]),
+        static_cast<GLsizei>(viewport_size[3]), 0, GL_RGB, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -454,13 +456,13 @@ void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_siz
     volume_rendering.transfer_function.is_dirty = true;
 }
 
-void upload_volume_data(GLuint volume_texture, const Eigen::RowVector3i& tex_size,
-                        const Eigen::VectorXd& texture)
+void upload_volume_data(GLuint volume_texture, const glm::ivec3& tex_size,
+                        double* texture_data, int size)
 {
-    std::vector<uint8_t> volume_data(texture.size());
+    std::vector<uint8_t> volume_data(size);
     std::transform(
-        texture.data(),
-        texture.data() + texture.size(),
+        texture_data,
+        texture_data + size,
         volume_data.begin(),
         [](double d) {
             return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max());
@@ -549,8 +551,8 @@ void update_transfer_function(Transfer_Function& transfer_function) {
 }
 
 void render_bounding_box(const Volume_Rendering& volume_rendering,
-                         Eigen::Matrix4f model_matrix, Eigen::Matrix4f view_matrix,
-                         Eigen::Matrix4f proj_matrix)
+                         glm::mat4 model_matrix, glm::mat4 view_matrix,
+                         glm::mat4 proj_matrix)
 {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
     //
@@ -559,29 +561,19 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
     glBindVertexArray(volume_rendering.bounding_box.vao);
     glUseProgram(volume_rendering.bounding_box.program);
 
-    Eigen::Matrix4f scaling = Eigen::Matrix4f::Zero();
-    scaling.diagonal() <<
-        volume_rendering.parameters.normalized_volume_dimensions[0],
-        volume_rendering.parameters.normalized_volume_dimensions[1],
-        volume_rendering.parameters.normalized_volume_dimensions[2],
-        1.f;
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), volume_rendering.parameters.normalized_volume_dimensions);
+    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
 
-    Eigen::Matrix4f translation = Eigen::Matrix4f::Zero();
-    translation.diagonal() << 1.f, 1.f, 1.f, 1.f;
-    translation(0, 3) = -0.5f;
-    translation(1, 3) = -0.5f;
-    translation(2, 3) = -0.5f;
-
-    Eigen::Matrix4f model = model_matrix * scaling * translation;
+    glm::mat4 model = model_matrix * scaling * translate;
 
     glUniformMatrix4fv(volume_rendering.bounding_box.uniform_location.model_matrix, 1,
-        GL_FALSE, model.data());
+        GL_FALSE, glm::value_ptr(model));
 
     glUniformMatrix4fv(volume_rendering.bounding_box.uniform_location.view_matrix, 1,
-        GL_FALSE, view_matrix.data());
+        GL_FALSE, glm::value_ptr(view_matrix));
 
     glUniformMatrix4fv(volume_rendering.bounding_box.uniform_location.projection_matrix,
-        1, GL_FALSE, proj_matrix.data());
+        1, GL_FALSE, glm::value_ptr(proj_matrix));
 
     // Render entry points of bounding box
     glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.bounding_box.entry_framebuffer);
@@ -599,10 +591,7 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
     glPopDebugGroup();
 }
 
-void render_volume(const Volume_Rendering& volume_rendering,
-                   Eigen::Matrix4f model_matrix, Eigen::Matrix4f view_matrix,
-                   Eigen::Matrix4f proj_matrix, Eigen::Vector3f light_position)
-{
+void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
     //
     //  Setup
@@ -644,11 +633,11 @@ void render_volume(const Volume_Rendering& volume_rendering,
 
     // Rendering parameters
     glUniform3iv(volume_rendering.program.uniform_location.volume_dimensions, 1,
-        volume_rendering.parameters.volume_dimensions.data());
+        glm::value_ptr(volume_rendering.parameters.volume_dimensions));
     glUniform3fv(volume_rendering.program.uniform_location.volume_dimensions_rcp, 1,
-        volume_rendering.parameters.volume_dimensions_rcp.data());
+        glm::value_ptr(volume_rendering.parameters.volume_dimensions_rcp));
     glUniform3fv(volume_rendering.program.uniform_location.light_position, 1,
-        light_position.data());
+        glm::value_ptr(light_position));
     glUniform3f(
         volume_rendering.program.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f
     );
@@ -666,11 +655,8 @@ void render_volume(const Volume_Rendering& volume_rendering,
     glPopDebugGroup();
 }
 
-Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
-                                     Eigen::Matrix4f model_matrix, 
-                                     Eigen::Matrix4f view_matrix,
-                                     Eigen::Matrix4f proj_matrix,
-                                     Eigen::Vector2i mouse_position)
+glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
+                               glm::ivec2 mouse_position)
 {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
     glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.picking_framebuffer);
@@ -705,15 +691,15 @@ Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
 
     // Rendering parameters
     glUniform3iv(volume_rendering.picking_program.uniform_location.volume_dimensions, 1,
-        volume_rendering.parameters.volume_dimensions.data());
+        glm::value_ptr(volume_rendering.parameters.volume_dimensions));
     glUniform3fv(volume_rendering.picking_program.uniform_location.volume_dimensions_rcp,
-        1, volume_rendering.parameters.volume_dimensions_rcp.data());
+        1, glm::value_ptr(volume_rendering.parameters.volume_dimensions_rcp));
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glUseProgram(0);
 
     GLfloat colors[3];
-    glReadPixels(mouse_position[0], mouse_position[1], 1, 1, GL_RGB, GL_FLOAT, colors);
+    glReadPixels(mouse_position.x, mouse_position.y, 1, 1, GL_RGB, GL_FLOAT, colors);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

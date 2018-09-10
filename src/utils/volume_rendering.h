@@ -6,6 +6,8 @@
 #include <Eigen/Core>
 #include <array>
 #include <vector>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace volumerendering {
 
@@ -31,7 +33,7 @@ struct Bounding_Box {
 struct Transfer_Function {
     struct Node {
         float t;
-        float rgba[4];
+        glm::vec4 rgba;
     };
 
     std::vector<Node> nodes;
@@ -40,10 +42,10 @@ struct Transfer_Function {
 };
 
 struct Parameters {
-    std::array<GLint, 3> volume_dimensions = { 0, 0, 0 };
-    std::array<GLfloat, 3> volume_dimensions_rcp = { 0.f, 0.f, 0.f };
+    glm::ivec3 volume_dimensions = { 0, 0, 0 };
+    glm::vec3 volume_dimensions_rcp = { 0.f, 0.f, 0.f };
 
-    std::array<float, 3> normalized_volume_dimensions = { 0.f, 0.f, 0.f };
+    glm::vec3 normalized_volume_dimensions = { 0.f, 0.f, 0.f };
 
     GLfloat sampling_rate = 10.0;
 };
@@ -94,26 +96,21 @@ struct Volume_Rendering {
 };
 
 
-void initialize(Volume_Rendering& volume_rendering, Eigen::Vector4f viewport_size,
+void initialize(Volume_Rendering& volume_rendering, const glm::vec4& viewport_size,
     const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
 
-void upload_volume_data(GLuint volume_texture, const Eigen::RowVector3i& tex_size,
-    const Eigen::VectorXd& texture);
+void upload_volume_data(GLuint volume_texture, const glm::ivec3& tex_size,
+    double* texture_data, int size);
 
 void update_transfer_function(Transfer_Function& transfer_function);
 
-void render_bounding_box(const Volume_Rendering& volume_rendering,
-    Eigen::Matrix4f model_matrix, Eigen::Matrix4f view_matrix,
-    Eigen::Matrix4f proj_matrix);
+void render_bounding_box(const Volume_Rendering& volume_rendering, glm::mat4 model_matrix,
+    glm::mat4 view_matrix, glm::mat4 proj_matrix);
 
-void render_volume(const Volume_Rendering& volume_rendering, Eigen::Matrix4f model_matrix,
-    Eigen::Matrix4f view_matrix, Eigen::Matrix4f proj_matrix,
-    Eigen::Vector3f light_position);
+void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position);
 
-Eigen::Vector3f pick_volume_location(const Volume_Rendering& volume_rendering,
-    Eigen::Matrix4f model_matrix, Eigen::Matrix4f view_matrix,
-    Eigen::Matrix4f proj_matrix, Eigen::Vector2i mouse_position);
-
+glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
+    glm::ivec2 mouse_position);
 
 } // namespace volumerendering
 

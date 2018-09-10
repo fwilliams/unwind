@@ -31,7 +31,7 @@ static void scale_zero_one(Eigen::VectorXd& V) {
 // Compute heat diffusion
 static void diffusion_distances(const Eigen::MatrixXd& TV,
                          const Eigen::MatrixXi& TT,
-                         const std::vector<std::array<int, 2>>& endpoints,
+                         const std::vector<std::pair<int, int>>& endpoints,
                          Eigen::VectorXd& isovals) {
   using namespace std;
   using namespace Eigen;
@@ -44,8 +44,8 @@ static void diffusion_distances(const Eigen::MatrixXd& TV,
   int ccount = 0;
   for (int i = 0; i < endpoints.size(); i++) {
     auto ep = endpoints[i];
-    constraint_indices(ccount, 0) = ep[1];
-    constraint_indices(ccount + 1, 0) = ep[0];
+    constraint_indices(ccount, 0) = ep.second;
+    constraint_indices(ccount + 1, 0) = ep.first;
     constraint_values(ccount, 0) = 1.0;
     constraint_values(ccount+1, 0) = 0.0;
     ccount += 2;
@@ -61,7 +61,7 @@ static void diffusion_distances(const Eigen::MatrixXd& TV,
 // Compute approximate geodesic distance
 void geodesic_distances(const Eigen::MatrixXd& TV,
                         const Eigen::MatrixXi& TT,
-                        const std::vector<std::array<int, 2>>& endpoints,
+                        const std::vector<std::pair<int, int>>& endpoints,
                         Eigen::VectorXd& isovals,
                         bool normalized) {
   using namespace std;

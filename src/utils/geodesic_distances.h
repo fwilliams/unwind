@@ -7,9 +7,9 @@
 // Compute approximate geodesic distance
 void geodesic_distances(const Eigen::MatrixXd& TV,
                         const Eigen::MatrixXi& TT,
-                        const std::vector<std::array<int, 2>>& endpoints,
+                        const std::vector<std::pair<int, int>>& endpoints,
                         Eigen::VectorXd& isovals,
-                        bool normalized=true);
+                        bool normalized = true);
 
 
 #endif // GEODESIC_DISTANCES_H
