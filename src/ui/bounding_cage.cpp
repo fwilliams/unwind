@@ -308,13 +308,13 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
   left_kf->_right_cell = ret;
   right_kf->_left_cell = ret;
 
-  // TODO: Self intersection test
+  // TODO: AABB tree Self intersection test
 
   return ret;
 }
 
 bool BoundingCage::Cell::update_mesh() {
-  //assert(left_keyframe->vertices_2d().rows() == right_keyframe->vertices_2d().rows());
+  assert(_left_keyframe()->vertices_2d().rows() == _right_keyframe->vertices_2d().rows());
 
   Eigen::MatrixXi left_kf_faces, right_kf_faces;
   _left_keyframe->triangulate(left_kf_faces);
