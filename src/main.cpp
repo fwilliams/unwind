@@ -36,7 +36,7 @@ void log_opengl_debug(GLenum source, GLenum type, GLuint id, GLenum severity,
     if (source == GL_DEBUG_SOURCE_APPLICATION) {
         return;
     }
-    _state.logger->debug(
+    _state.logger->error(
         "OpenGL Debug msg: Source: {}, Type: {}, Id: {}, Severity: {}, Message: {}",
         source, type, id, severity, std::string(message)
     );

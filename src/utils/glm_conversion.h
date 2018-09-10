@@ -6,31 +6,41 @@
 #include <Eigen/Core>
 
 
-bool operator==(const glm::vec4& lhs, const Eigen::Vector4f& rhs) {
+inline bool operator==(const glm::vec4& lhs, const Eigen::Vector4f& rhs) {
     return lhs.x == rhs.x() && lhs.y == rhs.y() && lhs.z == rhs.z();
 }
-bool operator==(const Eigen::Vector4f& lhs, const glm::vec4& rhs) {
+inline bool operator==(const Eigen::Vector4f& lhs, const glm::vec4& rhs) {
     return operator==(rhs, lhs);
 }
 
-bool operator!=(const glm::vec4& lhs, const Eigen::Vector4f& rhs) {
+inline bool operator!=(const glm::vec4& lhs, const Eigen::Vector4f& rhs) {
     return !operator==(lhs, rhs);
 }
-bool operator!=(const Eigen::Vector4f& lhs, const glm::vec4& rhs) {
+inline bool operator!=(const Eigen::Vector4f& lhs, const glm::vec4& rhs) {
     return operator!=(rhs, lhs);
 }
 
 // naming scheme
-// <a><null | b><c>(...)
+// <a><null | b><c><d>(...)
 //
 // a: E if conversion from glm to Eigen       G if conversion from Eigen to glm
 // b: M if the conversion is a matrix, empty if the conversion is a vector
 // c: number of components
+// d: type (f: float, i: int, d: double)
 
 #define E3i(glm_vector) Eigen::RowVector3i((glm_vector).x, (glm_vector).y, (glm_vector).z)
 
-#define G3(eigen_vector) glm::make_vec3((eigen_vector).data())
-#define G4(eigen_vector) glm::make_vec4((eigen_vector).data())
-#define GM4(eigen_matrix) glm::make_mat4((eigen_matrix).data())
+#define G3f(eigen_vector) glm::vec3((eigen_vector).x(), (eigen_vector).y(), (eigen_vector).z())
+#define G4f(eigen_vector) glm::vec4((eigen_vector).x(), (eigen_vector).y(), (eigen_vector).z(), (eigen_vector).w())
+#define GM3f(eigen_matrix) glm::mat3(                                                    \
+    (eigen_matrix).row(0)[0], (eigen_matrix).row(1)[0], (eigen_matrix).row(2)[0],        \
+    (eigen_matrix).row(0)[1], (eigen_matrix).row(1)[1], (eigen_matrix).row(2)[1],        \
+    (eigen_matrix).row(0)[2], (eigen_matrix).row(1)[2], (eigen_matrix).row(2)[2])
+
+#define GM4f(eigen_matrix) glm::mat4(                                                    \
+    (eigen_matrix).row(0)[0], (eigen_matrix).row(1)[0], (eigen_matrix).row(2)[0], (eigen_matrix).row(3)[0], \
+    (eigen_matrix).row(0)[1], (eigen_matrix).row(1)[1], (eigen_matrix).row(2)[1], (eigen_matrix).row(3)[1], \
+    (eigen_matrix).row(0)[2], (eigen_matrix).row(1)[2], (eigen_matrix).row(2)[2], (eigen_matrix).row(3)[2], \
+    (eigen_matrix).row(0)[3], (eigen_matrix).row(1)[3], (eigen_matrix).row(2)[3], (eigen_matrix).row(3)[3])
 
 #endif // __GLM_CONVERSION__H__
