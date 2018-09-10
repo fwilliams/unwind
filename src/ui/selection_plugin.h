@@ -3,6 +3,8 @@
 
 #include "fish_ui_viewer_plugin.h"
 
+#include <glm/glm.hpp>
+
 struct State;
 
 class Selection_Menu : public FishUIViewerPlugin {
@@ -17,11 +19,11 @@ public:
     bool post_draw() override;
 
 private:
-    void resize_framebuffer_textures(igl::opengl::ViewerCore& core);
+    void resize_framebuffer_textures(glm::ivec2 framebuffer_size);
 
     State& _state;
 
-    float clicked_mouse_position[2] = { 0.f, 0.f };
+    glm::vec2 clicked_mouse_position = { 0.f, 0.f };
     bool is_currently_interacting = false;
     int current_interaction_index = -1;
     bool has_added_node_since_initial_click = false;

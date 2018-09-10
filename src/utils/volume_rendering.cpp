@@ -254,7 +254,7 @@ using namespace igl::opengl;
 
 namespace volumerendering {
 
-void initialize(Volume_Rendering& volume_rendering, const glm::vec4& viewport_size,
+void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_size,
                 const char* fragment_shader, const char* picking_shader)
 {
     //
@@ -391,8 +391,8 @@ void initialize(Volume_Rendering& volume_rendering, const glm::vec4& viewport_si
     // Entry point texture and frame buffer
     glGenTextures(1, &volume_rendering.bounding_box.entry_texture);
     glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.entry_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(viewport_size[2]),
-        static_cast<GLsizei>(viewport_size[3]), 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
+        GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -405,8 +405,8 @@ void initialize(Volume_Rendering& volume_rendering, const glm::vec4& viewport_si
     // Exit point texture and frame buffer
     glGenTextures(1, &volume_rendering.bounding_box.exit_texture);
     glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.exit_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(viewport_size[2]),
-        static_cast<GLsizei>(viewport_size[3]), 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
+        GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -428,8 +428,8 @@ void initialize(Volume_Rendering& volume_rendering, const glm::vec4& viewport_si
     // Picking texture and framebuffer
     glGenTextures(1, &volume_rendering.picking_texture);
     glBindTexture(GL_TEXTURE_2D, volume_rendering.picking_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(viewport_size[2]),
-        static_cast<GLsizei>(viewport_size[3]), 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
+        GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 

@@ -164,7 +164,7 @@ bool mouse_up(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
 
 int main(int argc, char** argv) {
     igl::opengl::glfw::Viewer viewer;
-    viewer.core.background_color = Eigen::Vector4f(0.1, 0.1, 0.1, 1.0);
+    viewer.core.background_color = Eigen::Vector4f(0.1f, 0.1f, 0.1f, 1.f);
     viewer.callback_init = init;
     viewer.callback_pre_draw = pre_draw;
     viewer.callback_post_draw = post_draw;

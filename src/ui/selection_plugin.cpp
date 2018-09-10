@@ -13,6 +13,7 @@
 
 #include "utils/glm_conversion.h"
 
+#include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 
@@ -21,7 +22,8 @@
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::initialize() {
-    volumerendering::initialize(_state.volume_rendering, G4(viewer->core.viewport),
+    volumerendering::initialize(_state.volume_rendering,
+        glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]),
         ContourTreeFragmentShader, ContourTreePickingFragmentShader);
 
     _state.uniform_locations_rendering.index_volume = glGetUniformLocation(
@@ -47,11 +49,8 @@ void Selection_Menu::initialize() {
     _state.volume_rendering.parameters.volume_dimensions = {
         _state.volume_file.w, _state.volume_file.h, _state.volume_file.d
     };
-    _state.volume_rendering.parameters.volume_dimensions_rcp = {
-      1.f / _state.volume_rendering.parameters.volume_dimensions[0],
-      1.f / _state.volume_rendering.parameters.volume_dimensions[1],
-      1.f / _state.volume_rendering.parameters.volume_dimensions[2]
-    };
+    _state.volume_rendering.parameters.volume_dimensions_rcp =
+        glm::vec3(1.f) / glm::vec3(_state.volume_rendering.parameters.volume_dimensions);
 
     int maxDim = glm::compMax(_state.volume_rendering.parameters.volume_dimensions);
     float md = static_cast<float>(maxDim);
@@ -99,21 +98,22 @@ void Selection_Menu::initialize() {
     _state.current_fish = 0;
 }
 
-void Selection_Menu::resize_framebuffer_textures(igl::opengl::ViewerCore& core) {
+void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
     // Entry point texture and frame buffer
     glBindTexture(GL_TEXTURE_2D, _state.volume_rendering.bounding_box.entry_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, static_cast<GLsizei>(core.viewport[2]),
-        static_cast<GLsizei>(core.viewport[3]), 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
+        GL_RGBA, GL_FLOAT, nullptr);
 
     // Exit point texture and frame buffer
     glBindTexture(GL_TEXTURE_2D, _state.volume_rendering.bounding_box.exit_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, static_cast<GLsizei>(core.viewport[2]),
-        static_cast<GLsizei>(core.viewport[3]), 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
+        GL_RGBA, GL_FLOAT, nullptr);
 }
 
 void Selection_Menu::draw_setup() {
     if (viewer->core.viewport != _state.target_viewport_size) {
-        resize_framebuffer_textures(viewer->core);
+        resize_framebuffer_textures(
+            glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
         _state.target_viewport_size = G4(viewer->core.viewport);
     }
 

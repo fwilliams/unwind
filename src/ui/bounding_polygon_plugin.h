@@ -23,9 +23,6 @@ private:
     Bounding_Polygon_Widget widget_2d;
     State& state;
 
-    // Vertices of the current plane
-    //Eigen::MatrixXd PV;
-
     int mesh_overlay_id = 0;
     size_t cage_mesh_overlay_id = size_t(-1);
     size_t points_overlay_id = size_t(-1);
