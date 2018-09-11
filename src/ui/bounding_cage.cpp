@@ -284,12 +284,11 @@ bool BoundingCage::KeyFrame::delete_vertex(unsigned idx, bool validate_2d, bool 
 BoundingCage::Cell::Cell(std::shared_ptr<KeyFrame> left_kf,
                          std::shared_ptr<KeyFrame> right_kf, std::weak_ptr<Cell> parent,
                          const BoundingCage* cage)
-    : _cage(cage)
-    , _left_keyframe(left_kf)
-    , _right_keyframe(right_kf)
-    , _parent_cell(parent)
-    , logger(spdlog::get(FishLoggerName))
-{}
+  : _cage(cage)
+  , _left_keyframe(left_kf)
+  , _right_keyframe(right_kf)
+  , _parent_cell(parent)
+  , logger(spdlog::get(FishLoggerName)) {}
 
 std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_ptr<KeyFrame> left_kf,
                                                                   std::shared_ptr<KeyFrame> right_kf,
@@ -357,7 +356,6 @@ bool BoundingCage::Cell::update_mesh() {
 
   return true;
 }
-
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
   // The index of the keyframe is out of range, since this method is called, internally,
