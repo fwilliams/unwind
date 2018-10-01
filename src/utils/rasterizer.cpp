@@ -195,7 +195,7 @@ void rasterize_tet_mesh(const Eigen::MatrixXd& TV,              // #V x 3  Tet m
 
             const RowVector3d tcbctr = bctr[0]*tc1 + bctr[1]*tc2 + bctr[2]*tc3 + bctr[3]*tc4;
             const RowVector3i tc = tcbctr.cwiseProduct(RowVector3d(in_w, in_h, in_d)).cast<int>();
-            const RowVector3i tc_clamped(clamp(tc[0], 0, in_w-1), clamp(tc[1], 0, in_h-1), clamp(tc[2], 0, in_d-1));
+            const RowVector3i tc_clamped(glm::clamp(tc[0], 0, in_w-1), glm::clamp(tc[1], 0, in_h-1), glm::clamp(tc[2], 0, in_d-1));
 
             const int out_idx = z*(out_w*out_h) + y*out_w + x;
             const int in_idx = tc_clamped[2]*in_w*in_h + tc_clamped[1]*in_w + tc_clamped[0];
