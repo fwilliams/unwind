@@ -31,9 +31,9 @@ private:
     //int current_slice_id = 0;
 
     igl::opengl::glfw::Viewer* viewer;
+
+    GLuint empty_vao = 0;
     struct {
-        GLuint vao = 0;
-        //GLuint vbo = 0;
         GLuint program = 0;
 
         GLint window_size_location = -1;
@@ -55,6 +55,21 @@ private:
         GLint color = -1;
     } polygon;
 
+    struct {
+        GLuint fbo = 0;
+        GLuint texture = 0;
+        glm::ivec2 texture_size = { 1024, 1024 };
+    } offscreen;
+
+    struct {
+        GLuint program = 0;
+        GLint position_location = -1;
+        GLint size_location = -1;
+        GLint texture_location = -1;
+    } blit;
+
+    glm::vec2 slice_position = { 0.f, 0.f };
+    float slice_size = 500.f;
 
 };
 
