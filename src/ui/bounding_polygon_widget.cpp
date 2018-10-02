@@ -14,6 +14,7 @@
 namespace {
 
 constexpr float SelectionRadius = 0.15f;
+constexpr float MaxZoomLevel = 2.f;
 
 constexpr const char* PlaneVertexShader = R"(
 #version 150
@@ -294,15 +295,18 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glm::vec3 kf_center = glm::vec3(G3f(kf->center()));
     glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
-    glm::vec3 ll = center + -1.f * x_axis + -1.f * y_axis;
-    glm::vec3 ul = center +  1.f * x_axis + -1.f * y_axis;
-    glm::vec3 lr = center + -1.f * x_axis +  1.f * y_axis;
-    glm::vec3 ur = center +  1.f * x_axis +  1.f * y_axis;
+    float z = ((view.zoom - 1.f) * -1.f) + 1.f;
+    glm::vec3 ll = center + -1.f * z * x_axis + -1.f * z * y_axis;
+    glm::vec3 ul = center +  1.f * z * x_axis + -1.f * z * y_axis;
+    glm::vec3 lr = center + -1.f * z * x_axis +  1.f * z * y_axis;
+    glm::vec3 ur = center +  1.f * z * x_axis +  1.f * z * y_axis;
 
     glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
     glUniform3fv(plane.lr_location, 1, glm::value_ptr(lr));
     glUniform3fv(plane.ul_location, 1, glm::value_ptr(ul));
     glUniform3fv(plane.ur_location, 1, glm::value_ptr(ur));
+
+
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, state.volume_rendering.volume_texture);
@@ -317,6 +321,18 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
     glUseProgram(polygon.program);
     glBindVertexArray(polygon.vao);
+
+
+
+
+    //glm::mat4 transform = GM4f(kf->transform());
+    //glm::vec4 ll_local = transform * glm::vec4(ll, 1.0);
+    //glm::vec4 ul_local = transform * glm::vec4(ul, 1.0);
+    //glm::vec4 lr_local = transform * glm::vec4(lr, 1.0);
+    //glm::vec4 ur_local = transform * glm::vec4(ur, 1.0);
+
+    
+
 
     //glm::vec3 scaled_x_axis = x_axis * glm::vec3(state.volume_rendering.parameters.volume_dimensions);
     //glm::vec3 scaled_y_axis = y_axis * glm::vec3(state.volume_rendering.parameters.volume_dimensions);
@@ -383,11 +399,11 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glUseProgram(0);
     glPopDebugGroup();
 
-
-
-
     glEnable(GL_DEPTH_TEST);
 
+
+    ImGui::SliderFloat2("Offset", glm::value_ptr(view.offset), -10.f, 10.f);
+    ImGui::SliderFloat("Zoom", &view.zoom, 0.f, MaxZoomLevel);
 
     ImGui::SliderFloat("Window Size", &slice_size, -h, h);
     ImGui::SliderFloat2("Window Position", glm::value_ptr(slice_position), 0.f, h);

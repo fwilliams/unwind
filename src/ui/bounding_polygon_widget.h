@@ -70,6 +70,10 @@ private:
     glm::vec2 slice_position = { 0.f, 0.f };
     float slice_size = 500.f;
 
+    struct {
+        glm::vec2 offset;
+        float zoom = 1.f;
+    } view;
 };
 
 #endif // BOUNDING_POLYGON_WIDGET_H
