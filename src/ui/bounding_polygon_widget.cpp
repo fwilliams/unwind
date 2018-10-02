@@ -225,15 +225,34 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
 
-    glm::ivec2 p = glm::ivec2(slice_position) + size / 2;
-    glm::ivec2 ll = p - glm::ivec2(slice_size / 2);
-    glm::ivec2 ur = p + glm::ivec2(slice_size / 2);
-    if (mouse_x < ll.x || mouse_x > ur.x || mouse_y < ll.y || mouse_y > ur.y) {
-        // we missed the overlay
+    if (!intersects(mouse_state.current_position)) {
         return false;
     }
 
-    if (mouse_state.is_down && current_edit_element != NoElement) {
+    bool ctrl_down = glfwGetKey(viewer->window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+                     glfwGetKey(viewer->window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+
+    if (mouse_state.is_left_button_down && ctrl_down) {
+        constexpr float InteractionScaleFactor = 5.f;
+
+        glm::vec2 current_mouse = { mouse_x, mouse_y };
+        glm::vec2 delta_mouse = (current_mouse - mouse_state.down_position) / glm::vec2(size);
+        delta_mouse *= InteractionScaleFactor;
+
+        mouse_state.down_position = current_mouse;
+
+        // Not sure why this swizzling and inverting has to happen, maybe left-handed
+        // v right-handed?  --abock
+        view.offset += glm::vec2(delta_mouse.y, -delta_mouse.x);
+
+        //view.offset = glm::clamp(view.offset, glm::vec2(-1.f), glm::vec2(1.f));
+
+        return true;
+    }
+
+    // We early out for the movement, so that we don't accidentally edit a node while
+    // shifting things around
+    if (mouse_state.is_left_button_down && current_edit_element != NoElement) {
         glm::vec2 current_mouse = { mouse_x, mouse_y };
         glm::vec2 normalized_mouse = (current_mouse / glm::vec2(size) - 0.5f) * 2.f;
         glm::vec2 mapped_mouse = normalized_mouse / (500.f / glm::vec2(size));
@@ -248,24 +267,6 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         if (!success) {
             current_edit_element = NoElement;
         }
-        return true;
-    }
-
-    // We early-out for the editing, so if we got here, we are clicking on the background
-    if (mouse_state.is_down) {
-        constexpr float InteractionScaleFactor = 5.f;
-
-        glm::vec2 current_mouse = { mouse_x, mouse_y };
-        glm::vec2 delta_mouse = (current_mouse - mouse_state.down_position) / glm::vec2(size);
-        delta_mouse *= InteractionScaleFactor;
-
-        mouse_state.down_position = current_mouse;
-
-        // Not sure why this swizzling and inverting has to happen, maybe left-handed
-        // v right-handed?  --abock
-        view.offset += glm::vec2(delta_mouse.y, -delta_mouse.x);
-        
-        return true;
     }
     return false;
 }
@@ -278,7 +279,7 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
 
 
     if (left_mouse) {
-        mouse_state.is_down = true;
+        mouse_state.is_left_button_down = true;
 
         glm::vec2 current_mouse = { viewer->current_mouse_x, viewer->current_mouse_y };
         // Zooming and panning
@@ -306,36 +307,39 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
 
 bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
     current_edit_element = NoElement;
-    mouse_state.is_down = false;
+    mouse_state.is_left_button_down = false;
     return false;
 }
 
 bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
     mouse_state.scroll = delta_y;
 
-    glm::ivec2 size;
-    glfwGetWindowSize(viewer->window, &size.x, &size.y);
-
-    glm::ivec2 p = glm::ivec2(slice_position) + size / 2;
-    glm::ivec2 ll = p - glm::ivec2(slice_size / 2);
-    glm::ivec2 ur = p + glm::ivec2(slice_size / 2);
-    if (mouse_state.current_position.x < ll.x || mouse_state.current_position.x > ur.x ||
-        mouse_state.current_position.y < ll.y || mouse_state.current_position.y > ur.y)
-    {
-        // we missed the overlay
+    if (!intersects(mouse_state.current_position)) {
         return false;
     }
-
 
     if (mouse_state.scroll != 0.f) {
         constexpr float InteractionScaleFactor = 0.035f;
 
         view.zoom += InteractionScaleFactor * mouse_state.scroll;
+        view.zoom = glm::clamp(view.zoom, std::numeric_limits<float>::epsilon(), MaxZoomLevel);
 
         mouse_state.scroll = 0.f;
     }
     return true;
 }
+
+bool Bounding_Polygon_Widget::intersects(const glm::ivec2& p) const {
+    glm::ivec2 size;
+    glfwGetWindowSize(viewer->window, &size.x, &size.y);
+
+    const glm::ivec2 wp = glm::ivec2(position) + size / 2;
+    const glm::ivec2 ll = wp - glm::ivec2(size / 2);
+    const glm::ivec2 ur = wp + glm::ivec2(size / 2);
+
+    return p.x >= ll.x && p.x <= ur.x && p.y >= ll.y || p.y <= ur.y;
+}
+
 
 
 bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int current_vertex_id) {
@@ -449,8 +453,8 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
     glUseProgram(blit.program);
     glBindVertexArray(empty_vao);
-    glUniform2f(blit.position_location, slice_position.x / w, slice_position.y / h);
-    glUniform2f(blit.size_location, slice_size / w, slice_size / h);
+    glUniform2f(blit.position_location, position.x / w, position.y / h);
+    glUniform2f(blit.size_location, size / w, size / h);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, offscreen.texture);
     glUniform1i(blit.texture_location, 0);
@@ -462,11 +466,8 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glEnable(GL_DEPTH_TEST);
 
 
-    ImGui::SliderFloat2("Offset", glm::value_ptr(view.offset), -2.f, 2.f);
-    ImGui::SliderFloat("Zoom", &view.zoom, 0.f, MaxZoomLevel);
-
-    ImGui::SliderFloat("Window Size", &slice_size, -h, h);
-    ImGui::SliderFloat2("Window Position", glm::value_ptr(slice_position), 0.f, h);
+    ImGui::SliderFloat("Window Size", &size, -h, h);
+    ImGui::SliderFloat2("Window Position", glm::value_ptr(position), 0.f, h);
 
 
     //int width;

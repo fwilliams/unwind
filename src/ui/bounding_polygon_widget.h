@@ -21,18 +21,18 @@ public:
     bool post_draw(BoundingCage::KeyFrameIterator it, int current_vertex_id);
 
 private:
+    bool intersects(const glm::ivec2& p) const;
+
     static constexpr const int NoElement = -1;
 
     State& state;
+    igl::opengl::glfw::Viewer* viewer;
 
+    // Editing state
     BoundingCage::KeyFrameIterator current_active_keyframe;
     int current_edit_element = NoElement;
 
-    //bool is_currently_on_slice = false;
-    //int current_slice_id = 0;
-
-    igl::opengl::glfw::Viewer* viewer;
-
+    // Rendering
     GLuint empty_vao = 0;
     struct {
         GLuint program = 0;
@@ -68,8 +68,8 @@ private:
         GLint texture_location = -1;
     } blit;
 
-    glm::vec2 slice_position = { 0.f, 0.f };
-    float slice_size = 500.f;
+    glm::vec2 position = { 0.f, 0.f }; // window coordinates
+    float size = 500.f;                // window coordinates
 
     struct {
         glm::vec2 offset;
@@ -77,9 +77,9 @@ private:
     } view;
 
     struct {
-        glm::ivec2 current_position;
-        glm::vec2 down_position;
-        bool is_down = false;
+        glm::ivec2 current_position; // window coordinates
+        glm::vec2 down_position;     // window coordinates
+        bool is_left_button_down = false;
         float scroll = 0.f;
     } mouse_state;
 };
