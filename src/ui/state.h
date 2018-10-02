@@ -93,18 +93,6 @@ struct State {
     // Selected pairs of endpoints
     std::vector<std::pair<int, int>> endpoint_pairs;
 
-    //struct BoundingPolygon {
-    //    int nPoints = 6;
-
-    //    struct Slice {
-    //        int vertex_id;
-    //        std::vector<Eigen::Vector2f> polygon;
-    //    };
-    //    std::vector<Slice> polygon_slices;
-    //};
-
-    //BoundingPolygon bounding_polygon;
-
     BoundingCage cage;
 
     // Geodesic distances

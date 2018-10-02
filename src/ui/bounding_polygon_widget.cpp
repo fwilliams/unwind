@@ -72,7 +72,7 @@ uniform sampler1D tf;
 void main() {
     // All areas outside the actual texture area should be black
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+        out_color = vec4(0.7, 0.0, 0.4, 1.0);
     }
     else {
         float v = texture(tex, uv).r;
@@ -319,10 +319,10 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
     }
 
     if (mouse_state.scroll != 0.f) {
-        constexpr float InteractionScaleFactor = 0.035f;
+        constexpr float InteractionScaleFactor = 1.f;
 
         view.zoom += InteractionScaleFactor * mouse_state.scroll;
-        view.zoom = glm::clamp(view.zoom, std::numeric_limits<float>::epsilon(), MaxZoomLevel);
+        //view.zoom = glm::clamp(view.zoom, std::numeric_limits<float>::epsilon(), MaxZoomLevel);
 
         mouse_state.scroll = 0.f;
     }
@@ -357,13 +357,22 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glm::vec3 x_axis = glm::vec3(G3f(kf->right()));
     glm::vec3 y_axis = glm::vec3(G3f(kf->up()));
     glm::vec3 kf_center = glm::vec3(G3f(kf->center()));
-    glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+    //glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+    glm::vec3 center = kf_center;
+
+
+
+
 
     float z = ((view.zoom - 1.f) * -1.f) + 1.f;
     glm::vec3 ll = center + (-1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
+    ll /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
     glm::vec3 ul = center + ( 1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
+    ul /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
     glm::vec3 lr = center + (-1.f + view.offset.x) * z * x_axis + ( 1.f + view.offset.y) * z * y_axis;
+    lr /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
     glm::vec3 ur = center + ( 1.f + view.offset.x) * z * x_axis + ( 1.f + view.offset.y) * z * y_axis;
+    ur /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
     glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
     glUniform3fv(plane.lr_location, 1, glm::value_ptr(lr));
@@ -415,13 +424,20 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
     //glm::vec3 size = scaled_ur - scaled_ll;
 
-
+    
     //glm::mat4 transform = GM4f(kf->transform());
     std::vector<glm::vec2> vertex_data = convert_vertices_2d(current_active_keyframe->vertices_2d());
-    //for (glm::vec2& v : vertex_data) {
-    //    glm::vec4 v_local = transform * glm::vec4(v, 0.f, 1.f);
-    //    v = v_local;
-    //}
+    for (glm::vec2& v : vertex_data) {
+        v /= glm::vec2(view.zoom);
+
+        v += glm::vec2(-view.offset.y, -view.offset.x);
+        //view.offset += glm::vec2();
+        //v += view.offset;
+
+        //v /= 10.f;
+        //glm::vec4 v_local = transform * glm::vec4(v, 0.f, 1.f);
+        //v = v_local;
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
     glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(glm::vec2),
@@ -466,7 +482,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glEnable(GL_DEPTH_TEST);
 
 
-    ImGui::SliderFloat("Window Size", &size, -h, h);
+    ImGui::SliderFloat("Window Size", &size, 0.f, h);
     ImGui::SliderFloat2("Window Position", glm::value_ptr(position), 0.f, h);
 
 

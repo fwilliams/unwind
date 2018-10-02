@@ -73,7 +73,7 @@ private:
 
     struct {
         glm::vec2 offset;
-        float zoom = 1.f;
+        float zoom = -25.f;
     } view;
 
     struct {
