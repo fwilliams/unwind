@@ -51,8 +51,7 @@ private:
         GLuint vbo = 0;
         GLuint program = 0;
 
-        GLint window_size_location = -1;
-        GLint color = -1;
+        GLint color_location = -1;
     } polygon;
 
     struct {

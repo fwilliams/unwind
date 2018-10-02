@@ -6,6 +6,7 @@
 #include <utils/glm_conversion.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 
 #pragma optimize ("", off)
@@ -83,15 +84,8 @@ constexpr const char* PolygonVertexShader = R"(
 #version 150
 in vec2 position;
 
-uniform vec2 window_size;
-const float Size = 500.f;
-
 void main() {
-    vec2 p = position;
-    p.x *= Size / window_size.x;
-    p.y *= Size / window_size.y;
-
-    gl_Position = vec4(p, 0.0, 1.0);
+    gl_Position = vec4(position, 0.0, 1.0);
 }
 )";
 
@@ -188,8 +182,7 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
     igl::opengl::create_shader_program(PolygonVertexShader, PolygonFragmentShader, {},
         polygon.program);
 
-    polygon.window_size_location = glGetUniformLocation(polygon.program, "window_size");
-    polygon.color = glGetUniformLocation(polygon.program, "color");
+    polygon.color_location = glGetUniformLocation(polygon.program, "color");
 
     glGenVertexArrays(1, &polygon.vao);
     glBindVertexArray(polygon.vao);
@@ -287,13 +280,12 @@ bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
 bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int current_vertex_id) {
     current_active_keyframe = kf;
 
-    glDisable(GL_DEPTH_TEST);
-
-
-    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render slice");
     glBindFramebuffer(GL_FRAMEBUFFER, offscreen.fbo);
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render slice");
     glUseProgram(plane.program);
     glBindVertexArray(empty_vao);
 
@@ -303,9 +295,9 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
     glm::vec3 ll = center + -1.f * x_axis + -1.f * y_axis;
-    glm::vec3 ul = center + 1.f * x_axis + -1.f * y_axis;
-    glm::vec3 lr = center + -1.f * x_axis + 1.f * y_axis;
-    glm::vec3 ur = center + 1.f * x_axis + 1.f * y_axis;
+    glm::vec3 ul = center +  1.f * x_axis + -1.f * y_axis;
+    glm::vec3 lr = center + -1.f * x_axis +  1.f * y_axis;
+    glm::vec3 ur = center +  1.f * x_axis +  1.f * y_axis;
 
     glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
     glUniform3fv(plane.lr_location, 1, glm::value_ptr(lr));
@@ -319,8 +311,56 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
     glUseProgram(0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glPopDebugGroup();
+
+
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
+    glUseProgram(polygon.program);
+    glBindVertexArray(polygon.vao);
+
+    //glm::vec3 scaled_x_axis = x_axis * glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+    //glm::vec3 scaled_y_axis = y_axis * glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+    //glm::vec3 scaled_ll = kf_center + -1.f * scaled_x_axis + -1.f * scaled_y_axis;
+    //glm::vec3 scaled_ul = kf_center +  1.f * scaled_x_axis + -1.f * scaled_y_axis;
+    //glm::vec3 scaled_lr = kf_center + -1.f * scaled_x_axis +  1.f * scaled_y_axis;
+    //glm::vec3 scaled_ur = kf_center +  1.f * scaled_x_axis +  1.f * scaled_y_axis;
+
+    //float left = scaled_ll.x;
+    //float right = scaled_ur.x;
+    //float bottom = scaled_ll.y;
+    //float up = scaled_ur.y;
+
+    //glm::mat4 p = glm::ortho(left, right, bottom, up);
+
+
+    //glm::vec3 size = scaled_ur - scaled_ll;
+
+
+    //glm::mat4 transform = GM4f(kf->transform());
+    std::vector<glm::vec2> vertex_data = convert_vertices_2d(current_active_keyframe->vertices_2d());
+    //for (glm::vec2& v : vertex_data) {
+    //    glm::vec4 v_local = transform * glm::vec4(v, 0.f, 1.f);
+    //    v = v_local;
+    //}
+
+    glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(glm::vec2),
+        vertex_data.data(), GL_STATIC_DRAW);
+
+    glPointSize(8.f);
+    glLineWidth(3.f);
+
+
+    glUniform4f(polygon.color_location, 0.85f, 0.85f, 0.f, 1.f);
+
+    glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
+    glDrawArrays(GL_POINTS, 0, vertex_data.size());
+
+
+    glPopDebugGroup();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
 
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Texture Blit");
@@ -341,10 +381,10 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
     glUseProgram(0);
-
-
-
     glPopDebugGroup();
+
+
+
 
     glEnable(GL_DEPTH_TEST);
 
