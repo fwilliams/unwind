@@ -16,6 +16,7 @@ public:
     bool mouse_move(int mouse_x, int mouse_y);
     bool mouse_down(int button, int modifier);
     bool mouse_up(int button, int modifier);
+    bool mouse_scroll(float delta_y);
 
     bool post_draw(BoundingCage::KeyFrameIterator it, int current_vertex_id);
 
@@ -74,6 +75,13 @@ private:
         glm::vec2 offset;
         float zoom = 1.f;
     } view;
+
+    struct {
+        glm::ivec2 current_position;
+        glm::vec2 down_position;
+        bool is_down = false;
+        float scroll = 0.f;
+    } mouse_state;
 };
 
 #endif // BOUNDING_POLYGON_WIDGET_H

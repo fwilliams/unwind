@@ -13,6 +13,7 @@ public:
     bool mouse_move(int mouse_x, int mouse_y) override;
     bool mouse_down(int button, int modifier) override;
     bool mouse_up(int button, int modifier) override;
+    bool mouse_scroll(float delta_y) override;
 
 
     bool post_draw() override;

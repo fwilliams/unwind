@@ -108,6 +108,16 @@ bool Bounding_Polygon_Menu::mouse_up(int button, int modifier) {
     }
 }
 
+bool Bounding_Polygon_Menu::mouse_scroll(float delta_y) {
+    if (show_slice_view) {
+        return widget_2d.mouse_scroll(delta_y);
+    }
+    else {
+        return FishUIViewerPlugin::mouse_scroll(delta_y);
+    }
+}
+
+
 
 bool Bounding_Polygon_Menu::post_draw() {
     bool ret = FishUIViewerPlugin::post_draw();
