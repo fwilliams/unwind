@@ -4,7 +4,7 @@
 file(GLOB UI_SRCS ui/*.cpp)
 file(GLOB UI_HEADER ui/*.h)
 add_executable(fish_deformation main.cpp ${UI_SRCS} ${UI_HEADER} ".editorconfig")
-set_property(TARGET fish_deformation PROPERTY CXX_STANDARD 17)
+set_property(TARGET fish_deformation PROPERTY CXX_STANDARD 14)
 set_property(TARGET fish_deformation PROPERTY CXX_STANDARD_REQUIRED ON)
 target_link_libraries(fish_deformation quartet contourtree utils vor3d spdlog
   igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal igl::triangle)

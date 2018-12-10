@@ -14,7 +14,7 @@
 namespace {
 
 constexpr float SelectionRadius = 0.15f;
-constexpr float MaxZoomLevel = 2.f;
+constexpr float MaxZoomLevel = 20.f;
 
 constexpr const char* PlaneVertexShader = R"(
 #version 150
@@ -104,28 +104,14 @@ void main() {
 constexpr const char* BlitVertexShader = R"(
 #version 150
 
-vec2 positions[6] = vec2[](
-    vec2(-1.0, -1.0),
-    vec2( 1.0, -1.0),
-    vec2( 1.0,  1.0),
-
-    vec2(-1.0, -1.0),
-    vec2( 1.0,  1.0),
-    vec2(-1.0,  1.0)
-);
+in vec2 in_position;
+in vec2 in_uv;
 
 out vec2 uv;
 
-uniform vec2 position;
-uniform vec2 size;
-
 void main() {
-    vec2 p = positions[gl_VertexID];
-    uv = (p + vec2(1.0)) / 2;
-
-    p = p * size + position;
-    gl_Position = vec4(p, 0, 1.0);
-
+    gl_Position = vec4(in_position, 0.0, 1.0);
+    uv = in_uv;
 }
 )";
 
@@ -142,6 +128,12 @@ void main() {
 }   
 
 )";
+
+struct BlitData {
+    float data[4]; // pos[2] + uv[2]
+};
+
+
 
 std::vector<glm::vec2> convert_vertices_2d(const Eigen::MatrixXd& vertices) {
     std::vector<glm::vec2> result(vertices.rows());
@@ -196,10 +188,19 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
 
 
     igl::opengl::create_shader_program(BlitVertexShader, BlitFragmentShader, {}, blit.program);
-    GLuint blit_program = 0;
-    blit.position_location = glGetUniformLocation(blit.program, "position");
-    blit.size_location = glGetUniformLocation(blit.program, "size");
     blit.texture_location = glGetUniformLocation(blit.program, "tex");
+
+    glGenVertexArrays(1, &blit.vao);
+    glBindVertexArray(blit.vao);
+
+    glGenBuffers(1, &blit.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, blit.vbo);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(BlitData), nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(BlitData), reinterpret_cast<void*>(2 * sizeof(float)));
+    glBindVertexArray(0);
+
 
 
 
@@ -220,8 +221,8 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
 }
 
 bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
-    glm::ivec2 size;
-    glfwGetWindowSize(viewer->window, &size.x, &size.y);
+    glm::ivec2 window_size;
+    glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
 
@@ -236,7 +237,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         constexpr float InteractionScaleFactor = 5.f;
 
         glm::vec2 current_mouse = { mouse_x, mouse_y };
-        glm::vec2 delta_mouse = (current_mouse - mouse_state.down_position) / glm::vec2(size);
+        glm::vec2 delta_mouse = (current_mouse - mouse_state.down_position) / glm::vec2(window_size);
         delta_mouse *= InteractionScaleFactor;
 
         mouse_state.down_position = current_mouse;
@@ -253,16 +254,28 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
     // We early out for the movement, so that we don't accidentally edit a node while
     // shifting things around
     if (mouse_state.is_left_button_down && current_edit_element != NoElement) {
-        glm::vec2 current_mouse = { mouse_x, mouse_y };
-        glm::vec2 normalized_mouse = (current_mouse / glm::vec2(size) - 0.5f) * 2.f;
-        glm::vec2 mapped_mouse = normalized_mouse / (500.f / glm::vec2(size));
-        mapped_mouse = glm::clamp(mapped_mouse, glm::vec2(-1.f), glm::vec2(1.f));
-        mapped_mouse.y *= -1.f;
+        // current_mouse is in pixel coordinates
+        glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
+        // Zooming and panning
+        mouse_state.down_position = current_mouse;
+
+        glm::vec2 window_ll = position;
+        glm::vec2 window_ur = position + size;
+
+        // Map mouse into [0, 1] in the subwindow
+        glm::vec2 normalized_mouse = (current_mouse - window_ll) / (window_ur - window_ll);
+
+        // Convert to [-1, 1]
+        glm::vec2 mapped_mouse = (normalized_mouse - glm::vec2(0.5f)) * 2.f;
+
+
+        // Convert into keyframe coordinates
+        glm::vec2 kf_mouse = mapped_mouse * view.zoom;
 
         const bool validate_2d = true;
         const bool validate_3d = false;
         bool success = current_active_keyframe->move_point_2d(current_edit_element,
-            Eigen::RowVector2d(mapped_mouse.x, mapped_mouse.y), validate_2d, validate_3d);
+            Eigen::RowVector2d(kf_mouse.x, kf_mouse.y), validate_2d, validate_3d);
 
         if (!success) {
             current_edit_element = NoElement;
@@ -272,36 +285,49 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 }
 
 bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
-    glm::ivec2 size;
-    glfwGetWindowSize(viewer->window, &size.x, &size.y);
+    glm::ivec2 window_size;
+    glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     bool left_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
-
 
     if (left_mouse) {
         mouse_state.is_left_button_down = true;
 
-        glm::vec2 current_mouse = { viewer->current_mouse_x, viewer->current_mouse_y };
+        // current_mouse is in pixel coordinates
+        glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
         // Zooming and panning
         mouse_state.down_position = current_mouse;
 
+        glm::vec2 window_ll = position;
+        glm::vec2 window_ur = position + size;
 
-        // Check if we are hitting a point to edit it
-        // @TODO(abock): This needs to be recomputed
-        glm::vec2 normalized_mouse = (current_mouse / glm::vec2(size) - 0.5f) * 2.f;
-        glm::vec2 mapped_mouse = normalized_mouse / (500.f / glm::vec2(size));
-        mapped_mouse.y *= -1.f;
+        // Map mouse into [0, 1] in the subwindow
+        glm::vec2 normalized_mouse = (current_mouse - window_ll) / (window_ur - window_ll);
 
+        // Convert to [-1, 1]
+        glm::vec2 mapped_mouse = (normalized_mouse - glm::vec2(0.5f)) * 2.f;
+
+
+        // Convert vertices into X
         std::vector<glm::vec2> vertices = convert_vertices_2d(current_active_keyframe->vertices_2d());
+        for (glm::vec2& v : vertices) {
+            v /= glm::vec2(view.zoom);
+
+            //v -= glm::vec2(view.offset.y, view.offset.x);
+            //v -= glm::vec2(view.offset.x, view.offset.y);
+        }
+
         for (int i = 0; i < vertices.size(); ++i) {
             float d = glm::distance(vertices[i], mapped_mouse);
             if (d < SelectionRadius) {
                 current_edit_element = i;
+                std::cout << "Hit\n";
                 return true;
             }
         }
     }
 
+    std::cout << "Miss\n";
     return false;
 }
 
@@ -321,8 +347,8 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
     if (mouse_state.scroll != 0.f) {
         constexpr float InteractionScaleFactor = 1.f;
 
-        view.zoom += InteractionScaleFactor * mouse_state.scroll;
-        //view.zoom = glm::clamp(view.zoom, std::numeric_limits<float>::epsilon(), MaxZoomLevel);
+        view.zoom += InteractionScaleFactor * -mouse_state.scroll;
+        view.zoom = glm::clamp(view.zoom, std::numeric_limits<float>::epsilon(), MaxZoomLevel);
 
         mouse_state.scroll = 0.f;
     }
@@ -345,7 +371,13 @@ bool Bounding_Polygon_Widget::intersects(const glm::ivec2& p) const {
 bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int current_vertex_id) {
     current_active_keyframe = kf;
 
+    
+    GLint old_viewport[4];
+    glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+
     glBindFramebuffer(GL_FRAMEBUFFER, offscreen.fbo);
+    glViewport(0, 0, offscreen.texture_size.x, offscreen.texture_size.y);
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
@@ -360,18 +392,18 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     //glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
     glm::vec3 center = kf_center;
 
-
-
-
-
     float z = ((view.zoom - 1.f) * -1.f) + 1.f;
-    glm::vec3 ll = center + (-1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
+    //glm::vec3 ll = center + (-1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
+    glm::vec3 ll = center + (-1.f ) * z * x_axis + (-1.f ) * z * y_axis;
     ll /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    glm::vec3 ul = center + ( 1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
+    //glm::vec3 ul = center + (1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
+    glm::vec3 ul = center + ( 1.f ) * z * x_axis + (-1.f ) * z * y_axis;
     ul /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    glm::vec3 lr = center + (-1.f + view.offset.x) * z * x_axis + ( 1.f + view.offset.y) * z * y_axis;
+    //glm::vec3 lr = center + (-1.f + view.offset.x) * z * x_axis + (1.f + view.offset.y) * z * y_axis;
+    glm::vec3 lr = center + (-1.f) * z * x_axis + ( 1.f ) * z * y_axis;
     lr /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    glm::vec3 ur = center + ( 1.f + view.offset.x) * z * x_axis + ( 1.f + view.offset.y) * z * y_axis;
+    //glm::vec3 ur = center + (1.f + view.offset.x) * z * x_axis + (1.f + view.offset.y) * z * y_axis;
+    glm::vec3 ur = center + ( 1.f ) * z * x_axis + ( 1.f ) * z * y_axis;
     ur /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
     glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
@@ -391,57 +423,35 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glPopDebugGroup();
 
 
+
+    //
+    // Render Polygon
+    //
+
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
+
     glUseProgram(polygon.program);
     glBindVertexArray(polygon.vao);
 
 
-
-
-    //glm::mat4 transform = GM4f(kf->transform());
-    //glm::vec4 ll_local = transform * glm::vec4(ll, 1.0);
-    //glm::vec4 ul_local = transform * glm::vec4(ul, 1.0);
-    //glm::vec4 lr_local = transform * glm::vec4(lr, 1.0);
-    //glm::vec4 ur_local = transform * glm::vec4(ur, 1.0);
-
-    
-
-
-    //glm::vec3 scaled_x_axis = x_axis * glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    //glm::vec3 scaled_y_axis = y_axis * glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    //glm::vec3 scaled_ll = kf_center + -1.f * scaled_x_axis + -1.f * scaled_y_axis;
-    //glm::vec3 scaled_ul = kf_center +  1.f * scaled_x_axis + -1.f * scaled_y_axis;
-    //glm::vec3 scaled_lr = kf_center + -1.f * scaled_x_axis +  1.f * scaled_y_axis;
-    //glm::vec3 scaled_ur = kf_center +  1.f * scaled_x_axis +  1.f * scaled_y_axis;
-
-    //float left = scaled_ll.x;
-    //float right = scaled_ur.x;
-    //float bottom = scaled_ll.y;
-    //float up = scaled_ur.y;
-
-    //glm::mat4 p = glm::ortho(left, right, bottom, up);
-
-
-    //glm::vec3 size = scaled_ur - scaled_ll;
-
-    
-    //glm::mat4 transform = GM4f(kf->transform());
     std::vector<glm::vec2> vertex_data = convert_vertices_2d(current_active_keyframe->vertices_2d());
     for (glm::vec2& v : vertex_data) {
+        //v -= glm::vec2(view.offset.y, view.offset.x);
         v /= glm::vec2(view.zoom);
 
-        v += glm::vec2(-view.offset.y, -view.offset.x);
-        //view.offset += glm::vec2();
-        //v += view.offset;
+        //v += glm::vec2(0.5f);
+        //v *= glm::vec2(2.f);
+    }
 
-        //v /= 10.f;
-        //glm::vec4 v_local = transform * glm::vec4(v, 0.f, 1.f);
-        //v = v_local;
+    std::vector<float> vertex_data_data;
+    for (const glm::vec2& v : vertex_data) {
+        vertex_data_data.push_back(v.x);
+        vertex_data_data.push_back(v.y);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(glm::vec2),
-        vertex_data.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertex_data_data.size() * sizeof(float),
+        vertex_data_data.data(), GL_STATIC_DRAW);
 
     glPointSize(8.f);
     glLineWidth(3.f);
@@ -452,9 +462,10 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
     glDrawArrays(GL_POINTS, 0, vertex_data.size());
 
-
     glPopDebugGroup();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
 
 
 
@@ -468,9 +479,50 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
 
     glUseProgram(blit.program);
-    glBindVertexArray(empty_vao);
-    glUniform2f(blit.position_location, position.x / w, position.y / h);
-    glUniform2f(blit.size_location, size / w, size / h);
+    glBindVertexArray(blit.vao);
+    //vec2(-1.0, -1.0),
+    //    vec2(1.0, -1.0),
+    //    vec2(1.0, 1.0),
+
+    //    vec2(-1.0, -1.0),
+    //    vec2(1.0, 1.0),
+    //    vec2(-1.0, 1.0)
+
+    glBindBuffer(GL_ARRAY_BUFFER, blit.vbo);
+    {
+        glm::vec2 size_ndc = size / glm::vec2(width, height) * 2.f;
+        glm::vec2 pos_ndc = (position / glm::vec2(width, height) - glm::vec2(0.5)) * 2.f;
+
+        BlitData box_ll = {
+            pos_ndc.x, pos_ndc.y,
+            0.f, 0.f
+        };
+
+        BlitData box_lr = {
+            pos_ndc.x + size_ndc.x, pos_ndc.y,
+            1.f, 0.f
+        };
+
+        BlitData box_ul = {
+            pos_ndc.x, pos_ndc.y + size_ndc.y,
+            0.f, 1.f
+        };
+
+        BlitData box_ur = {
+            pos_ndc.x + size_ndc.x,  pos_ndc.y + size_ndc.y,
+            1.f, 1.f
+        };
+
+        std::array<BlitData, 6> blit_data = {
+            box_ll, box_lr, box_ur, box_ll, box_ur, box_ul
+
+        };
+
+        glBufferData(GL_ARRAY_BUFFER, blit_data.size() * sizeof(BlitData),
+            blit_data.data(), GL_STATIC_DRAW);
+
+
+    }
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, offscreen.texture);
     glUniform1i(blit.texture_location, 0);
@@ -482,7 +534,8 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glEnable(GL_DEPTH_TEST);
 
 
-    ImGui::SliderFloat("Window Size", &size, 0.f, h);
+
+    ImGui::SliderFloat2("Window Size", glm::value_ptr(size), 0.f, h);
     ImGui::SliderFloat2("Window Position", glm::value_ptr(position), 0.f, h);
 
 

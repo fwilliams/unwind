@@ -128,7 +128,17 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bo
       return false;
   }
 
-  return left_cell()->update_mesh() && right_cell()->update_mesh();
+  bool ret = true;
+
+  if (left_cell()) {
+      ret = left_cell()->update_mesh();
+  }
+  if (right_cell()) {
+      ret = ret && right_cell()->update_mesh();
+  }
+  assert(left_cell() || right_cell());
+
+  return ret;
 }
 
 bool BoundingCage::KeyFrame::validate_points_2d() {

@@ -63,17 +63,18 @@ private:
 
     struct {
         GLuint program = 0;
-        GLint position_location = -1;
-        GLint size_location = -1;
+        GLuint vao = 0;
+        GLuint vbo = 0;
+
         GLint texture_location = -1;
     } blit;
 
-    glm::vec2 position = { 0.f, 0.f }; // window coordinates
-    float size = 500.f;                // window coordinates
+    glm::vec2 position = { 0.f, 0.f }; // window coordinates in pixels lower left of window
+    glm::vec2 size = { 500.f, 500.f }; // window coordinates in pixels
 
     struct {
         glm::vec2 offset;
-        float zoom = -25.f;
+        float zoom = 10.f;
     } view;
 
     struct {

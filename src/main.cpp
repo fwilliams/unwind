@@ -30,7 +30,7 @@ Rasterization_Menu rasterization_menu(_state);
 void log_opengl_debug(GLenum source, GLenum type, GLuint id, GLenum severity,
                       GLsizei length, const GLchar* message, const void* userParam)
 {
-    if (id == 131185 || id == 7) {
+    if (id == 131185 || id == 7 || id == 131218) {
         return;
     }
     if (source == GL_DEBUG_SOURCE_APPLICATION) {
