@@ -23,6 +23,9 @@ public:
 private:
     bool intersects(const glm::ivec2& p) const;
 
+    glm::vec2 convert_position_mainwindow_to_keyframe(const glm::vec2& p);
+    glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p);
+
     static constexpr const int NoElement = -1;
 
     State& state;
@@ -73,7 +76,7 @@ private:
     glm::vec2 size = { 500.f, 500.f }; // window coordinates in pixels
 
     struct {
-        glm::vec2 offset;
+        glm::vec2 offset; // in kf
         float zoom = 10.f;
     } view;
 

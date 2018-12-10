@@ -31,7 +31,7 @@ private:
         int end_index = 0;
         char output_folder[BufferSize] = {};
         char output_prefix[BufferSize] = {};
-        int downsample_factor = 2;
+        int downsample_factor = 4;
         bool write_original = true;
     } ui;
 

@@ -9,12 +9,12 @@
 
 Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(state) {
 #ifdef WIN32
-    strcpy(ui.folder_name, "D:/Segmentangling/Fish_Deformation/Plagiotremus-tapinosoma");
+    strcpy(ui.folder_name, "C:/ab7512/Plagiotremus-tapinosoma");
     strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
     strcpy(ui.extension, "bmp");
     ui.start_index = 2;
     ui.end_index = 1798;
-    strcpy(ui.output_folder, "D:/Segmentangling/Fish_Deformation/Plagiotremus-tapinosoma-output");
+    strcpy(ui.output_folder, "C:/ab7512/Plagiotremus-tapinosoma-output");
     strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #else
     strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
