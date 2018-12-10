@@ -274,6 +274,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 
         const bool validate_2d = true;
         const bool validate_3d = false;
+        Eigen::RowVector2d mapped_mouse_eigen = Eigen::RowVector2d(mapped_mouse.x, mapped_mouse.y);
         bool success = current_active_keyframe->move_point_2d(current_edit_element,
             Eigen::RowVector2d(kf_mouse.x, kf_mouse.y), validate_2d, validate_3d);
 
