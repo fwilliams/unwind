@@ -22,7 +22,7 @@ Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(
     strcpy(ui.extension, "bmp");
     ui.start_index = 2;
     ui.end_index = 1798;
-    strcpy(ui.output_folder, "/home/francis/proje`cts/fish_deformation/data/Plaagiotremus_tapinosoma/output");
+    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
     strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #endif
 }
