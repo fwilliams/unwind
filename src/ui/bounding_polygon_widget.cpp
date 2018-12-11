@@ -229,10 +229,10 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         return false;
     }
 
-    bool ctrl_down = glfwGetKey(viewer->window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-            glfwGetKey(viewer->window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+//    bool ctrl_down = glfwGetKey(viewer->window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+//            glfwGetKey(viewer->window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
 
-    if (mouse_state.is_left_button_down && ctrl_down) {
+    if (mouse_state.is_right_button_down) {
         //constexpr float InteractionScaleFactor = 0.005f;
 
         glm::vec2 current_mouse = { mouse_x, window_size.y - mouse_y };
@@ -277,9 +277,11 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     bool left_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS;
+    bool right_mouse = glfwGetMouseButton(viewer->window, GLFW_MOUSE_BUTTON_2) == GLFW_PRESS;
 
-    if (left_mouse) {
-        mouse_state.is_left_button_down = true;
+    if (left_mouse || right_mouse) {
+        mouse_state.is_left_button_down = left_mouse;
+        mouse_state.is_right_button_down = right_mouse;
 
         // current_mouse is in pixel coordinates
         glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
@@ -287,15 +289,18 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
 
         glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
 
-        // Convert vertices into X
-        std::vector<glm::vec2> vertices = convert_vertices_2d(current_active_keyframe->vertices_2d());
+        // Selection to move a point on the bounding polygon
+        if (right_mouse) {
+            // Convert vertices into X
+            std::vector<glm::vec2> vertices = convert_vertices_2d(current_active_keyframe->vertices_2d());
 
-        // TODO: Use closest element instead of first element
-        for (int i = 0; i < vertices.size(); ++i) {
-            float d = glm::distance(vertices[i], kf_mouse);
-            if (d < SelectionRadius * view.zoom) {
-                current_edit_element = i;
-                return true;
+            // TODO: Use closest element instead of first element
+            for (int i = 0; i < vertices.size(); ++i) {
+                float d = glm::distance(vertices[i], kf_mouse);
+                if (d < SelectionRadius * view.zoom) {
+                    current_edit_element = i;
+                    return true;
+                }
             }
         }
     }
@@ -306,6 +311,7 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
 bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
     current_edit_element = NoElement;
     mouse_state.is_left_button_down = false;
+    mouse_state.is_right_button_down = false;
     return false;
 }
 

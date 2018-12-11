@@ -82,9 +82,10 @@ private:
     } view;
 
     struct {
-        glm::ivec2 current_position; // window coordinates
-        glm::vec2 down_position;     // window coordinates
+        glm::ivec2 current_position; // main window coordinates
+        glm::vec2 down_position;     // main window coordinates
         bool is_left_button_down = false;
+        bool is_right_button_down = false;
         float scroll = 0.f;
     } mouse_state;
 };
