@@ -37,6 +37,4 @@ int containing_tet(const Eigen::MatrixXd& TV,
 // Return the index of the closest vertex to p
 int nearest_vertex(const Eigen::MatrixXd& TV, const Eigen::RowVector3d& p);
 
-
-
 #endif // UTILS_H

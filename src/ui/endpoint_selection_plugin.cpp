@@ -99,7 +99,10 @@ void smooth_skeleton(const Eigen::MatrixXd& skeleton_vertices,
 
 } // namespace
 
-EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state) : state(state) {}
+EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state) : state(state) {
+  extracting_skeleton = false;
+  done_extracting_skeleton = false;
+}
 
 
 void EndPoint_Selection_Menu::initialize() {

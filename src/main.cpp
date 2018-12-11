@@ -67,6 +67,12 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 
 bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
     if (previous_state != _state.application_state) {
+
+        switch (previous_state) {
+        case Application_State::BoundingPolygon:
+          bounding_polygon_menu.deinitialize();
+        }
+
         viewer.plugins.clear();
 
         switch (_state.application_state) {

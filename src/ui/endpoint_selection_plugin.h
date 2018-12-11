@@ -23,8 +23,8 @@ private:
 
     bool selecting_endpoints = false;
 
-    std::atomic_bool extracting_skeleton = false;
-    std::atomic_bool done_extracting_skeleton = false;
+    std::atomic_bool extracting_skeleton;
+    std::atomic_bool done_extracting_skeleton;
     std::thread extract_skeleton_thread;
 
 

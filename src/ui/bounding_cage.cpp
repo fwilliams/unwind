@@ -142,6 +142,7 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bo
 }
 
 bool BoundingCage::KeyFrame::validate_points_2d() {
+  // Return false if two non-adjacent segments intersect
   const int num_v = _vertices_2d.rows();
   for (int i = 0; i < num_v; i++) {
     for (int j = i+2; j < num_v; j++) {

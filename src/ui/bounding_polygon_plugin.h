@@ -15,12 +15,15 @@ public:
     bool mouse_up(int button, int modifier) override;
     bool mouse_scroll(float delta_y) override;
 
-
     bool post_draw() override;
     bool pre_draw() override;
+
     void initialize();
+    void deinitialize();
 
 private:
+    float view_hsplit = 0.5; // Horizontal split for the two menus (normalized distance
+    float view_vsplit = 0.2; // Vertical split for the bottom menu (normalized distance from the bottom)
     Bounding_Polygon_Widget widget_2d;
     State& state;
 
@@ -31,7 +34,8 @@ private:
     float current_cut_index = 0;
     int current_vertex = 0;
 
-    bool show_slice_view = false;
+    Eigen::Vector4f old_viewport;
+    Eigen::Vector4f viewer_viewport;
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__

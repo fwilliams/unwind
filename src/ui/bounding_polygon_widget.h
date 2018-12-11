@@ -20,6 +20,10 @@ public:
 
     bool post_draw(BoundingCage::KeyFrameIterator it, int current_vertex_id);
 
+
+    glm::vec2 position = { 0.f, 0.f }; // window coordinates in pixels lower left of window
+    glm::vec2 size = { 500.f, 500.f }; // window coordinates in pixels
+
 private:
     bool intersects(const glm::ivec2& p) const;
 
@@ -71,9 +75,6 @@ private:
 
         GLint texture_location = -1;
     } blit;
-
-    glm::vec2 position = { 0.f, 0.f }; // window coordinates in pixels lower left of window
-    glm::vec2 size = { 500.f, 500.f }; // window coordinates in pixels
 
     struct {
         glm::vec2 offset; // in kf
