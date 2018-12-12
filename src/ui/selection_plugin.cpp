@@ -399,7 +399,7 @@ bool Selection_Menu::post_draw() {
                 ImGui::Text("Current highlighted id: %i", current_selected_feature);
             }
 
-            ImGui::Text("Frame Counter: %i", _state.frame_counter);
+            ImGui::Text("Frame Counter: %lu", _state.frame_counter);
         }
 
         ImGui::Text("%s", "Transfer Function");

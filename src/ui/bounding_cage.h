@@ -214,6 +214,7 @@ public:
                  const Eigen::RowVector3d& center,
                  const KeyFrame& from_kf,
                  const Eigen::MatrixXd& pts,
+                 const Eigen::RowVector2d& centroid,
                  std::shared_ptr<Cell> cell,
                  double idx,
                  BoundingCage *_cage);
@@ -224,6 +225,7 @@ public:
         KeyFrame(const Eigen::RowVector3d& center,
                  const Eigen::Matrix3d& coord_frame,
                  const Eigen::MatrixXd& pts,
+                 const Eigen::RowVector2d& centroid,
                  std::shared_ptr<Cell> cell,
                  double idx,
                  BoundingCage *_cage);
@@ -268,9 +270,13 @@ public:
         Eigen::Matrix3d _orientation;
         Eigen::RowVector3d _center;
 
+
         /// 2D positions of the boundary polygon of this KeyFrame
         ///
         Eigen::MatrixXd _vertices_2d;
+
+        /// Centroid position in 2d coordinates
+        Eigen::RowVector2d _centroid_2d;
 
         /// Indices of the 3D positions of the boundary polygon in the
         /// mesh of the BoundingCage which owns this KeyFrame
@@ -379,6 +385,12 @@ public:
             return _vertices_2d;
         }
 
+        /// Get the 2d position of the centroid of this KeyFrame
+        ///
+        const Eigen::RowVector2d& centroid_2d() const {
+            return _centroid_2d;
+        }
+
         /// Get the ordered 3d points of the keyframe polygon boundary.
         /// These points are just the 2d points projected onto the KeyFrame plane.
         ///
@@ -388,6 +400,13 @@ public:
                 points3d.row(i) = _center + _vertices_2d(i, 0) *_orientation.row(0) + _vertices_2d(i, 1) *_orientation.row(1);
             }
             return points3d;
+        }
+
+        /// Get the 3D position of the centroid for this KeyFrame
+        ///
+        Eigen::RowVector3d centroid_3d() const {
+            Eigen::RowVector3d c(0.0, 0.0, 0.0);
+            c += _centroid_2d[0]*right() + _centroid_2d[1]*up();
         }
 
         /// Get the index value of this KeyFrame.
@@ -405,6 +424,11 @@ public:
         /// Otherwise, if validate is unset, this method always returns true
         ///
         bool move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate2d=true, bool validate_3d=false);
+
+        /// Move the center point of the KeyFrame in its xy plane. If relative is set, then the
+        /// polygon points preserve their relative vectors with respect to the center
+        ///
+        bool move_centroid_2d(Eigen::RowVector2d& new_center);
     };
 
     /// Bidirectional Iterator class used to traverse the linked list of KeyFrames

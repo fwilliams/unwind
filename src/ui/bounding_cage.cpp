@@ -68,12 +68,14 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                                  const Eigen::RowVector3d& center,
                                  const BoundingCage::KeyFrame& from_kf,
                                  const Eigen::MatrixXd& pts,
+                                 const Eigen::RowVector2d& centroid,
                                  std::shared_ptr<BoundingCage::Cell> cell,
                                  double idx,
                                  BoundingCage* cage) {
     _cage = cage;
     _index = idx;
     _orientation = parallel_transport(from_kf, normal);
+    _centroid_2d = centroid;
     _center = center;
     _vertices_2d = pts;
 
@@ -86,6 +88,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
 BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
                                  const Eigen::Matrix3d& coord_frame,
                                  const Eigen::MatrixXd& pts,
+                                 const Eigen::RowVector2d& centroid,
                                  std::shared_ptr<BoundingCage::Cell> cell,
                                  double idx,
                                  BoundingCage *cage) {
@@ -94,7 +97,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
     _orientation = coord_frame;
     _center = center;
     _vertices_2d = pts;
-
+    _centroid_2d = centroid;
     _left_cell = cell;
     _right_cell = cell;
 
@@ -139,6 +142,16 @@ bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bo
     assert(left_cell() || right_cell());
 
     return ret;
+}
+
+bool BoundingCage::KeyFrame::move_centroid_2d(Eigen::RowVector2d& new_centroid_2d) {
+    if (!in_bounding_cage()) {
+        logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
+        return false;
+    }
+
+    _centroid_2d = new_centroid_2d;
+    return true;
 }
 
 bool BoundingCage::KeyFrame::validate_points_2d() {
@@ -506,9 +519,10 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
         }
         assert("Bad mid index" && (mid > 0) && (mid < SV_smooth.rows()-1));
 
+        Eigen::RowVector2d mid_centroid = 0.5 * (cell->_left_keyframe->centroid_2d() + cell->_right_keyframe->centroid_2d());
         Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+1) - SV_smooth.row(mid-1)).normalized();
         Eigen::MatrixXd mid_pts_2d = 0.5 * (cell->_left_keyframe->vertices_2d() + cell->_left_keyframe->vertices_2d());
-        std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->_left_keyframe, mid_pts_2d, cell, mid, this));
+        std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->_left_keyframe, mid_pts_2d, mid_centroid, cell, mid, this));
         assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
 
         if(split_internal(mid_keyframe)) {
@@ -568,11 +582,13 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     front_normal.normalize();
     back_normal.normalize();
 
+    Eigen::RowVector2d centroid = poly_template.colwise().mean();
+
     Eigen::Matrix3d front_coord_system = local_coordinate_system(front_normal);
-    std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template,
+    std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template, centroid,
                                                           std::shared_ptr<Cell>(), 0, this));
     std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), *front_keyframe,
-                                                         poly_template, std::shared_ptr<Cell>(),
+                                                         poly_template, centroid, std::shared_ptr<Cell>(),
                                                          SV.rows()-1, this));
     assert("Parallel transport bug" && (1.0-fabs(back_keyframe->normal().dot(back_normal))) < 1e-6);
 
@@ -635,7 +651,8 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
     points2d.col(0) = A*coord_frame.row(0).transpose();
     points2d.col(1) = A*coord_frame.row(1).transpose();
 
-    std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, cell, index, (BoundingCage*)this));
+    Eigen::RowVector2d centroid2d = (1.0-coeff)*cell->_left_keyframe->centroid_2d() + coeff*cell->_right_keyframe->centroid_2d();
+    std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, centroid2d, cell, index, (BoundingCage*)this));
     return KeyFrameIterator(kf);
 }
 

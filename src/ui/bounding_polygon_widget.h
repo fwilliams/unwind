@@ -30,9 +30,14 @@ public:
     float polygon_line_width = 3.f;
     float selected_point_size = 10.f;
     float split_point_size = 7.f;
+    float center_point_size = 12.f;
+    float selected_center_point_size = 14.f;
+
     glm::vec4 polygon_line_color = glm::vec4(0.85f, 0.85f, 0.f, 1.f);
     glm::vec4 selected_point_color = glm::vec4(0.8f, 0.2f, 0.2f, 1.f);
     glm::vec4 available_point_color = glm::vec4(0.2f, 0.8f, 0.2f, 1.f);
+    glm::vec4 center_point_color = glm::vec4(0.2f, 0.2f, 0.8f, 1.f);
+    glm::vec4 selected_center_point_color = glm::vec4(0.2f, 0.5f, 0.8f, 1.f);
 
 private:
     enum PolygonDrawMode {
@@ -53,6 +58,7 @@ private:
     glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p);
 
     static constexpr const int NoElement = -1;
+    static constexpr const int CenterElement = -2;
 
     State& state;
     igl::opengl::glfw::Viewer* viewer;
@@ -109,8 +115,9 @@ private:
 
     // Editing state
     struct {
-        bool matched_vertex;
-        bool matched_edge;
+        bool matched_center = false;
+        bool matched_vertex = false;
+        bool matched_edge = false;
         int closest_vertex_index = NoElement;
         int closest_edge_index = NoElement;
         int current_edit_element = NoElement;
