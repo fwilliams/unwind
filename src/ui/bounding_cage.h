@@ -241,14 +241,15 @@ public:
         bool init_mesh();
 
         /// Split the KeyFrame polygon along an edge starting at vertex i
-        /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i])
+        /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
+        /// This method is called by the owning BoundingCage.
         ///
-        bool insert_vertex(unsigned i, double t);
+        bool _insert_vertex(unsigned i, double t);
 
         /// Delete the vertex at position i. If the deletion causes the BoundingCage to become invalid, then this
-        /// method returns false.
+        /// method returns false. This method is called by the owning BoundingCage.
         ///
-        bool delete_vertex(unsigned i, bool validate_2d=true, bool validate_3d=true);
+        bool _delete_vertex(unsigned i, bool validate_2d=true, bool validate_3d=true);
 
         /// If the KeyFrame is an endpoint, then triangulate the bounding polygon, inserting
         /// whatever necessary vertices in the BoundinCage vertex buffer. The output, faces,
@@ -292,6 +293,30 @@ public:
         std::shared_ptr<spdlog::logger> logger;
 
     public:
+
+        /// Split the every KeyFrame polygon in the Bounding cage along an edge
+        /// starting at vertex i.
+        /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
+        /// If this KeyFrame is not in the BoundingCage, then this method returns false.
+        ///
+        bool insert_vertex(unsigned i, double t) {
+            if (!in_bounding_cage()) {
+                return false;
+            }
+            return _cage->insert_boundary_vertex(i, t);
+        }
+
+        /// Delete the vertex at position i of every KeyFrame in the BoundingCage.
+        /// If the KeyFrame is not in the BoundingCage or if the deletion causes the
+        /// BoundingCage to become invalid, then this method returns false.
+        ///
+        bool delete_vertex(unsigned i) {
+            if (!in_bounding_cage()) {
+                return false;
+            }
+            return _cage->delete_boundary_vertex(i);
+        }
+
         /// Returns true if this KeyFrame is part of the bounding cage
         ///
         bool in_bounding_cage() {

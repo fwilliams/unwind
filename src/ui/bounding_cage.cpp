@@ -248,7 +248,7 @@ bool BoundingCage::KeyFrame::triangulate(Eigen::MatrixXi &faces) {
     return true;
 }
 
-bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
+bool BoundingCage::KeyFrame::_insert_vertex(unsigned idx, double t) {
     const int num_old_rows = _vertices_2d.rows();
     const unsigned next_idx = (idx + 1) % vertices_2d().rows();
     const Eigen::RowVector2d new_v = t*vertices_2d().row(idx) + (1.0-t)*vertices_2d().row(next_idx);
@@ -260,10 +260,10 @@ bool BoundingCage::KeyFrame::insert_vertex(unsigned idx, double t) {
     return init_mesh();
 }
 
-bool BoundingCage::KeyFrame::delete_vertex(unsigned idx, bool validate_2d, bool validate_3d) {
+bool BoundingCage::KeyFrame::_delete_vertex(unsigned idx, bool validate_2d, bool validate_3d) {
     // Cannot make degenerate polygon
     if (_vertices_2d.rows() == 3) {
-        logger->warn("delete_vertex {} led to degenerate BoundingCage, reverting...", idx);
+        logger->warn("delete_vertex {} led to degenerate BoundingCage (fewer than 3 vertices), reverting...", idx);
         return false;
     }
 
@@ -861,7 +861,7 @@ bool BoundingCage::insert_boundary_vertex(unsigned idx, double t) {
     }
 
     for (KeyFrame& kf : keyframes) {
-        if (!kf.insert_vertex(idx, t)) { return false; }
+        if (!kf._insert_vertex(idx, t)) { return false; }
     }
 
     for (Cell& cell : cells) {
@@ -879,7 +879,7 @@ bool BoundingCage::delete_boundary_vertex(unsigned idx) {
     }
 
     for (KeyFrame& kf : keyframes) {
-        if(!kf.delete_vertex(idx)) { return false; }
+        if(!kf._delete_vertex(idx)) { return false; }
     }
 
     for (Cell& cell : cells) {

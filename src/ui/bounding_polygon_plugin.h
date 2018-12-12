@@ -22,6 +22,7 @@ public:
     void deinitialize();
 
 private:
+
     float view_hsplit = 0.5; // Horizontal split for the two menus (normalized distance
     float view_vsplit = 0.2; // Vertical split for the bottom menu (normalized distance from the bottom)
     Bounding_Polygon_Widget widget_2d;

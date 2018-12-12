@@ -24,9 +24,31 @@ public:
     glm::vec2 position = { 0.f, 0.f }; // window coordinates in pixels lower left of window
     glm::vec2 size = { 500.f, 500.f }; // window coordinates in pixels
 
+    const float SelectionRadius = 0.15f;
+    const float MaxZoomLevel = 200.f;
+    float polygon_point_size = 8.f;
+    float polygon_line_width = 3.f;
+    float selected_point_size = 10.f;
+    float split_point_size = 7.f;
+    glm::vec4 polygon_line_color = glm::vec4(0.85f, 0.85f, 0.f, 1.f);
+    glm::vec4 selected_point_color = glm::vec4(0.8f, 0.2f, 0.2f, 1.f);
+    glm::vec4 available_point_color = glm::vec4(0.2f, 0.8f, 0.2f, 1.f);
+
 private:
+    enum PolygonDrawMode {
+        Points,
+        Lines,
+        PointsAndLines
+    };
+
+    std::pair<int, float> closest_vertex(const glm::vec2& p);
+    std::tuple<int, float, glm::vec2> closest_edge(const glm::vec2& p);
+
     bool intersects(const glm::ivec2& p) const;
 
+    void draw_polygon(const std::vector<glm::vec2>& points, glm::vec4 color, float point_size, float line_width, PolygonDrawMode mode);
+
+    void update_selection();
     glm::vec2 convert_position_mainwindow_to_keyframe(const glm::vec2& p);
     glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p);
 
@@ -34,10 +56,6 @@ private:
 
     State& state;
     igl::opengl::glfw::Viewer* viewer;
-
-    // Editing state
-    BoundingCage::KeyFrameIterator current_active_keyframe;
-    int current_edit_element = NoElement;
 
     // Rendering
     GLuint empty_vao = 0;
@@ -88,6 +106,17 @@ private:
         bool is_right_button_down = false;
         float scroll = 0.f;
     } mouse_state;
+
+    // Editing state
+    struct {
+        bool matched_vertex;
+        bool matched_edge;
+        int closest_vertex_index = NoElement;
+        int closest_edge_index = NoElement;
+        int current_edit_element = NoElement;
+        glm::vec2 closest_edge_point;
+        BoundingCage::KeyFrameIterator current_active_keyframe;
+    } selection;
 };
 
 #endif // BOUNDING_POLYGON_WIDGET_H
