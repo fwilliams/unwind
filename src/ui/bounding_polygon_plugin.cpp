@@ -85,6 +85,8 @@ void Bounding_Polygon_Menu::initialize() {
     // Initialize the 2d cross section widget
     widget_2d.initialize(viewer);
 
+    exporter.init(128, 128, 1024);
+
     state.logger->trace("Done initializing bounding polygon plugin!");
 }
 
@@ -208,7 +210,10 @@ bool Bounding_Polygon_Menu::post_draw() {
                  ImGuiWindowFlags_AlwaysAutoResize |
                  ImGuiWindowFlags_NoTitleBar);
 
-    if (ImGui::Button("< Prev")) {
+    const float min_cut_index = static_cast<float>(state.cage.min_index());
+    const float max_cut_index = static_cast<float>(state.cage.max_index());
+
+    if (ImGui::Button("< Prev KF")) {
         BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
         it--;
         if (it == state.cage.keyframes.end()) {
@@ -217,17 +222,23 @@ bool Bounding_Polygon_Menu::post_draw() {
         current_cut_index = static_cast<float>(it->index());
     }
     ImGui::SameLine();
-    bool changed_slider = ImGui::SliderFloat("#vertexid", &current_cut_index,
-                                             static_cast<float>(state.cage.min_index()),
-                                             static_cast<float>(state.cage.max_index()));
-    if (changed_slider) {
-        const float min = static_cast<float>(state.cage.min_index());
-        const float max = static_cast<float>(state.cage.max_index());
-
-        current_cut_index = std::max(min, std::min(current_cut_index, max));
+    if (ImGui::Button("<")) {
+        current_cut_index = std::max(min_cut_index, std::min(current_cut_index - keyframe_nudge_amount, max_cut_index));
     }
     ImGui::SameLine();
-    if (ImGui::Button("Next >")) {
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.85f);
+    if(ImGui::SliderFloat("", &current_cut_index,
+                          static_cast<float>(state.cage.min_index()),
+                          static_cast<float>(state.cage.max_index()))) {
+        current_cut_index = std::max(min_cut_index, std::min(current_cut_index, max_cut_index));
+    }
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    if (ImGui::Button(">")) {
+        current_cut_index = std::max(min_cut_index, std::min(current_cut_index + keyframe_nudge_amount, max_cut_index));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Next KF >")) {
         BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
         it++;
         if (it == state.cage.keyframes.end()) {
@@ -236,63 +247,90 @@ bool Bounding_Polygon_Menu::post_draw() {
         current_cut_index = static_cast<float>(it->index());
     }
 
+    if (ImGui::InputFloat("Nudge Amount", &keyframe_nudge_amount, 0.01, 0.1, 5)) {
+
+    }
+
+
     if (ImGui::Button("Insert KF")) {
         state.cage.insert_keyframe(current_cut_index);
         glfwPostEmptyEvent();
     }
+    ImGui::SameLine();
     if (ImGui::Button("Remove KF")) {
         BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
         state.cage.delete_keyframe(it);
         glfwPostEmptyEvent();
     }
-    BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
-    if (ImGui::InputInt("vertex: ", &current_vertex, 1, 1)) {
-        current_vertex = std::max(0, current_vertex);
-        current_vertex = std::min(current_vertex, static_cast<int>(it->vertices_2d().rows() - 1));
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("+x")) {
-        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(1, 0);
-        const bool validate_2d = true;
-        const bool validate_3d = false;
-        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-        glfwPostEmptyEvent();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("-x")) {
-        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(-1, 0);
-        const bool validate_2d = true;
-        const bool validate_3d = false;
-        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-        glfwPostEmptyEvent();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("+y")) {
-        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, 1);
-        const bool validate_2d = true;
-        const bool validate_3d = false;
-        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-        glfwPostEmptyEvent();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("-y")) {
-        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, -1);
-        const bool validate_2d = true;
-        const bool validate_3d = false;
-        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-        glfwPostEmptyEvent();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Add Vertex")) {
-        state.cage.insert_boundary_vertex(current_vertex, 0.5);
-        glfwPostEmptyEvent();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Rmv Vertex")) {
-        state.cage.delete_boundary_vertex(current_vertex);
-        glfwPostEmptyEvent();
-    }
 
+//    BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+//    if (ImGui::InputInt("vertex: ", &current_vertex, 1, 1)) {
+//        current_vertex = std::max(0, current_vertex);
+//        current_vertex = std::min(current_vertex, static_cast<int>(it->vertices_2d().rows() - 1));
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("+x")) {
+//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(1, 0);
+//        const bool validate_2d = true;
+//        const bool validate_3d = false;
+//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
+//        glfwPostEmptyEvent();
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("-x")) {
+//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(-1, 0);
+//        const bool validate_2d = true;
+//        const bool validate_3d = false;
+//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
+//        glfwPostEmptyEvent();
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("+y")) {
+//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, 1);
+//        const bool validate_2d = true;
+//        const bool validate_3d = false;
+//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
+//        glfwPostEmptyEvent();
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("-y")) {
+//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, -1);
+//        const bool validate_2d = true;
+//        const bool validate_3d = false;
+//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
+//        glfwPostEmptyEvent();
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("Add Vertex")) {
+//        state.cage.insert_boundary_vertex(current_vertex, 0.5);
+//        glfwPostEmptyEvent();
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("Rmv Vertex")) {
+//        state.cage.delete_boundary_vertex(current_vertex);
+//        glfwPostEmptyEvent();
+//    }
+
+    ImGui::Separator();
+    if (ImGui::InputInt("W", &exp_w)) {
+        exporter.set_export_dims(exp_w, exp_h, exp_d);
+    }
+    ImGui::SameLine();
+    if (ImGui::InputInt("H", &exp_h)) {
+        exporter.set_export_dims(exp_w, exp_h, exp_d);
+    }
+    ImGui::SameLine();
+    if (ImGui::InputInt("D", &exp_d)) {
+        exporter.set_export_dims(exp_w, exp_h, exp_d);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Export Volume")) {
+        exporter.draw(state.cage, state.volume_rendering.volume_texture,
+                      state.volume_rendering.parameters.volume_dimensions);
+        state.logger->debug("EXPORT");
+        exporter.write_texture_data_to_file("out_volume.raw");
+        state.logger->debug("DONE");
+    }
     ImGui::End();
     ImGui::Render();
 

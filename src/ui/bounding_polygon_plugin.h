@@ -3,6 +3,7 @@
 
 #include "fish_ui_viewer_plugin.h"
 #include "bounding_polygon_widget.h"
+#include "volume_exporter.h"
 
 struct State;
 
@@ -26,6 +27,8 @@ private:
     float view_hsplit = 0.5; // Horizontal split for the two menus (normalized distance
     float view_vsplit = 0.2; // Vertical split for the bottom menu (normalized distance from the bottom)
     Bounding_Polygon_Widget widget_2d;
+    VolumeExporter exporter;
+
     State& state;
 
     int mesh_overlay_id = 0;
@@ -37,6 +40,11 @@ private:
 
     Eigen::Vector4f old_viewport;
     Eigen::Vector4f viewer_viewport;
+
+    float keyframe_nudge_amount = 0.1;
+
+    // GUI variables for setting width height and depth to export
+    int exp_w = 128, exp_h = 128, exp_d = 1024;
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__

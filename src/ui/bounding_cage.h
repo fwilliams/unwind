@@ -406,7 +406,7 @@ public:
         ///
         Eigen::RowVector3d centroid_3d() const {
             Eigen::RowVector3d c(0.0, 0.0, 0.0);
-            c += _centroid_2d[0]*right() + _centroid_2d[1]*up();
+            c += _center + _centroid_2d[0]*right() + _centroid_2d[1]*up();
         }
 
         /// Get the index value of this KeyFrame.

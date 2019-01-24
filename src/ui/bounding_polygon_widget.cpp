@@ -1,4 +1,5 @@
 #include "bounding_polygon_widget.h"
+#include "volume_exporter.h"
 
 #include <igl/opengl/create_shader_program.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -8,6 +9,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
+
+#include "volume_exporter.h"
 
 #pragma optimize ("", off)
 
@@ -130,7 +133,6 @@ struct BlitData {
     float data[4]; // pos[2] + uv[2]
 };
 
-
 std::vector<glm::vec2> vertices_2d_to_glm(const Eigen::MatrixXd& vertices) {
     std::vector<glm::vec2> result(vertices.rows());
     for (int i = 0; i < vertices.rows(); ++i) {
@@ -146,7 +148,6 @@ std::vector<glm::vec3> vertices_3d_to_glm(const Eigen::MatrixXd& vertices) {
     }
     return result;
 }
-
 
 } // namespace
 
@@ -291,7 +292,6 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
                            offscreen.texture, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 }
 
 bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
@@ -444,8 +444,8 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
 void Bounding_Polygon_Widget::update_selection() {
     glm::ivec2 window_size;
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
-    glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
-    glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
+    glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y }; // In main window pixel space
+    glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);                    // In keyframe ndc
 
     std::pair<int, float> cv = closest_vertex(kf_mouse);
     std::tuple<int, float, glm::vec2> ce = closest_edge(kf_mouse);
@@ -562,8 +562,6 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     glUniform3fv(plane.ul_location, 1, glm::value_ptr(ul));
     glUniform3fv(plane.ur_location, 1, glm::value_ptr(ur));
 
-
-
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, state.volume_rendering.volume_texture);
     glUniform1i(plane.texture_location, 0);
@@ -610,7 +608,20 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
             selected_vertices_2d.push_back(G2f(selection.current_active_keyframe->centroid_2d()));
             draw_polygon(selected_vertices_2d, center_point_color, center_point_size, 1.f, PolygonDrawMode::Points);
         }
+
+        glm::vec4 bounds = keyframe_bounds(state.cage);
+        glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
+        std::vector<glm::vec2> bbox_vertices;
+        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[2]));
+        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[2]));
+        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[3]));
+        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[3]));
+
+        glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
+
+        draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines);
     }
+
     glPopDebugGroup();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

@@ -4,6 +4,8 @@
 #include <Eigen/Core>
 #include "glad/glad.h"
 #include "state.h"
+#include "volume_exporter.h"
+
 
 namespace igl { namespace opengl { namespace glfw { class Viewer; }}}
 
