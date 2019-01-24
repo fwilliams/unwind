@@ -50,6 +50,8 @@ private:
     bool insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
     bool replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
 
+    int _num_keyframes = 0;
+
 public:
     /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
     /// to their distance along the skeleton of the bounding cage. A Cell's "left" keyframe always
@@ -541,6 +543,10 @@ public:
     friend class KeyFrame;
     friend class Cell;
 
+    const int num_keyframes() const {
+        return _num_keyframes;
+    }
+
     /// Set the skeleton vertices to whatever the user provides.
     /// There must be at least two vertices, if not the method returns false.
     /// Upon setting the vertices, The
@@ -552,6 +558,7 @@ public:
     /// Clear the bounding cage and skeleton vertices
     ///
     void clear() {
+        _num_keyframes = 0;
         root.reset();
         cells.head.reset();
         cells.tail.reset();

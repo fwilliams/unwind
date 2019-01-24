@@ -9,6 +9,15 @@
 
 #pragma optimize ("", off)
 
+void bounding_cage_polygon(BoundingCage& cage, Eigen::MatrixXf& V, Eigen::MatrixXi& F) {
+    V.resize(cage.num_keyframes(), 3);
+    F.resize((cage.num_keyframes()-1)*2*4+4, 3);
+
+    for (BoundingCage::KeyFrame& kf : cage.keyframes) {
+
+    }
+}
+
 Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
     : state(state)
     , widget_2d(Bounding_Polygon_Widget(state))
@@ -263,54 +272,8 @@ bool Bounding_Polygon_Menu::post_draw() {
         glfwPostEmptyEvent();
     }
 
-//    BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
-//    if (ImGui::InputInt("vertex: ", &current_vertex, 1, 1)) {
-//        current_vertex = std::max(0, current_vertex);
-//        current_vertex = std::min(current_vertex, static_cast<int>(it->vertices_2d().rows() - 1));
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("+x")) {
-//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(1, 0);
-//        const bool validate_2d = true;
-//        const bool validate_3d = false;
-//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-//        glfwPostEmptyEvent();
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("-x")) {
-//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(-1, 0);
-//        const bool validate_2d = true;
-//        const bool validate_3d = false;
-//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-//        glfwPostEmptyEvent();
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("+y")) {
-//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, 1);
-//        const bool validate_2d = true;
-//        const bool validate_3d = false;
-//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-//        glfwPostEmptyEvent();
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("-y")) {
-//        Eigen::RowVector2d pt = it->vertices_2d().row(current_vertex) + Eigen::RowVector2d(0, -1);
-//        const bool validate_2d = true;
-//        const bool validate_3d = false;
-//        it->move_point_2d(current_vertex, pt, validate_2d, validate_3d);
-//        glfwPostEmptyEvent();
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("Add Vertex")) {
-//        state.cage.insert_boundary_vertex(current_vertex, 0.5);
-//        glfwPostEmptyEvent();
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("Rmv Vertex")) {
-//        state.cage.delete_boundary_vertex(current_vertex);
-//        glfwPostEmptyEvent();
-//    }
-
+    ImGui::Separator();
+    ImGui::Text("Num Keyframes: %d", state.cage.num_keyframes());
     ImGui::Separator();
     if (ImGui::InputInt("W", &exp_w)) {
         exporter.set_export_dims(exp_w, exp_h, exp_d);

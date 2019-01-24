@@ -614,6 +614,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     }
 
     logger->info("Done constructing initial cage for skeleton.");
+    _num_keyframes += 2; // Head and tail keyframes
     return true;
 }
 
@@ -741,6 +742,7 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::split_internal(std::shared
         cells.tail = right_cell->_right_child;
     }
 
+    _num_keyframes += 1;
     return split_kf;
 }
 
@@ -795,6 +797,7 @@ bool BoundingCage::delete_keyframe(KeyFrameIterator& it) {
         update = update->_parent_cell.lock();
     }
 
+    _num_keyframes -= 1;
     return true;
 }
 
