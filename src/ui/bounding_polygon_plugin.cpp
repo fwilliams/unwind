@@ -82,13 +82,7 @@ void Bounding_Polygon_Menu::initialize() {
     {
         viewer->data().clear();
         viewer->data().set_face_based(true);
-        Eigen::MatrixXi faces(0, 3);
-        for (const BoundingCage::Cell& cell : state.cage.cells) {
-            int idx = faces.rows();
-            faces.conservativeResize(faces.rows() + cell.mesh_faces().rows(), 3);
-            faces.block(idx, 0, cell.mesh_faces().rows(), 3) = cell.mesh_faces();
-        }
-        viewer->data().set_mesh(state.cage.mesh_vertices(), faces);
+        viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
     }
 
     // Initialize the 2d cross section widget
@@ -165,12 +159,6 @@ bool Bounding_Polygon_Menu::pre_draw() {
         viewer->data().point_size = 10.f;
         BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
 
-        for (const BoundingCage::Cell& cell : state.cage.cells) {
-            Eigen::MatrixXd P1;
-            Eigen::MatrixXd P2;
-            edge_endpoints(state.cage.mesh_vertices(), cell.mesh_faces(), P1, P2);
-            viewer->data().add_edges(P1, P2, ColorRGB::GREEN);
-        }
 
         viewer->data().add_points(kf->center(), ColorRGB::RED);
         viewer->data().add_points(kf->vertices_3d(), ColorRGB::ORANGERED);
@@ -185,13 +173,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
     {
         viewer->data().clear();
         viewer->data().set_face_based(true);
-        Eigen::MatrixXi faces(0, 3);
-        for (const BoundingCage::Cell& cell : state.cage.cells) {
-            int idx = faces.rows();
-            faces.conservativeResize(faces.rows() + cell.mesh_faces().rows(), 3);
-            faces.block(idx, 0, cell.mesh_faces().rows(), 3) = cell.mesh_faces();
-        }
-        viewer->data().set_mesh(state.cage.mesh_vertices(), faces);
+        viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
         viewer->selected_data_index = push_overlay_id;
     }
 

@@ -41,14 +41,14 @@ private:
 
     /// Mesh for the whole bounding cage
     ///
-    Eigen::MatrixXd CV;
-    Eigen::VectorXi CV_refcount;
-    std::vector<int> CV_free_list;
-    int num_mesh_vertices = 0;
+//    Eigen::MatrixXd CV;
+//    Eigen::VectorXi CV_refcount;
+//    std::vector<int> CV_free_list;
+//    int num_mesh_vertices = 0;
 
-    bool update_vertex(int i, const Eigen::RowVector3d& v);
-    bool insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
-    bool replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
+//    bool update_vertex(int i, const Eigen::RowVector3d& v);
+//    bool insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
+//    bool replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
 
     int _num_keyframes = 0;
 
@@ -121,7 +121,7 @@ public:
         /// This method initializes the BoundingCage mesh for this Cell, allocating new
         /// storage for the face information
         ///
-        bool update_mesh();
+//        bool update_mesh();
 
         /// Construct a new Cell. Don't call this directly, instead use the factory
         /// function `make_cell()`.
@@ -242,14 +242,14 @@ public:
         /// When polygon vertex changes (via `set_point_2d()`), these methods
         /// validate that the change does not create *LOCAL* self intersections.
         ///
-        bool validate_points_2d();
-        bool validate_cage();
+//        bool validate_points_2d();
+//        bool validate_cage();
 
         /// Called internally to initialize the BoundingCage mesh with this KeyFrame's data
         /// If tesselate is true, the polygon for this KeyFrame will be triangulated and
         /// included in the BoundingCage mesh. We use this for the caps of the cage mesh.
         ///
-        bool init_mesh();
+//        bool init_mesh();
 
         /// Split the KeyFrame polygon along an edge starting at vertex i
         /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
@@ -267,7 +267,7 @@ public:
         /// is an index buffer of the faces of the triangulated polygon indexing into the
         /// BoundingCage vertex buffer.
         ///
-        bool triangulate(Eigen::MatrixXi& faces);
+//        bool triangulate(Eigen::MatrixXi& faces);
 
 
         /// The BoundingCage which owns this KeyFrame
@@ -290,9 +290,12 @@ public:
         /// Indices of the 3D positions of the boundary polygon in the
         /// mesh of the BoundingCage which owns this KeyFrame
         ///
-        Eigen::VectorXi _mesh_boundary_indices;
-        Eigen::VectorXi _mesh_interior_indices;
-        Eigen::MatrixXi _mesh_faces;
+//        Eigen::VectorXi _mesh_boundary_indices;
+//        Eigen::VectorXi _mesh_interior_indices;
+//        Eigen::MatrixXi _mesh_faces;
+
+        /// True if this keyframe is part of the bounding cage
+        bool _in_cage = false;
 
         /// The index of this KeyFrame.
         double _index;
@@ -335,7 +338,7 @@ public:
         /// Returns true if this KeyFrame is part of the bounding cage
         ///
         bool in_bounding_cage() {
-            return _mesh_boundary_indices.rows() != 0;
+            return _in_cage;
         }
 
         /// True if this KeyFrame is at one of the endpoints of its BoundingCage
@@ -374,18 +377,6 @@ public:
         ///
         const Eigen::RowVector3d& center() const {
             return _center;
-        }
-
-        /// An affine transformation to map points to the local coordinates
-        /// this KeyFrame
-        ///
-        Eigen::Matrix4d transform() const {
-            Eigen::MatrixX4d ret;
-            ret.setZero();
-            ret.block<3, 3>(0, 0) = _orientation;
-            ret.block<3, 1>(0, 3) = _center.transpose();
-            ret(3, 3) = 1.0;
-            return ret;
         }
 
         /// Get the ordered 2d points of the KeyFrame polygon boundary.
@@ -571,8 +562,8 @@ public:
         cells.tail.reset();
         SV.resize(0, 0);
         SV_smooth.resize(0, 0);
-        CV.resize(0, 0);
-        num_mesh_vertices = 0;
+//        CV.resize(0, 0);
+//        num_mesh_vertices = 0;
     }
 
     /// Add a new KeyFrame at the given index in the bounding Cage.
@@ -596,7 +587,8 @@ public:
     /// To get the faces, iterate over the cells and call mesh_faces for each cell.
     /// Each cell's face buffer indexes into mesh_vertices()
     ///
-    const Eigen::MatrixXd& mesh_vertices() const { return CV; }
+    const Eigen::MatrixXd mesh_vertices();
+    const Eigen::MatrixXi mesh_faces() const;
 
     /// Get the minimum keyframe index
     ///
