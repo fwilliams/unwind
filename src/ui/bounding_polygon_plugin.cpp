@@ -132,7 +132,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
         viewer->data().line_width = 2.4f;
 
         for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-            viewer->data().add_points(kf.center(), ColorRGB::GREEN);
+            viewer->data().add_points(kf.centroid_3d(), ColorRGB::GREEN);
             Eigen::MatrixXd V3d = kf.vertices_3d();
             Eigen::RowVector3d clr = kf.index() == current_cut_index ?
                         ColorRGB::ORANGERED : ColorRGB::RED;
@@ -145,14 +145,14 @@ bool Bounding_Polygon_Menu::pre_draw() {
         for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
             Eigen::Matrix3d cf = kf->orientation();
             if (kf->index() != current_cut_index) {
-                viewer->data().add_edges(kf->center(), kf->center() + 100.0 * cf.row(0), ColorRGB::RED);
-                viewer->data().add_edges(kf->center(), kf->center() + 100.0 * cf.row(1), ColorRGB::GREEN);
-                viewer->data().add_edges(kf->center(), kf->center() + 100.0 * cf.row(2), ColorRGB::BLUE);
+                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(0), ColorRGB::RED);
+                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(1), ColorRGB::GREEN);
+                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(2), ColorRGB::BLUE);
             }
             else {
-                viewer->data().add_edges(kf->center(), kf->center() + 100.0 * cf.row(0), ColorRGB::CYAN);
-                viewer->data().add_edges(kf->center(), kf->center() + 100.0 * cf.row(1), ColorRGB::YELLOW);
-                viewer->data().add_edges(kf->center(), kf->center() + 100.0 * cf.row(2), ColorRGB::MAGENTA);
+                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(0), ColorRGB::CYAN);
+                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(1), ColorRGB::YELLOW);
+                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(2), ColorRGB::MAGENTA);
             }
         }
 
@@ -160,11 +160,11 @@ bool Bounding_Polygon_Menu::pre_draw() {
         BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
 
 
-        viewer->data().add_points(kf->center(), ColorRGB::RED);
+        viewer->data().add_points(kf->origin(), ColorRGB::RED);
         viewer->data().add_points(kf->vertices_3d(), ColorRGB::ORANGERED);
-        viewer->data().add_edges(kf->center(), kf->center() + 100 * kf->orientation().row(0), ColorRGB::CYAN);
-        viewer->data().add_edges(kf->center(), kf->center() + 100 * kf->orientation().row(1), ColorRGB::YELLOW);
-        viewer->data().add_edges(kf->center(), kf->center() + 100 * kf->orientation().row(2), ColorRGB::MAGENTA);
+        viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(0), ColorRGB::CYAN);
+        viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(1), ColorRGB::YELLOW);
+        viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(2), ColorRGB::MAGENTA);
         viewer->selected_data_index = push_overlay_id;
     }
 

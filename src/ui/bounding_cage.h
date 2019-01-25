@@ -39,17 +39,7 @@ private:
     /// By default this is the null logger
     std::shared_ptr<spdlog::logger> logger;
 
-    /// Mesh for the whole bounding cage
-    ///
-//    Eigen::MatrixXd CV;
-//    Eigen::VectorXi CV_refcount;
-//    std::vector<int> CV_free_list;
-//    int num_mesh_vertices = 0;
-
-//    bool update_vertex(int i, const Eigen::RowVector3d& v);
-//    bool insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
-//    bool replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI);
-
+    /// Number of keyframes in the bounding cage
     int _num_keyframes = 0;
 
     Eigen::Vector4d _keyframe_bounding_box;
@@ -58,6 +48,17 @@ public:
 
     Eigen::Vector4d keyframe_bounding_box() const {
         return _keyframe_bounding_box;
+    }
+
+    bool set_keyframe_bounding_box(const Eigen::Vector4d& bbox) {
+        if (bbox[0] >= bbox[1] || bbox[2] >= bbox[3]) {
+            logger->error("Invalid intial bounding box. The input is (min_u, max_u, min_v, max_v) = ({}, {}, {}, {})."
+                          "We require that min_u < max_u and min_v < max_v", bbox[0], bbox[1], bbox[2], bbox[3]);
+            return false;
+        }
+
+        this->_keyframe_bounding_box = bbox;
+        return true;
     }
 
     /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
@@ -117,11 +118,6 @@ public:
         /// Logger for this class
         ///
         std::shared_ptr<spdlog::logger> logger;
-
-        /// This method initializes the BoundingCage mesh for this Cell, allocating new
-        /// storage for the face information
-        ///
-//        bool update_mesh();
 
         /// Construct a new Cell. Don't call this directly, instead use the factory
         /// function `make_cell()`.
@@ -220,7 +216,7 @@ public:
         /// by transporting the frame from from_kf
         ///
         KeyFrame(const Eigen::RowVector3d& normal,
-                 const Eigen::RowVector3d& center,
+                 const Eigen::RowVector3d& origin,
                  const KeyFrame& from_kf,
                  const Eigen::MatrixXd& pts,
                  const Eigen::RowVector2d& centroid,
@@ -231,43 +227,13 @@ public:
         /// Explicit constructor:
         /// The local coordinate frame for this KeyFrame is provided explicitly
         ///
-        KeyFrame(const Eigen::RowVector3d& center,
+        KeyFrame(const Eigen::RowVector3d& origin,
                  const Eigen::Matrix3d& coord_frame,
                  const Eigen::MatrixXd& pts,
                  const Eigen::RowVector2d& centroid,
                  std::shared_ptr<Cell> cell,
                  double idx,
                  BoundingCage *_cage);
-
-        /// When polygon vertex changes (via `set_point_2d()`), these methods
-        /// validate that the change does not create *LOCAL* self intersections.
-        ///
-//        bool validate_points_2d();
-//        bool validate_cage();
-
-        /// Called internally to initialize the BoundingCage mesh with this KeyFrame's data
-        /// If tesselate is true, the polygon for this KeyFrame will be triangulated and
-        /// included in the BoundingCage mesh. We use this for the caps of the cage mesh.
-        ///
-//        bool init_mesh();
-
-        /// Split the KeyFrame polygon along an edge starting at vertex i
-        /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
-        /// This method is called by the owning BoundingCage.
-        ///
-//        bool _insert_vertex(unsigned i, double t);
-
-        /// Delete the vertex at position i. If the deletion causes the BoundingCage to become invalid, then this
-        /// method returns false. This method is called by the owning BoundingCage.
-        ///
-//        bool _delete_vertex(unsigned i, bool validate_2d=true, bool validate_3d=true);
-
-        /// If the KeyFrame is an endpoint, then triangulate the bounding polygon, inserting
-        /// whatever necessary vertices in the BoundinCage vertex buffer. The output, faces,
-        /// is an index buffer of the faces of the triangulated polygon indexing into the
-        /// BoundingCage vertex buffer.
-        ///
-//        bool triangulate(Eigen::MatrixXi& faces);
 
 
         /// The BoundingCage which owns this KeyFrame
@@ -277,7 +243,7 @@ public:
         /// State representing the plane for this KeyFrame.
         ///
         Eigen::Matrix3d _orientation;
-        Eigen::RowVector3d _center;
+        Eigen::RowVector3d _origin;
 
 
         /// 2D positions of the boundary polygon of this KeyFrame
@@ -286,13 +252,6 @@ public:
 
         /// Centroid position in 2d coordinates
         Eigen::RowVector2d _centroid_2d;
-
-        /// Indices of the 3D positions of the boundary polygon in the
-        /// mesh of the BoundingCage which owns this KeyFrame
-        ///
-//        Eigen::VectorXi _mesh_boundary_indices;
-//        Eigen::VectorXi _mesh_interior_indices;
-//        Eigen::MatrixXi _mesh_faces;
 
         /// True if this keyframe is part of the bounding cage
         bool _in_cage = false;
@@ -311,29 +270,6 @@ public:
         std::shared_ptr<spdlog::logger> logger;
 
     public:
-
-        /// Split the every KeyFrame polygon in the Bounding cage along an edge
-        /// starting at vertex i.
-        /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
-        /// If this KeyFrame is not in the BoundingCage, then this method returns false.
-        ///
-//        bool insert_vertex(unsigned i, double t) {
-//            if (!in_bounding_cage()) {
-//                return false;
-//            }
-//            return _cage->insert_boundary_vertex(i, t);
-//        }
-
-        /// Delete the vertex at position i of every KeyFrame in the BoundingCage.
-        /// If the KeyFrame is not in the BoundingCage or if the deletion causes the
-        /// BoundingCage to become invalid, then this method returns false.
-        ///
-//        bool delete_vertex(unsigned i) {
-//            if (!in_bounding_cage()) {
-//                return false;
-//            }
-//            return _cage->delete_boundary_vertex(i);
-//        }
 
         /// Returns true if this KeyFrame is part of the bounding cage
         ///
@@ -375,8 +311,8 @@ public:
 
         /// Get the center of the KeyFrame.
         ///
-        const Eigen::RowVector3d& center() const {
-            return _center;
+        const Eigen::RowVector3d& origin() const {
+            return _origin;
         }
 
         /// Get the ordered 2d points of the KeyFrame polygon boundary.
@@ -391,22 +327,19 @@ public:
             return _centroid_2d;
         }
 
+        const Eigen::RowVector3d centroid_3d() const {
+            return _origin + right()*_centroid_2d[0] + up()*_centroid_2d[1];
+        }
+
         /// Get the ordered 3d points of the keyframe polygon boundary.
         /// These points are just the 2d points projected onto the KeyFrame plane.
         ///
         Eigen::MatrixXd vertices_3d() const {
             Eigen::MatrixXd points3d(_vertices_2d.rows(), 3);
             for (int i = 0; i < _vertices_2d.rows(); i++) {
-                points3d.row(i) = _center + _vertices_2d(i, 0) *_orientation.row(0) + _vertices_2d(i, 1) *_orientation.row(1);
+                points3d.row(i) = _origin + _vertices_2d(i, 0) *_orientation.row(0) + _vertices_2d(i, 1) *_orientation.row(1);
             }
             return points3d;
-        }
-
-        /// Get the 3D position of the centroid for this KeyFrame
-        ///
-        Eigen::RowVector3d centroid_3d() const {
-            Eigen::RowVector3d c(0.0, 0.0, 0.0);
-            c += _center + _centroid_2d[0]*right() + _centroid_2d[1]*up();
         }
 
         /// Get the index value of this KeyFrame.
@@ -414,16 +347,6 @@ public:
         const double index() const {
             return _index;
         }
-
-        /// Move the i^th point on the polygon boundary to the 2d position newpos. To get the
-        /// ordered polygon points, call `points_2d()`.
-        ///
-        /// If validate is set and the movement causes the bounding cage to self-intersect,
-        /// no state gets changed, and this method returns false.
-        ///
-        /// Otherwise, if validate is unset, this method always returns true
-        ///
-//        bool move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate2d=true, bool validate_3d=false);
 
         /// Move the center point of the KeyFrame in its xy plane. If relative is set, then the
         /// polygon points preserve their relative vectors with respect to the center
@@ -562,8 +485,6 @@ public:
         cells.tail.reset();
         SV.resize(0, 0);
         SV_smooth.resize(0, 0);
-//        CV.resize(0, 0);
-//        num_mesh_vertices = 0;
     }
 
     /// Add a new KeyFrame at the given index in the bounding Cage.
@@ -609,9 +530,6 @@ public:
         assert(root->max_index() == cells.tail->max_index());
         return root->max_index();
     }
-
-//    bool insert_boundary_vertex(unsigned i, double t);
-//    bool delete_boundary_vertex(unsigned i);
 
     /// Get a KeyFrame at the specified index.
     /// The KeyFrame may not yet be inserted into the bounding cage.

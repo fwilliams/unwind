@@ -76,7 +76,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
     _index = idx;
     _orientation = parallel_transport(from_kf, normal);
     _centroid_2d = centroid;
-    _center = center;
+    _origin = center;
     _vertices_2d = pts;
 
     _left_cell = cell;
@@ -95,7 +95,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
     _cage = cage;
     _index = idx;
     _orientation = coord_frame;
-    _center = center;
+    _origin = center;
     _vertices_2d = pts;
     _centroid_2d = centroid;
     _left_cell = cell;
@@ -114,114 +114,6 @@ bool BoundingCage::KeyFrame::move_centroid_2d(Eigen::RowVector2d& new_centroid_2
     _centroid_2d = new_centroid_2d;
     return true;
 }
-
-//bool BoundingCage::KeyFrame::validate_points_2d() {
-//    // Return false if two non-adjacent segments intersect
-//    const int num_v = _vertices_2d.rows();
-//    for (int i = 0; i < num_v; i++) {
-//        for (int j = i+2; j < num_v; j++) {
-//            double t, u;
-//            const int next_i = (i+1)%num_v;
-//            const int next_j = (j+1)%num_v;
-//            if (i == next_j) { continue; }
-
-//            Eigen::RowVector3d a1(_vertices_2d(i, 0), _vertices_2d(i, 1), 0);
-//            Eigen::RowVector3d a2(_vertices_2d(next_i, 0), _vertices_2d(next_i, 1), 0);
-//            Eigen::RowVector3d da = a2 - a1;
-
-//            Eigen::RowVector3d b1(_vertices_2d(j, 0), _vertices_2d(j, 1), 0);
-//            Eigen::RowVector3d b2(_vertices_2d(next_j, 0), _vertices_2d(next_j, 1), 0);
-//            Eigen::RowVector3d db = b2 - b1;
-
-//            if (igl::segments_intersect(a1, da, b1, db, t, u)) {
-//                if (t > 1.0 || u > 1.0) {
-//                    continue;
-//                }
-//                return false;
-//            }
-//        }
-//    }
-//    return true;
-//}
-
-//bool BoundingCage::KeyFrame::validate_cage() {
-//    bool ret = true;
-//    // TODO: Validation code
-
-//    if (left_cell()) {
-//    }
-
-//    if(right_cell()) {
-//    }
-
-//    return ret;
-//}
-
-//bool BoundingCage::KeyFrame::init_mesh() {
-//    // Insert the boundary vertices
-//    _cage->replace_vertices(vertices_3d(), _mesh_boundary_indices);
-//    _mesh_interior_indices.resize(0, 0);
-
-//    return true;
-//}
-
-//bool BoundingCage::KeyFrame::triangulate(Eigen::MatrixXi &faces) {
-//    if (!is_endpoint()) {
-//        return true;
-//    }
-
-//    // Compute a new triangulation of the KeyFrame boundary
-//    Eigen::MatrixXi E(_vertices_2d.rows(), 2);
-//    Eigen::MatrixXd V;
-//    Eigen::MatrixXi F;
-//    Eigen::MatrixXd H(0, 2);
-//    Eigen::VectorXi VMin(_vertices_2d.rows()), VMout;
-//    Eigen::VectorXi EMin, EMout;
-//    std::string args("Q");
-//    for (int i = 0; i < _vertices_2d.rows(); i++) {
-//        E.row(i) = Eigen::RowVector2i(i, (i+1)%_vertices_2d.rows());
-//        VMin[i] = i+1;
-//    }
-//    igl::triangle::triangulate(_vertices_2d, E, H, VMin, EMin, args, V, F, VMout, EMout);
-
-
-//    // New Vertex positions added by the triangulation
-//    Eigen::MatrixXd newV(V.rows(), 3);
-//    Eigen::VectorXi vmap(V.rows());
-//    int vcount = 0;
-//    for (int i = 0; i < V.rows(); i++) {
-//        Eigen::RowVector3d v = V(i, 0)*right() + V(i, 1)*up() + center();
-//        if (VMout[i] == 0) {
-//            // If not a boundary vertex, then we'll add a new vertex
-//            newV.row(vcount) = v;
-//            vmap[i] = vcount;
-//            vcount += 1;
-//        } else {
-//            // The number of boundary vertices should never change,
-//            // so we can just update the vertex directly
-//            const int vidx = _mesh_boundary_indices[VMout[i]-1];
-//            _cage->update_vertex(vidx, v);
-//            vmap[i] = VMout[i]-1;
-//        }
-//    }
-//    newV.conservativeResize(vcount, 3);
-//    _cage->replace_vertices(newV, _mesh_interior_indices);
-
-//    faces.resize(F.rows(), 3);
-//    for (int i = 0; i < F.rows(); i++) {
-//        for (int j = 0; j < 3; j++) {
-//            const int vid = F(i, j);
-//            if (VMout[vid] == 0) {
-//                faces(i, j) = _mesh_interior_indices[vmap[vid]];
-//            } else {
-//                faces(i, j) = _mesh_boundary_indices[vmap[vid]];
-//            }
-//        }
-//    }
-
-//    return true;
-//}
-
 
 
 
@@ -264,50 +156,6 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
     return ret;
 }
 
-//bool BoundingCage::Cell::update_mesh() {
-//    assert(_left_keyframe()->vertices_2d().rows() == _right_keyframe->vertices_2d().rows());
-
-//    Eigen::MatrixXi left_kf_faces, right_kf_faces;
-//    _left_keyframe->triangulate(left_kf_faces);
-//    _right_keyframe->triangulate(right_kf_faces);
-
-//    const int num_new_faces = 2 * _left_keyframe->vertices_2d().rows() +
-//            left_kf_faces.rows() + right_kf_faces.rows();
-//    _mesh_faces.resize(num_new_faces, 3);
-
-//    int fcount = 0;
-//    Eigen::RowVector3d centroid = Eigen::RowVector3d::Zero();
-
-//    for (int i = 0; i < _left_keyframe->vertices_2d().rows(); i++) {
-//        int next_i =(i+1) % _right_keyframe->_mesh_boundary_indices.rows();
-//        centroid += _cage->CV.row(_left_keyframe->_mesh_boundary_indices[i]);
-//        centroid += _cage->CV.row(_right_keyframe->_mesh_boundary_indices[i]);
-
-//        _mesh_faces.row(fcount++) = Eigen::RowVector3i(
-//                    _left_keyframe->_mesh_boundary_indices[i],
-//                    _right_keyframe->_mesh_boundary_indices[i],
-//                    _right_keyframe->_mesh_boundary_indices[next_i]);
-//        _mesh_faces.row(fcount++) = Eigen::RowVector3i(
-//                    _left_keyframe->_mesh_boundary_indices[i],
-//                    _right_keyframe->_mesh_boundary_indices[next_i],
-//                    _left_keyframe->_mesh_boundary_indices[next_i]);
-//    }
-//    centroid /= (2*_left_keyframe->vertices_2d().rows());
-
-
-//    if (_left_keyframe->normal().dot(centroid - _left_keyframe->center()) < 0.0) {
-//        left_kf_faces.col(2).swap(left_kf_faces.col(1));
-//    }
-//    if (_right_keyframe->normal().dot(centroid - _right_keyframe->center()) < 0.0) {
-//        right_kf_faces.col(2).swap(right_kf_faces.col(1));
-//    }
-
-//    _mesh_faces.block(fcount, 0, left_kf_faces.rows(), 3) = left_kf_faces;
-//    fcount += left_kf_faces.rows();
-//    _mesh_faces.block(fcount, 0, right_kf_faces.rows(), 3) = right_kf_faces;
-
-//    return true;
-//}
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
     // The index of the keyframe is out of range, since this method is called, internally,
@@ -352,11 +200,6 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
         // If we added a cell with a different normal than the left key-frame, we need to recompute the
         // the local coordinate frame of the right keyframe
         _right_keyframe->_orientation = parallel_transport(*_right_child->_left_keyframe, _right_keyframe->normal());
-
-        // We've successfully inserted, update the BoundingCage mesh
-//        keyframe->init_mesh();
-//        _left_child->update_mesh();
-//        _right_child->update_mesh();
 
         return keyframe;
 
@@ -463,8 +306,6 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
 
     clear();
-//    CV.resize(4, 3);
-//    CV_refcount.resize(CV.rows());
 
     logger = spdlog::get(FishLoggerName);
 
@@ -485,12 +326,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
     double min_u = bounding_box[0], max_u = bounding_box[1],
            min_v = bounding_box[2], max_v = bounding_box[3];
-    if (min_u >= max_u || min_v >= max_v) {
-        logger->error("Invalid intial bounding box. The input is (min_u, max_u, min_v, max_v) = ({}, {}, {}, {})."
-                      "We require that min_u < max_u and min_v < max_v", min_u, max_u, min_v, max_v);
+    if (!set_keyframe_bounding_box(bounding_box)) {
         return false;
     }
-    _keyframe_bounding_box = bounding_box;
 
     Eigen::MatrixXd poly_template(4, 2);
     poly_template << min_u, min_v,
@@ -508,6 +346,8 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
                                                          SV.rows()-1, this));
     front_keyframe->_in_cage = true;
     back_keyframe->_in_cage = true;
+    logger->debug("1-<bn, transport(fn)> = {}", 1.0-fabs(back_keyframe->normal().dot(back_normal)));
+
     assert("Parallel transport bug" && (1.0-fabs(back_keyframe->normal().dot(back_normal))) < 1e-6);
 
     root = Cell::make_cell(front_keyframe, back_keyframe, this);
@@ -517,10 +357,6 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
         assert("TODO: Use bounding box" && false);
         return false;
     }
-
-//    front_keyframe->init_mesh();
-//    back_keyframe->init_mesh();
-//    root->update_mesh();
 
     cells.head = root;
     cells.tail = cells.head;
@@ -553,7 +389,7 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
 
     const double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
     Eigen::MatrixXd V = (1.0-coeff)*cell->_left_keyframe->vertices_3d() + coeff*cell->_right_keyframe->vertices_3d();
-    Eigen::RowVector3d ctr = (1.0-coeff)*cell->_left_keyframe->center() + coeff*cell->_right_keyframe->center();
+    Eigen::RowVector3d ctr = (1.0-coeff)*cell->_left_keyframe->origin() + coeff*cell->_right_keyframe->origin();
 
     Eigen::MatrixXd A = V.rowwise() - ctr;
     Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
@@ -699,9 +535,6 @@ bool BoundingCage::delete_keyframe(KeyFrameIterator& it) {
     prev_cell->_right_keyframe = next_keyframe;
     next_keyframe->_left_cell = prev_cell;
 
-//    next_cell->update_mesh();
-//    prev_cell->update_mesh();
-
     std::shared_ptr<Cell> next_parent = next_cell->_parent_cell.lock();
 
     std::shared_ptr<Cell> update = next_parent;
@@ -721,77 +554,6 @@ bool BoundingCage::delete_keyframe(KeyFrameIterator& it) {
     return true;
 }
 
-//bool BoundingCage::update_vertex(int i, const Eigen::RowVector3d& v) {
-//    CV.row(i) = v;
-//    return true;
-//}
-
-//bool BoundingCage::insert_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
-//    VI.conservativeResize(V.rows());
-//
-//    if (CV_free_list.empty()) {
-//        while(CV.rows() < num_mesh_vertices + V.rows()) {
-//            CV.conservativeResize(2*CV.rows(), 3);
-//            CV_refcount.conservativeResize(2*CV_refcount.rows());
-//        }
-//        CV.block(num_mesh_vertices, 0, V.rows(), 3) = V;
-//        CV_refcount.block(num_mesh_vertices, 0, V.rows(), 1).setOnes();
-//        VI.setLinSpaced(num_mesh_vertices, num_mesh_vertices+V.rows()-1);
-//        num_mesh_vertices += V.rows();
-//        return true;
-//    }
-//
-//    int vcount = 0;
-//    for (int i = 0; i < std::min((int)V.rows(), (int)CV_free_list.size()); i++) {
-//        int next_free = CV_free_list.back();
-//        CV_free_list.pop_back();
-//        VI[vcount] = next_free;
-//        CV.row(next_free) = V.row(vcount++);
-//    }
-//    const int num_overflow = V.rows()-vcount;
-//    if (num_overflow > 0) {
-//        while(CV.rows() < num_mesh_vertices + num_overflow) {
-//            CV.conservativeResize(2*CV.rows(), 3);
-//            CV_refcount.conservativeResize(2*CV_refcount.rows());
-//        }
-//        CV.block(num_mesh_vertices, 0, num_overflow, 3) = V.block(vcount, 0, V.rows(), 3);
-//        CV_refcount.block(num_mesh_vertices, 0, num_overflow, 1).setZero();
-//        VI.block(vcount, 0, V.rows()-1, 1).setLinSpaced(num_mesh_vertices, num_mesh_vertices+num_overflow-1);
-//        num_mesh_vertices += num_overflow;
-//    }
-//
-//    return true;
-//}
-
-//bool BoundingCage::replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& VI) {
-//    // 1) VI has fewer vertices than V
-//    if (VI.rows() <= V.rows()) {
-//        int num_vi = VI.rows();
-//        int num_new_vertices = V.rows() - num_vi;
-//
-//        VI.conservativeResize(V.rows(), 3);
-//        for (int i = 0; i < num_vi; i++) {
-//            CV.row(VI[i]) = V.row(i);
-//        }
-//        Eigen::VectorXi newVI(num_new_vertices, 3);
-//        insert_vertices(V.block(num_vi, 0, num_new_vertices, 3), newVI);
-//        VI.block(num_vi, 0, num_new_vertices, 3) = newVI;
-//    }
-//    // 2) VI has more vertices than V
-//    else {
-//        for (int i = 0; i < V.rows(); i++) {
-//            CV.row(VI[i]) = V.row(i);
-//        }
-//        for (int i = V.rows(); i < VI.rows(); i++) {
-//            CV_refcount[VI[i]] -= 1;
-//            if (CV_refcount[VI[i]] <= 0) {
-//                CV_free_list.push_back(VI[i]);
-//            }
-//        }
-//        VI.conservativeResize(V.rows(), 3);
-//    }
-//    return true;
-//}
 
 const Eigen::MatrixXd BoundingCage::mesh_vertices() {
     int num_vertices = this->num_keyframes()*4;
@@ -800,7 +562,7 @@ const Eigen::MatrixXd BoundingCage::mesh_vertices() {
     int count = 0;
     for (KeyFrame& kf : this->keyframes) {
         Eigen::RowVector2d bbox_ctr = kf.centroid_2d();
-        Eigen::RowVector3d ctr = kf.center();
+        Eigen::RowVector3d ctr = kf.origin();
         Eigen::RowVector3d u_axis = kf.right();
         Eigen::RowVector3d v_axis = kf.up();
         double min_u = _keyframe_bounding_box[0], max_u = _keyframe_bounding_box[1],
@@ -809,6 +571,7 @@ const Eigen::MatrixXd BoundingCage::mesh_vertices() {
         Eigen::RowVector3d lr = ctr + u_axis*(bbox_ctr[0]+max_u) + v_axis*(bbox_ctr[1]+min_v);
         Eigen::RowVector3d ur = ctr + u_axis*(bbox_ctr[0]+max_u) + v_axis*(bbox_ctr[1]+max_v);
         Eigen::RowVector3d ul = ctr + u_axis*(bbox_ctr[0]+min_u) + v_axis*(bbox_ctr[1]+max_v);
+
         ret.row(count++) = ll;
         ret.row(count++) = lr;
         ret.row(count++) = ur;

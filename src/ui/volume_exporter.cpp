@@ -161,7 +161,7 @@ void VolumeExporter::draw(BoundingCage& cage, GLuint volume_texture, glm::ivec3 
 
         glm::vec3 u_axis = glm::vec3(G3f(kf->right()));
         glm::vec3 v_axis = glm::vec3(G3f(kf->up()));
-        glm::vec3 kf_center = glm::vec3(G3f(kf->center()));
+        glm::vec3 kf_center = glm::vec3(G3f(kf->origin()));
         glm::vec2 ctr = G2f(kf->centroid_2d());
 
         glm::vec3 ll = kf_center + u_axis*(min_u+ctr[0]) + v_axis*(min_v+ctr[1]);

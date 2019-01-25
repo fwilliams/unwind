@@ -122,8 +122,6 @@ private:
         BoundingCage::KeyFrameIterator current_active_keyframe;
     } selection;
 
-    const float INITIAL_RANGE = 15.0;
-    float min_u = -INITIAL_RANGE, max_u = INITIAL_RANGE, min_v = -INITIAL_RANGE, max_v = INITIAL_RANGE;
 };
 
 #endif // BOUNDING_POLYGON_WIDGET_H

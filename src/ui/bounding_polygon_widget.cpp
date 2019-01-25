@@ -271,6 +271,9 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         std::vector<glm::vec2> bbox_v = bbox_vertices();
         for (int i = 0; i < 4; i++) { bbox_v[i] -= ctr; }
 
+        Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
+        float min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+
         glm::vec2 assign_mouse = kf_mouse - ctr;
         switch (selection.closest_vertex_index) {
         case 0:
@@ -290,6 +293,8 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
             max_v = std::max(assign_mouse[1], min_v);
             break;
         }
+
+        state.cage.set_keyframe_bounding_box(Eigen::Vector4d(min_u, max_u, min_v, max_v));
     }
 
     if (mouse_state.is_left_button_down && selection.current_edit_element == CenterElement) {
@@ -370,6 +375,9 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
 
 
 std::vector<glm::vec2> Bounding_Polygon_Widget::bbox_vertices() {
+    Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
+    double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+
     glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
     std::vector<glm::vec2> vertices;
     vertices.push_back(ctr + glm::vec2(min_u, min_v));
@@ -480,7 +488,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
         glm::vec3 x_axis = glm::vec3(G3f(kf->right()));
         glm::vec3 y_axis = glm::vec3(G3f(kf->up()));
-        glm::vec3 kf_center = glm::vec3(G3f(kf->center()));
+        glm::vec3 kf_center = glm::vec3(G3f(kf->origin()));
         //glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
 
@@ -527,6 +535,9 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         }
 
         glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
+        Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
+        double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+
         std::vector<glm::vec2> bbox_vertices;
         bbox_vertices.push_back(ctr + glm::vec2(min_u, min_v));
         bbox_vertices.push_back(ctr + glm::vec2(max_u, min_v));
