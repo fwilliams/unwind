@@ -52,7 +52,14 @@ private:
 
     int _num_keyframes = 0;
 
+    Eigen::Vector4d _keyframe_bounding_box;
+
 public:
+
+    Eigen::Vector4d keyframe_bounding_box() const {
+        return _keyframe_bounding_box;
+    }
+
     /// A Cell represents a prism whose bases are two keyframes which are indexed proportionally
     /// to their distance along the skeleton of the bounding cage. A Cell's "left" keyframe always
     /// has a smaller index than its "right" keyframe.
@@ -248,12 +255,12 @@ public:
         /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
         /// This method is called by the owning BoundingCage.
         ///
-        bool _insert_vertex(unsigned i, double t);
+//        bool _insert_vertex(unsigned i, double t);
 
         /// Delete the vertex at position i. If the deletion causes the BoundingCage to become invalid, then this
         /// method returns false. This method is called by the owning BoundingCage.
         ///
-        bool _delete_vertex(unsigned i, bool validate_2d=true, bool validate_3d=true);
+//        bool _delete_vertex(unsigned i, bool validate_2d=true, bool validate_3d=true);
 
         /// If the KeyFrame is an endpoint, then triangulate the bounding polygon, inserting
         /// whatever necessary vertices in the BoundinCage vertex buffer. The output, faces,
@@ -307,23 +314,23 @@ public:
         /// t in [0, 1] specifies where to split. i.e. v[i] + t*(v[i+1]-v[i]).
         /// If this KeyFrame is not in the BoundingCage, then this method returns false.
         ///
-        bool insert_vertex(unsigned i, double t) {
-            if (!in_bounding_cage()) {
-                return false;
-            }
-            return _cage->insert_boundary_vertex(i, t);
-        }
+//        bool insert_vertex(unsigned i, double t) {
+//            if (!in_bounding_cage()) {
+//                return false;
+//            }
+//            return _cage->insert_boundary_vertex(i, t);
+//        }
 
         /// Delete the vertex at position i of every KeyFrame in the BoundingCage.
         /// If the KeyFrame is not in the BoundingCage or if the deletion causes the
         /// BoundingCage to become invalid, then this method returns false.
         ///
-        bool delete_vertex(unsigned i) {
-            if (!in_bounding_cage()) {
-                return false;
-            }
-            return _cage->delete_boundary_vertex(i);
-        }
+//        bool delete_vertex(unsigned i) {
+//            if (!in_bounding_cage()) {
+//                return false;
+//            }
+//            return _cage->delete_boundary_vertex(i);
+//        }
 
         /// Returns true if this KeyFrame is part of the bounding cage
         ///
@@ -425,7 +432,7 @@ public:
         ///
         /// Otherwise, if validate is unset, this method always returns true
         ///
-        bool move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate2d=true, bool validate_3d=false);
+//        bool move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate2d=true, bool validate_3d=false);
 
         /// Move the center point of the KeyFrame in its xy plane. If relative is set, then the
         /// polygon points preserve their relative vectors with respect to the center
@@ -553,7 +560,7 @@ public:
     ///
     bool set_skeleton_vertices(const Eigen::MatrixXd& new_SV,
                                unsigned smoothing_iters,
-                               const Eigen::MatrixXd& polygon_template);
+                               const Eigen::Vector4d& bounding_box);
 
     /// Clear the bounding cage and skeleton vertices
     ///
@@ -611,8 +618,8 @@ public:
         return root->max_index();
     }
 
-    bool insert_boundary_vertex(unsigned i, double t);
-    bool delete_boundary_vertex(unsigned i);
+//    bool insert_boundary_vertex(unsigned i, double t);
+//    bool delete_boundary_vertex(unsigned i);
 
     /// Get a KeyFrame at the specified index.
     /// The KeyFrame may not yet be inserted into the bounding cage.

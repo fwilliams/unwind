@@ -104,45 +104,45 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
     logger = spdlog::get(FishLoggerName);
 }
 
-bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate_2d, bool validate_3d) {
-    if (i < 0 || i >= _vertices_2d.rows()) {
-        assert("i in move_vertex() was out of range" && false);
-        logger->error("move_point_2d(i, newpos), index i={} was out of range, ({}, {})",
-                      i, 0, _vertices_2d.rows()-1);
-        return false;
-    }
+//bool BoundingCage::KeyFrame::move_point_2d(int i, Eigen::RowVector2d& newpos, bool validate_2d, bool validate_3d) {
+//    if (i < 0 || i >= _vertices_2d.rows()) {
+//        assert("i in move_vertex() was out of range" && false);
+//        logger->error("move_point_2d(i, newpos), index i={} was out of range, ({}, {})",
+//                      i, 0, _vertices_2d.rows()-1);
+//        return false;
+//    }
 
-    if (!in_bounding_cage()) {
-        logger->warn("Cannot move KeyFrame vertex if KeyFrame is not in bounding cage");
-        return false;
-    }
+//    if (!in_bounding_cage()) {
+//        logger->warn("Cannot move KeyFrame vertex if KeyFrame is not in bounding cage");
+//        return false;
+//    }
 
-    Eigen::RowVector2d old_pt_2d = _vertices_2d.row(i);
-    Eigen::RowVector3d old_pt_3d = _cage->CV.row(_mesh_boundary_indices[i]);
+//    Eigen::RowVector2d old_pt_2d = _vertices_2d.row(i);
+//    Eigen::RowVector3d old_pt_3d = _cage->CV.row(_mesh_boundary_indices[i]);
 
 
-    _vertices_2d.row(i) = newpos;
-    _cage->CV.row(_mesh_boundary_indices[i]) = _center + newpos[0]*right()+ newpos[1]*up();
+//    _vertices_2d.row(i) = newpos;
+//    _cage->CV.row(_mesh_boundary_indices[i]) = _center + newpos[0]*right()+ newpos[1]*up();
 
-    if (validate_2d && !validate_points_2d() || validate_3d && !validate_cage()) {
-        _vertices_2d.row(i) = old_pt_2d;
-        _cage->CV.row(_mesh_boundary_indices[i]) = old_pt_3d;
-        logger->debug("move_point_2d() would have created invalid cage, reverting");
-        return false;
-    }
+//    if (validate_2d && !validate_points_2d() || validate_3d && !validate_cage()) {
+//        _vertices_2d.row(i) = old_pt_2d;
+//        _cage->CV.row(_mesh_boundary_indices[i]) = old_pt_3d;
+//        logger->debug("move_point_2d() would have created invalid cage, reverting");
+//        return false;
+//    }
 
-    bool ret = true;
+//    bool ret = true;
 
-    if (left_cell()) {
-        ret = left_cell()->update_mesh();
-    }
-    if (right_cell()) {
-        ret = ret && right_cell()->update_mesh();
-    }
-    assert(left_cell() || right_cell());
+//    if (left_cell()) {
+//        ret = left_cell()->update_mesh();
+//    }
+//    if (right_cell()) {
+//        ret = ret && right_cell()->update_mesh();
+//    }
+//    assert(left_cell() || right_cell());
 
-    return ret;
-}
+//    return ret;
+//}
 
 bool BoundingCage::KeyFrame::move_centroid_2d(Eigen::RowVector2d& new_centroid_2d) {
     if (!in_bounding_cage()) {
@@ -261,39 +261,39 @@ bool BoundingCage::KeyFrame::triangulate(Eigen::MatrixXi &faces) {
     return true;
 }
 
-bool BoundingCage::KeyFrame::_insert_vertex(unsigned idx, double t) {
-    const int num_old_rows = _vertices_2d.rows();
-    const unsigned next_idx = (idx + 1) % vertices_2d().rows();
-    const Eigen::RowVector2d new_v = t*vertices_2d().row(idx) + (1.0-t)*vertices_2d().row(next_idx);
-    _vertices_2d.conservativeResize(num_old_rows+1, 2);
-    Eigen::MatrixXd cpy = _vertices_2d.block(idx+1, 0, num_old_rows-idx-1, 2);
-    _vertices_2d.row(idx+1) = new_v;
-    _vertices_2d.block(idx+2, 0, num_old_rows-idx-1, 2) = cpy;
+//bool BoundingCage::KeyFrame::_insert_vertex(unsigned idx, double t) {
+//    const int num_old_rows = _vertices_2d.rows();
+//    const unsigned next_idx = (idx + 1) % vertices_2d().rows();
+//    const Eigen::RowVector2d new_v = t*vertices_2d().row(idx) + (1.0-t)*vertices_2d().row(next_idx);
+//    _vertices_2d.conservativeResize(num_old_rows+1, 2);
+//    Eigen::MatrixXd cpy = _vertices_2d.block(idx+1, 0, num_old_rows-idx-1, 2);
+//    _vertices_2d.row(idx+1) = new_v;
+//    _vertices_2d.block(idx+2, 0, num_old_rows-idx-1, 2) = cpy;
 
-    return init_mesh();
-}
+//    return init_mesh();
+//}
 
-bool BoundingCage::KeyFrame::_delete_vertex(unsigned idx, bool validate_2d, bool validate_3d) {
-    // Cannot make degenerate polygon
-    if (_vertices_2d.rows() == 3) {
-        logger->warn("delete_vertex {} led to degenerate BoundingCage (fewer than 3 vertices), reverting...", idx);
-        return false;
-    }
+//bool BoundingCage::KeyFrame::_delete_vertex(unsigned idx, bool validate_2d, bool validate_3d) {
+//    // Cannot make degenerate polygon
+//    if (_vertices_2d.rows() == 3) {
+//        logger->warn("delete_vertex {} led to degenerate BoundingCage (fewer than 3 vertices), reverting...", idx);
+//        return false;
+//    }
 
-    Eigen::MatrixXd old_pts = _vertices_2d;
-    int n = old_pts.rows()-idx-1;
+//    Eigen::MatrixXd old_pts = _vertices_2d;
+//    int n = old_pts.rows()-idx-1;
 
-    _vertices_2d.block(idx, 0, n, 2) = _vertices_2d.block(idx+1, 0, n, 2);
-    _vertices_2d.conservativeResize(old_pts.rows()-1, 2);
+//    _vertices_2d.block(idx, 0, n, 2) = _vertices_2d.block(idx+1, 0, n, 2);
+//    _vertices_2d.conservativeResize(old_pts.rows()-1, 2);
 
-    if (validate_2d && !validate_points_2d() || validate_3d && !validate_cage()) {
-        _vertices_2d = old_pts;
-        logger->warn("delete_vertex {} led to invalid BoundingCage, reverting...", idx);
-        return false;
-    }
+//    if (validate_2d && !validate_points_2d() || validate_3d && !validate_cage()) {
+//        _vertices_2d = old_pts;
+//        logger->warn("delete_vertex {} led to invalid BoundingCage, reverting...", idx);
+//        return false;
+//    }
 
-    return init_mesh();
-}
+//    return init_mesh();
+//}
 
 
 
@@ -478,7 +478,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::find(double index) {
 // |                      | //
 // |======================| //
 
-bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters, const Eigen::MatrixXd &poly_template) {
+bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned smoothing_iters, const Eigen::Vector4d& bounding_box) {
     assert(cells.begin() == cells.end());
     assert(keyframes.begin() == keyframes.end());
     assert(cells.rbegin() == cells.rend());
@@ -535,7 +535,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
 
     clear();
-    CV.resize(poly_template.rows(), 3);
+    CV.resize(4, 3);
     CV_refcount.resize(CV.rows());
 
     logger = spdlog::get(FishLoggerName);
@@ -550,37 +550,25 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
     smooth_skeleton(smoothing_iters);
 
-    if(poly_template.rows() < 3 || poly_template.cols() != 2) {
-        logger->error("Polygon template passed to set_skeleton_vertices was invalid. "
-                      "It needs to contain at least 3 points of dimension 2."
-                      "Got an input matrix of size {}x{}.", poly_template.rows(), poly_template.cols());
-        return false;
-    }
-
-    { // Check that polygon template is convex
-        Eigen::MatrixXd PTP(poly_template.rows(), 3);
-        PTP.setZero();
-        PTP.block(0, 0, poly_template.rows(), 2) = poly_template;
-        Eigen::MatrixXd PTP_W;
-        Eigen::MatrixXi PTP_G;
-        igl::copyleft::cgal::convex_hull(PTP, PTP_W, PTP_G);
-
-        if (PTP_W.rows() != PTP.rows()) {
-            logger->error("Polygon template passed to set_skeleton_vertices was not convex. "
-                          "It needs to be a convex polygon of dimension 2.");
-            return false;
-        }
-        if (PTP_G.rows() <= 0) {
-            logger->error("Zero triangles when computing convex hull of polygon_template in set_skeleton_vertices.");
-            return false;
-        }
-        assert(PTP_W.rows() >= 3);
-    }
-
     Eigen::RowVector3d front_normal = SV_smooth.row(1) - SV_smooth.row(0);
     Eigen::RowVector3d back_normal = SV_smooth.row(SV.rows()-1) - SV_smooth.row(SV.rows()-2);
     front_normal.normalize();
     back_normal.normalize();
+
+    double min_u = bounding_box[0], max_u = bounding_box[1],
+           min_v = bounding_box[2], max_v = bounding_box[3];
+    if (min_u >= max_u || min_v >= max_v) {
+        logger->error("Invalid intial bounding box. The input is (min_u, max_u, min_v, max_v) = ({}, {}, {}, {})."
+                      "We require that min_u < max_u and min_v < max_v", min_u, max_u, min_v, max_v);
+        return false;
+    }
+    _keyframe_bounding_box = bounding_box;
+
+    Eigen::MatrixXd poly_template(4, 2);
+    poly_template << min_u, min_v,
+                     max_u, min_v,
+                     max_u, max_v,
+                     min_u, max_v;
 
     Eigen::RowVector2d centroid = poly_template.colwise().mean();
 
@@ -873,38 +861,38 @@ bool BoundingCage::replace_vertices(const Eigen::MatrixXd& V, Eigen::VectorXi& V
     return true;
 }
 
-bool BoundingCage::insert_boundary_vertex(unsigned idx, double t) {
-    std::shared_ptr<KeyFrame> head_kf = cells.head->_left_keyframe;
-    if (idx >= head_kf->vertices_2d().rows()) {
-        logger->error("insert_boundary_vertex index {} out of bounds", idx);
-        return false;
-    }
+//bool BoundingCage::insert_boundary_vertex(unsigned idx, double t) {
+//    std::shared_ptr<KeyFrame> head_kf = cells.head->_left_keyframe;
+//    if (idx >= head_kf->vertices_2d().rows()) {
+//        logger->error("insert_boundary_vertex index {} out of bounds", idx);
+//        return false;
+//    }
 
-    for (KeyFrame& kf : keyframes) {
-        if (!kf._insert_vertex(idx, t)) { return false; }
-    }
+//    for (KeyFrame& kf : keyframes) {
+//        if (!kf._insert_vertex(idx, t)) { return false; }
+//    }
 
-    for (Cell& cell : cells) {
-        if (!cell.update_mesh()) { return false; }
-    }
+//    for (Cell& cell : cells) {
+//        if (!cell.update_mesh()) { return false; }
+//    }
 
-    return true;
-}
+//    return true;
+//}
 
-bool BoundingCage::delete_boundary_vertex(unsigned idx) {
-    std::shared_ptr<KeyFrame> head_kf = cells.head->_left_keyframe;
-    if (idx >= head_kf->vertices_2d().rows()) {
-        logger->error("delete_boundary_vertex index {} out of bounds", idx);
-        return false;
-    }
+//bool BoundingCage::delete_boundary_vertex(unsigned idx) {
+//    std::shared_ptr<KeyFrame> head_kf = cells.head->_left_keyframe;
+//    if (idx >= head_kf->vertices_2d().rows()) {
+//        logger->error("delete_boundary_vertex index {} out of bounds", idx);
+//        return false;
+//    }
 
-    for (KeyFrame& kf : keyframes) {
-        if(!kf._delete_vertex(idx)) { return false; }
-    }
+//    for (KeyFrame& kf : keyframes) {
+//        if(!kf._delete_vertex(idx)) { return false; }
+//    }
 
-    for (Cell& cell : cells) {
-        if (!cell.update_mesh()) { return false; }
-    }
+//    for (Cell& cell : cells) {
+//        if (!cell.update_mesh()) { return false; }
+//    }
 
-    return true;
-}
+//    return true;
+//}

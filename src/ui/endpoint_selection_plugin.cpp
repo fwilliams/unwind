@@ -337,15 +337,9 @@ void EndPoint_Selection_Menu::extract_skeleton() {
             state.endpoint_pairs, state.extracted_volume.connected_components,
             100, skeleton_vertices);
 
-        Eigen::MatrixXd poly_template(4, 2);
         const double rad = 7.5;
-        poly_template << -rad, -rad,
-                          rad, -rad,
-                          rad,  rad,
-                         -rad,  rad;
-        state.cage.set_skeleton_vertices(skeleton_vertices,
-            50, // smoothing iterations
-            poly_template);
+        Eigen::Vector4d bbox(-rad, rad, -rad, rad);
+        state.cage.set_skeleton_vertices(skeleton_vertices, 50 /* smoothing iterations */, bbox);
 
         extracting_skeleton = false;
         done_extracting_skeleton = true;
