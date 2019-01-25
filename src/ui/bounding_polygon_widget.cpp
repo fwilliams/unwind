@@ -133,24 +133,9 @@ struct BlitData {
     float data[4]; // pos[2] + uv[2]
 };
 
-std::vector<glm::vec2> vertices_2d_to_glm(const Eigen::MatrixXd& vertices) {
-    std::vector<glm::vec2> result(vertices.rows());
-    for (int i = 0; i < vertices.rows(); ++i) {
-        result[i] = G2f(vertices.row(i));
-    }
-    return result;
-}
-
-std::vector<glm::vec3> vertices_3d_to_glm(const Eigen::MatrixXd& vertices) {
-    std::vector<glm::vec3> result(vertices.rows());
-    for (int i = 0; i < vertices.rows(); ++i) {
-        result[i] = G3f(vertices.row(i));
-    }
-    return result;
-}
-
 } // namespace
 
+Bounding_Polygon_Widget::Bounding_Polygon_Widget(State& state) : state(state) {}
 
 glm::vec2 Bounding_Polygon_Widget::convert_position_mainwindow_to_keyframe(const glm::vec2& p) {
     glm::vec2 window_ll = position;
@@ -170,7 +155,7 @@ glm::vec2 Bounding_Polygon_Widget::convert_position_keyframe_to_ndc(const glm::v
     return ret / view.zoom;
 }
 
-bool Bounding_Polygon_Widget::intersects(const glm::ivec2& p) const {
+bool Bounding_Polygon_Widget::point_in_widget(const glm::ivec2& p) const {
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
 
@@ -179,38 +164,6 @@ bool Bounding_Polygon_Widget::intersects(const glm::ivec2& p) const {
     const glm::ivec2 ur = position + size;
     return p_tx.x >= ll.x && p_tx.x <= ur.x && p_tx.y >= ll.y && p_tx.y <= ur.y;
 }
-
-std::tuple<int, float, glm::vec2> Bounding_Polygon_Widget::closest_edge(const glm::vec2& p) {
-    std::vector<glm::vec2> vertices = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
-
-    float min_dist = std::numeric_limits<float>::max();
-    int index = -1;
-    glm::vec2 point;
-
-    for (int i = 0; i < vertices.size(); i++) {
-        glm::vec2 v1 = vertices[i];
-        glm::vec2 v2 = vertices[(i + 1) % vertices.size()];
-
-        glm::vec2 e = glm::normalize(v2 - v1);
-        glm::vec2 v_to_p = p - v1;
-
-        glm::vec2 lp = v1 + e*glm::dot(e, v_to_p);
-        float lam = glm::clamp(glm::dot(lp - v1, e), 0.f, glm::distance(v1, v2));
-        lp = vertices[i] + lam*e;
-
-        float dist = glm::distance(p, lp);
-
-        if (dist < min_dist) {
-            min_dist = dist;
-            index = i;
-            point = lp;
-        }
-    }
-
-    return std::make_tuple(index, min_dist, point);
-}
-
-Bounding_Polygon_Widget::Bounding_Polygon_Widget(State& state) : state(state) {}
 
 void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
     this->viewer = viewer;
@@ -282,7 +235,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
 
-    if (!intersects(mouse_state.current_position)) {
+    if (!point_in_widget(mouse_state.current_position)) {
         return false;
     }
 
@@ -316,32 +269,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
         glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
         std::vector<glm::vec2> bbox_v = bbox_vertices();
-//        bbox_v[selection.closest_edge_index] = kf_mouse;
         for (int i = 0; i < 4; i++) { bbox_v[i] -= ctr; }
-
-//        switch (selection.closest_vertex_index) {
-//        case 0:
-//            min_u = std::min(current_mouse[0], max_u);
-//            min_v = std::min(current_mouse[1], max_v);
-//            break;
-//        case 1:
-//            max_u = std::max(current_mouse[0], min_u);
-//            min_v = std::min(current_mouse[1], max_v);
-//            break;
-//        case 2:
-//            max_u = std::max(current_mouse[0], min_u);
-//            max_v = std::max(current_mouse[1], min_v);
-//            break;
-//        case 3:
-//            min_u = std::min(current_mouse[0], max_u);
-//            max_v = std::max(current_mouse[1], min_v);
-//            break;
-//        }
-
-//        vertices.push_back(ctr + glm::vec2(min_u, min_v));
-//        vertices.push_back(ctr + glm::vec2(max_u, min_v));
-//        vertices.push_back(ctr + glm::vec2(max_u, max_v));
-//        vertices.push_back(ctr + glm::vec2(min_u, max_v));
 
         glm::vec2 assign_mouse = kf_mouse - ctr;
         switch (selection.closest_vertex_index) {
@@ -362,9 +290,6 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
             max_v = std::max(assign_mouse[1], min_v);
             break;
         }
-
-        std::cout << "min_u = " << min_u << ", max_u = " << max_u << ", min_v = " << min_v << ", max_v = " << max_v << std::endl;
-
     }
 
     if (mouse_state.is_left_button_down && selection.current_edit_element == CenterElement) {
@@ -406,16 +331,14 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
         // Selection to move a point on the bounding polygon
         if (left_mouse && selection.matched_vertex) {
             selection.current_edit_element = selection.closest_vertex_index;
-            state.logger->debug("SELECTION MATCHED A VERTEX {}", selection.closest_vertex_index);
         }
 
         if (left_mouse && selection.matched_center) {
             selection.current_edit_element = CenterElement;
-            state.logger->debug("SELECTION MATCHED A CENTER");
         }
     }
 
-    return intersects(mouse_state.current_position);
+    return point_in_widget(mouse_state.current_position);
 }
 
 bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
@@ -428,7 +351,7 @@ bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
 bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
     mouse_state.scroll = delta_y;
 
-    if (!intersects(mouse_state.current_position)) {
+    if (!point_in_widget(mouse_state.current_position)) {
         return false;
     }
 
@@ -457,52 +380,36 @@ std::vector<glm::vec2> Bounding_Polygon_Widget::bbox_vertices() {
     return vertices;
 }
 
-std::pair<int, float> Bounding_Polygon_Widget::closest_vertex(const glm::vec2& p) {
-    // Convert vertices from Eigen to glm
-
-    std::vector<glm::vec2> vertices = bbox_vertices();
-
-    float min_dist = std::numeric_limits<float>::max();
-    int index = -1;
-
-    for (int i = 0; i < vertices.size(); ++i) {
-        float d = glm::distance(vertices[i], p);
-        if (d < min_dist) {
-            index = i;
-            min_dist = d;
-        }
-    }
-
-    return std::make_pair(index, min_dist);
-}
-
 
 void Bounding_Polygon_Widget::update_selection() {
+    // Helper function to find the closest vertex in vertices to p
+    auto closest_vertex = [](const glm::vec2& p, const std::vector<glm::vec2>& vertices) -> std::pair<int, float> {
+        float min_dist = std::numeric_limits<float>::max();
+        int index = -1;
+
+        for (int i = 0; i < vertices.size(); ++i) {
+            float d = glm::distance(vertices[i], p);
+            if (d < min_dist) {
+                index = i;
+                min_dist = d;
+            }
+        }
+
+        return std::make_pair(index, min_dist);
+    };
+
     glm::ivec2 window_size;
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
     glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y }; // In main window pixel space
     glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);                    // In keyframe ndc
 
-    std::pair<int, float> cv = closest_vertex(kf_mouse);
-    std::tuple<int, float, glm::vec2> ce = closest_edge(kf_mouse);
+    std::pair<int, float> cv = closest_vertex(kf_mouse, bbox_vertices());
 
     selection.matched_vertex = std::get<1>(cv) < view.zoom * SelectionRadius;
-    selection.matched_edge = std::get<1>(ce) < view.zoom * SelectionRadius;
     float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
 
     selection.matched_center = dist_to_center < view.zoom * SelectionRadius;
-
-    if (selection.matched_center && selection.matched_edge) {
-        if (std::get<1>(cv) < dist_to_center) {
-            selection.matched_center = false;
-        } else {
-            selection.matched_center = true;
-        }
-    }
-
-    selection.closest_edge_index = std::get<0>(ce);
     selection.closest_vertex_index = std::get<0>(cv);
-    selection.closest_edge_point = std::get<2>(ce);
 }
 
 void Bounding_Polygon_Widget::draw_polygon(const std::vector<glm::vec2>& pixel_space_points,
@@ -556,83 +463,59 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
 
-
+    // All 2D UI gets rendered into a framebuffer texture which we then blit to the screen
     glBindFramebuffer(GL_FRAMEBUFFER, offscreen.fbo);
     glViewport(0, 0, offscreen.texture_size.x, offscreen.texture_size.y);
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
 
+    //
+    // Render the slice of the volume for this keyframe into an OpenGL texture
+    //
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render slice");
-    glUseProgram(plane.program);
-    glBindVertexArray(empty_vao);
+    {
+        glUseProgram(plane.program);
+        glBindVertexArray(empty_vao);
 
-    glm::vec3 x_axis = glm::vec3(G3f(kf->right()));
-    glm::vec3 y_axis = glm::vec3(G3f(kf->up()));
-    glm::vec3 kf_center = glm::vec3(G3f(kf->center()));
-    //glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+        glm::vec3 x_axis = glm::vec3(G3f(kf->right()));
+        glm::vec3 y_axis = glm::vec3(G3f(kf->up()));
+        glm::vec3 kf_center = glm::vec3(G3f(kf->center()));
+        //glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
 
-    glm::vec3 center = kf_center + view.offset.x * x_axis + view.offset.y * y_axis;
-    glm::vec3 ll = center - x_axis * view.zoom - y_axis * view.zoom;
-    glm::vec3 lr = center + x_axis * view.zoom - y_axis * view.zoom;
-    glm::vec3 ul = center - x_axis * view.zoom + y_axis * view.zoom;
-    glm::vec3 ur = center + x_axis * view.zoom + y_axis * view.zoom;
+        glm::vec3 center = kf_center + view.offset.x * x_axis + view.offset.y * y_axis;
+        glm::vec3 ll = center - x_axis * view.zoom - y_axis * view.zoom;
+        glm::vec3 lr = center + x_axis * view.zoom - y_axis * view.zoom;
+        glm::vec3 ul = center - x_axis * view.zoom + y_axis * view.zoom;
+        glm::vec3 ur = center + x_axis * view.zoom + y_axis * view.zoom;
 
-    //float z = ((view.zoom - 1.f) * -1.f) + 1.f;
-    ////glm::vec3 ll = center + (-1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
-    //glm::vec3 ll = center + (-1.f ) * z * x_axis + (-1.f ) * z * y_axis;
-    ll /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    ////glm::vec3 ul = center + (1.f + view.offset.x) * z * x_axis + (-1.f + view.offset.y) * z * y_axis;
-    //glm::vec3 ul = center + ( 1.f ) * z * x_axis + (-1.f ) * z * y_axis;
-    ul /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    ////glm::vec3 lr = center + (-1.f + view.offset.x) * z * x_axis + (1.f + view.offset.y) * z * y_axis;
-    //glm::vec3 lr = center + (-1.f) * z * x_axis + ( 1.f ) * z * y_axis;
-    lr /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-    ////glm::vec3 ur = center + (1.f + view.offset.x) * z * x_axis + (1.f + view.offset.y) * z * y_axis;
-    //glm::vec3 ur = center + ( 1.f ) * z * x_axis + ( 1.f ) * z * y_axis;
-    ur /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+        ll /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+        ul /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+        lr /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+        ur /= glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
-    glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
-    glUniform3fv(plane.lr_location, 1, glm::value_ptr(lr));
-    glUniform3fv(plane.ul_location, 1, glm::value_ptr(ul));
-    glUniform3fv(plane.ur_location, 1, glm::value_ptr(ur));
+        glUniform3fv(plane.ll_location, 1, glm::value_ptr(ll));
+        glUniform3fv(plane.lr_location, 1, glm::value_ptr(lr));
+        glUniform3fv(plane.ul_location, 1, glm::value_ptr(ul));
+        glUniform3fv(plane.ur_location, 1, glm::value_ptr(ur));
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_3D, state.volume_rendering.volume_texture);
-    glUniform1i(plane.texture_location, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_3D, state.volume_rendering.volume_texture);
+        glUniform1i(plane.texture_location, 0);
 
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
-    glUseProgram(0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+        glUseProgram(0);
+    }
     glPopDebugGroup();
 
 
-
     //
-    // Render Bounding Polygon
+    // Render the bounding-box, center, and axes into the same texture
     //
-
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
     {
-//        std::vector<glm::vec2> vertices_2d = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
-//        draw_polygon(vertices_2d, polygon_line_color, polygon_point_size, polygon_line_width, PolygonDrawMode::PointsAndLines);
-//        if (selection.matched_vertex && selection.current_edit_element == NoElement) {
-//            std::vector<glm::vec2> selected_vertices_2d;
-//            selected_vertices_2d.push_back(vertices_2d[selection.closest_vertex_index]);
-//            draw_polygon(selected_vertices_2d, available_point_color, selected_point_size, 1.f, PolygonDrawMode::Points);
-//        } else if (selection.current_edit_element != NoElement) {
-//            std::vector<glm::vec2> selected_vertices_2d;
-//            selected_vertices_2d.push_back(vertices_2d[selection.closest_vertex_index]);
-//            draw_polygon(selected_vertices_2d, selected_point_color, selected_point_size, 1.f, PolygonDrawMode::Points);
-//        }
-
-//        if (selection.matched_edge && !selection.matched_vertex && selection.current_edit_element == NoElement) {
-//            std::vector<glm::vec2> selected_vertices_2d;
-//            selected_vertices_2d.push_back(selection.closest_edge_point);
-//            draw_polygon(selected_vertices_2d, available_point_color, split_point_size, 1.f, PolygonDrawMode::Points);
-//        }
-
         if (selection.matched_center) {
             std::vector<glm::vec2> selected_vertices_2d;
             selected_vertices_2d.push_back(G2f(selection.current_active_keyframe->centroid_2d()));
@@ -653,82 +536,73 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
 
         draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines);
-
-//        glm::vec4 bounds = keyframe_bounds(state.cage);
-//        glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
-//        std::vector<glm::vec2> bbox_vertices;
-//        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[2]));
-//        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[2]));
-//        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[3]));
-//        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[3]));
-
-//        glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
-
-//        draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines);
     }
-
     glPopDebugGroup();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    // Restore the framebuffer and viewport
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
 
 
 
-
+    //
+    // Blit the texture we just rendered to the screen
+    //
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Texture Blit");
-    int width;
-    int height;
-    glfwGetWindowSize(viewer->window, &width, &height);
-    float w = static_cast<float>(width);
-    float h = static_cast<float>(height);
-
-
-    glUseProgram(blit.program);
-    glBindVertexArray(blit.vao);
-
-    glBindBuffer(GL_ARRAY_BUFFER, blit.vbo);
     {
-        glm::vec2 size_ndc = size / glm::vec2(width, height) * 2.f;
-        glm::vec2 pos_ndc = (position / glm::vec2(width, height) - glm::vec2(0.5)) * 2.f;
-
-        BlitData box_ll = {
-            pos_ndc.x, pos_ndc.y,
-            0.f, 0.f
-        };
-
-        BlitData box_lr = {
-            pos_ndc.x + size_ndc.x, pos_ndc.y,
-            1.f, 0.f
-        };
-
-        BlitData box_ul = {
-            pos_ndc.x, pos_ndc.y + size_ndc.y,
-            0.f, 1.f
-        };
-
-        BlitData box_ur = {
-            pos_ndc.x + size_ndc.x,  pos_ndc.y + size_ndc.y,
-            1.f, 1.f
-        };
-
-        std::array<BlitData, 6> blit_data = {
-            box_ll, box_lr, box_ur, box_ll, box_ur, box_ul
-
-        };
-
-        glBufferData(GL_ARRAY_BUFFER, blit_data.size() * sizeof(BlitData),
-                     blit_data.data(), GL_STATIC_DRAW);
+        int width;
+        int height;
+        glfwGetWindowSize(viewer->window, &width, &height);
+        float w = static_cast<float>(width);
+        float h = static_cast<float>(height);
 
 
+        glUseProgram(blit.program);
+        glBindVertexArray(blit.vao);
+
+        glBindBuffer(GL_ARRAY_BUFFER, blit.vbo);
+        {
+            glm::vec2 size_ndc = size / glm::vec2(width, height) * 2.f;
+            glm::vec2 pos_ndc = (position / glm::vec2(width, height) - glm::vec2(0.5)) * 2.f;
+
+            BlitData box_ll = {
+                pos_ndc.x, pos_ndc.y,
+                0.f, 0.f
+            };
+
+            BlitData box_lr = {
+                pos_ndc.x + size_ndc.x, pos_ndc.y,
+                1.f, 0.f
+            };
+
+            BlitData box_ul = {
+                pos_ndc.x, pos_ndc.y + size_ndc.y,
+                0.f, 1.f
+            };
+
+            BlitData box_ur = {
+                pos_ndc.x + size_ndc.x,  pos_ndc.y + size_ndc.y,
+                1.f, 1.f
+            };
+
+            std::array<BlitData, 6> blit_data = {
+                box_ll, box_lr, box_ur, box_ll, box_ur, box_ul
+
+            };
+
+            glBufferData(GL_ARRAY_BUFFER, blit_data.size() * sizeof(BlitData),
+                         blit_data.data(), GL_STATIC_DRAW);
+
+
+        }
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, offscreen.texture);
+        glUniform1i(blit.texture_location, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+        glUseProgram(0);
     }
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, offscreen.texture);
-    glUniform1i(blit.texture_location, 0);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
-    glUseProgram(0);
     glPopDebugGroup();
-
     glEnable(GL_DEPTH_TEST);
 
     //    ImGui::SliderFloat2("Window Size", glm::value_ptr(size), 0.f, h);

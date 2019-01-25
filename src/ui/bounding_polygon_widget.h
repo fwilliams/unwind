@@ -48,12 +48,9 @@ private:
         PointsAndLines
     };
 
-    std::pair<int, float> closest_vertex(const glm::vec2& p);
-    std::tuple<int, float, glm::vec2> closest_edge(const glm::vec2& p);
     std::vector<glm::vec2> bbox_vertices();
 
-    bool intersects(const glm::ivec2& p) const;
-
+    bool point_in_widget(const glm::ivec2& p) const;
     void draw_polygon(const std::vector<glm::vec2>& points, glm::vec4 color, float point_size, float line_width, PolygonDrawMode mode);
 
     void update_selection();
@@ -120,11 +117,8 @@ private:
     struct {
         bool matched_center = false;
         bool matched_vertex = false;
-        bool matched_edge = false;
         int closest_vertex_index = NoElement;
-        int closest_edge_index = NoElement;
         int current_edit_element = NoElement;
-        glm::vec2 closest_edge_point;
         BoundingCage::KeyFrameIterator current_active_keyframe;
     } selection;
 
