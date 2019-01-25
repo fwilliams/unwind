@@ -180,24 +180,6 @@ bool Bounding_Polygon_Widget::intersects(const glm::ivec2& p) const {
     return p_tx.x >= ll.x && p_tx.x <= ur.x && p_tx.y >= ll.y && p_tx.y <= ur.y;
 }
 
-std::pair<int, float> Bounding_Polygon_Widget::closest_vertex(const glm::vec2& p) {
-    // Convert vertices from Eigen to glm
-    std::vector<glm::vec2> vertices = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
-
-    float min_dist = std::numeric_limits<float>::max();
-    int index = -1;
-
-    for (int i = 0; i < vertices.size(); ++i) {
-        float d = glm::distance(vertices[i], p);
-        if (d < min_dist) {
-            index = i;
-            min_dist = d;
-        }
-    }
-
-    return std::make_pair(index, min_dist);
-}
-
 std::tuple<int, float, glm::vec2> Bounding_Polygon_Widget::closest_edge(const glm::vec2& p) {
     std::vector<glm::vec2> vertices = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
 
@@ -332,20 +314,57 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         mouse_state.down_position = current_mouse;
 
         glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
+        glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
+        std::vector<glm::vec2> bbox_v = bbox_vertices();
+//        bbox_v[selection.closest_edge_index] = kf_mouse;
+        for (int i = 0; i < 4; i++) { bbox_v[i] -= ctr; }
 
-        const bool validate_2d = true;
-        const bool validate_3d = true;
+//        switch (selection.closest_vertex_index) {
+//        case 0:
+//            min_u = std::min(current_mouse[0], max_u);
+//            min_v = std::min(current_mouse[1], max_v);
+//            break;
+//        case 1:
+//            max_u = std::max(current_mouse[0], min_u);
+//            min_v = std::min(current_mouse[1], max_v);
+//            break;
+//        case 2:
+//            max_u = std::max(current_mouse[0], min_u);
+//            max_v = std::max(current_mouse[1], min_v);
+//            break;
+//        case 3:
+//            min_u = std::min(current_mouse[0], max_u);
+//            max_v = std::max(current_mouse[1], min_v);
+//            break;
+//        }
 
-        if (!selection.current_active_keyframe->in_bounding_cage()) {
-            selection.current_active_keyframe = state.cage.insert_keyframe(selection.current_active_keyframe);
+//        vertices.push_back(ctr + glm::vec2(min_u, min_v));
+//        vertices.push_back(ctr + glm::vec2(max_u, min_v));
+//        vertices.push_back(ctr + glm::vec2(max_u, max_v));
+//        vertices.push_back(ctr + glm::vec2(min_u, max_v));
+
+        glm::vec2 assign_mouse = kf_mouse - ctr;
+        switch (selection.closest_vertex_index) {
+        case 0:
+            min_u = std::min(assign_mouse[0], max_u);
+            min_v = std::min(assign_mouse[1], max_v);
+            break;
+        case 1:
+            max_u = std::max(assign_mouse[0], min_u);
+            min_v = std::min(assign_mouse[1], max_v);
+            break;
+        case 2:
+            max_u = std::max(assign_mouse[0], min_u);
+            max_v = std::max(assign_mouse[1], min_v);
+            break;
+        case 3:
+            min_u = std::min(assign_mouse[0], max_u);
+            max_v = std::max(assign_mouse[1], min_v);
+            break;
         }
-        Eigen::RowVector2d kf_mouse_eigen(kf_mouse.x, kf_mouse.y);
-        bool success = selection.current_active_keyframe->move_point_2d(selection.current_edit_element, kf_mouse_eigen, validate_2d, validate_3d);
 
-        // TODO: This is broken until we have full self intersection checks
-        if (!success) {
-            // selection.current_edit_element = NoElement;
-        }
+        std::cout << "min_u = " << min_u << ", max_u = " << max_u << ", min_v = " << min_v << ", max_v = " << max_v << std::endl;
+
     }
 
     if (mouse_state.is_left_button_down && selection.current_edit_element == CenterElement) {
@@ -387,28 +406,12 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
         // Selection to move a point on the bounding polygon
         if (left_mouse && selection.matched_vertex) {
             selection.current_edit_element = selection.closest_vertex_index;
+            state.logger->debug("SELECTION MATCHED A VERTEX {}", selection.closest_vertex_index);
         }
 
         if (left_mouse && selection.matched_center) {
             selection.current_edit_element = CenterElement;
-        }
-
-        if (left_mouse && selection.matched_edge && !selection.matched_vertex && ! selection.matched_center) {
-            std::vector<glm::vec2> vertex_data = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
-
-            if (!selection.current_active_keyframe->in_bounding_cage()) {
-                selection.current_active_keyframe = state.cage.insert_keyframe(selection.current_active_keyframe);
-            }
-
-            int next_index = (selection.closest_edge_index + 1) % vertex_data.size();
-            glm::vec2 v1 = vertex_data[next_index];
-            glm::vec2 v2 = vertex_data[selection.closest_edge_index];
-            double t = glm::distance(selection.closest_edge_point, v1) / glm::distance(v1, v2);
-            bool success = selection.current_active_keyframe->insert_vertex(selection.closest_edge_index, t);
-            if (!success) {
-                state.logger->error("Failed to insert vertex. This should never happen!");
-            }
-            selection.current_edit_element = (selection.closest_edge_index + 1) % selection.current_active_keyframe->vertices_2d().size();
+            state.logger->debug("SELECTION MATCHED A CENTER");
         }
     }
 
@@ -440,6 +443,39 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
 
     return true;
 }
+
+
+
+std::vector<glm::vec2> Bounding_Polygon_Widget::bbox_vertices() {
+    glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
+    std::vector<glm::vec2> vertices;
+    vertices.push_back(ctr + glm::vec2(min_u, min_v));
+    vertices.push_back(ctr + glm::vec2(max_u, min_v));
+    vertices.push_back(ctr + glm::vec2(max_u, max_v));
+    vertices.push_back(ctr + glm::vec2(min_u, max_v));
+
+    return vertices;
+}
+
+std::pair<int, float> Bounding_Polygon_Widget::closest_vertex(const glm::vec2& p) {
+    // Convert vertices from Eigen to glm
+
+    std::vector<glm::vec2> vertices = bbox_vertices();
+
+    float min_dist = std::numeric_limits<float>::max();
+    int index = -1;
+
+    for (int i = 0; i < vertices.size(); ++i) {
+        float d = glm::distance(vertices[i], p);
+        if (d < min_dist) {
+            index = i;
+            min_dist = d;
+        }
+    }
+
+    return std::make_pair(index, min_dist);
+}
+
 
 void Bounding_Polygon_Widget::update_selection() {
     glm::ivec2 window_size;
@@ -579,25 +615,23 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
     {
-        std::vector<glm::vec2> vertices_2d = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
-        draw_polygon(vertices_2d, polygon_line_color, polygon_point_size, polygon_line_width, PolygonDrawMode::PointsAndLines);
+//        std::vector<glm::vec2> vertices_2d = vertices_2d_to_glm(selection.current_active_keyframe->vertices_2d());
+//        draw_polygon(vertices_2d, polygon_line_color, polygon_point_size, polygon_line_width, PolygonDrawMode::PointsAndLines);
+//        if (selection.matched_vertex && selection.current_edit_element == NoElement) {
+//            std::vector<glm::vec2> selected_vertices_2d;
+//            selected_vertices_2d.push_back(vertices_2d[selection.closest_vertex_index]);
+//            draw_polygon(selected_vertices_2d, available_point_color, selected_point_size, 1.f, PolygonDrawMode::Points);
+//        } else if (selection.current_edit_element != NoElement) {
+//            std::vector<glm::vec2> selected_vertices_2d;
+//            selected_vertices_2d.push_back(vertices_2d[selection.closest_vertex_index]);
+//            draw_polygon(selected_vertices_2d, selected_point_color, selected_point_size, 1.f, PolygonDrawMode::Points);
+//        }
 
-
-        if (selection.matched_vertex && selection.current_edit_element == NoElement) {
-            std::vector<glm::vec2> selected_vertices_2d;
-            selected_vertices_2d.push_back(vertices_2d[selection.closest_vertex_index]);
-            draw_polygon(selected_vertices_2d, available_point_color, selected_point_size, 1.f, PolygonDrawMode::Points);
-        } else if (selection.current_edit_element != NoElement) {
-            std::vector<glm::vec2> selected_vertices_2d;
-            selected_vertices_2d.push_back(vertices_2d[selection.closest_vertex_index]);
-            draw_polygon(selected_vertices_2d, selected_point_color, selected_point_size, 1.f, PolygonDrawMode::Points);
-        }
-
-        if (selection.matched_edge && !selection.matched_vertex && selection.current_edit_element == NoElement) {
-            std::vector<glm::vec2> selected_vertices_2d;
-            selected_vertices_2d.push_back(selection.closest_edge_point);
-            draw_polygon(selected_vertices_2d, available_point_color, split_point_size, 1.f, PolygonDrawMode::Points);
-        }
+//        if (selection.matched_edge && !selection.matched_vertex && selection.current_edit_element == NoElement) {
+//            std::vector<glm::vec2> selected_vertices_2d;
+//            selected_vertices_2d.push_back(selection.closest_edge_point);
+//            draw_polygon(selected_vertices_2d, available_point_color, split_point_size, 1.f, PolygonDrawMode::Points);
+//        }
 
         if (selection.matched_center) {
             std::vector<glm::vec2> selected_vertices_2d;
@@ -609,17 +643,28 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
             draw_polygon(selected_vertices_2d, center_point_color, center_point_size, 1.f, PolygonDrawMode::Points);
         }
 
-        glm::vec4 bounds = keyframe_bounds(state.cage);
         glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
         std::vector<glm::vec2> bbox_vertices;
-        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[2]));
-        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[2]));
-        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[3]));
-        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[3]));
+        bbox_vertices.push_back(ctr + glm::vec2(min_u, min_v));
+        bbox_vertices.push_back(ctr + glm::vec2(max_u, min_v));
+        bbox_vertices.push_back(ctr + glm::vec2(max_u, max_v));
+        bbox_vertices.push_back(ctr + glm::vec2(min_u, max_v));
 
         glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
 
         draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines);
+
+//        glm::vec4 bounds = keyframe_bounds(state.cage);
+//        glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
+//        std::vector<glm::vec2> bbox_vertices;
+//        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[2]));
+//        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[2]));
+//        bbox_vertices.push_back(ctr + glm::vec2(bounds[1], bounds[3]));
+//        bbox_vertices.push_back(ctr + glm::vec2(bounds[0], bounds[3]));
+
+//        glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
+
+//        draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines);
     }
 
     glPopDebugGroup();

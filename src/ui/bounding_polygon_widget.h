@@ -50,6 +50,7 @@ private:
 
     std::pair<int, float> closest_vertex(const glm::vec2& p);
     std::tuple<int, float, glm::vec2> closest_edge(const glm::vec2& p);
+    std::vector<glm::vec2> bbox_vertices();
 
     bool intersects(const glm::ivec2& p) const;
 
@@ -126,6 +127,9 @@ private:
         glm::vec2 closest_edge_point;
         BoundingCage::KeyFrameIterator current_active_keyframe;
     } selection;
+
+    const float INITIAL_RANGE = 15.0;
+    float min_u = -INITIAL_RANGE, max_u = INITIAL_RANGE, min_v = -INITIAL_RANGE, max_v = INITIAL_RANGE;
 };
 
 #endif // BOUNDING_POLYGON_WIDGET_H
