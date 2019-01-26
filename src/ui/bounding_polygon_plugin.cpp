@@ -133,7 +133,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
         for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
             viewer->data().add_points(kf.centroid_3d(), ColorRGB::GREEN);
-            Eigen::MatrixXd V3d = kf.vertices_3d();
+            Eigen::MatrixXd V3d = kf.bounding_box_vertices_3d();
             Eigen::RowVector3d clr = kf.index() == current_cut_index ?
                         ColorRGB::ORANGERED : ColorRGB::RED;
             for (int i = 0; i < V3d.rows(); i++) {
@@ -161,7 +161,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
 
         viewer->data().add_points(kf->origin(), ColorRGB::RED);
-        viewer->data().add_points(kf->vertices_3d(), ColorRGB::ORANGERED);
+        viewer->data().add_points(kf->bounding_box_vertices_3d(), ColorRGB::ORANGERED);
         viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(0), ColorRGB::CYAN);
         viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(1), ColorRGB::YELLOW);
         viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(2), ColorRGB::MAGENTA);

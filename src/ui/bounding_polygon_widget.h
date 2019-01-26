@@ -42,28 +42,42 @@ public:
     glm::vec4 selected_center_point_color = glm::vec4(0.2f, 0.5f, 0.8f, 1.f);
 
 private:
-    enum PolygonDrawMode {
-        Points,
-        Lines,
-        PointsAndLines
-    };
-
-    std::vector<glm::vec2> bbox_vertices();
-
     bool point_in_widget(const glm::ivec2& p) const;
-    void draw_polygon(const std::vector<glm::vec2>& points, glm::vec4 color, float point_size, float line_width, PolygonDrawMode mode);
+    glm::vec2 convert_position_mainwindow_to_keyframe(const glm::vec2& p) const;
+    glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p) const;
 
     void update_selection();
-    glm::vec2 convert_position_mainwindow_to_keyframe(const glm::vec2& p);
-    glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p);
-
-    static constexpr const int NoElement = -1;
-    static constexpr const int CenterElement = -2;
 
     State& state;
     igl::opengl::glfw::Viewer* viewer;
 
-    // Rendering
+    // State to track pan and zoom
+    struct {
+        glm::vec2 offset; // in kf
+        float zoom = 10.f;
+    } view;
+
+    // State tracking cursor position and button state
+    struct {
+        glm::ivec2 current_position; // main window coordinates
+        glm::vec2 down_position;     // main window coordinates
+        bool is_left_button_down = false;
+        bool is_right_button_down = false;
+        float scroll = 0.f;
+    } mouse_state;
+
+    // State tracking what elements are being edited
+    static constexpr const int NoElement = -1;
+    static constexpr const int CenterElement = -2;
+    struct {
+        bool matched_center = false;
+        bool matched_vertex = false;
+        int closest_vertex_index = NoElement;
+        int current_edit_element = NoElement;
+        BoundingCage::KeyFrameIterator current_active_keyframe;
+    } selection;
+
+    // OpenGL handles
     GLuint empty_vao = 0;
     struct {
         GLuint program = 0;
@@ -99,29 +113,6 @@ private:
 
         GLint texture_location = -1;
     } blit;
-
-    struct {
-        glm::vec2 offset; // in kf
-        float zoom = 10.f;
-    } view;
-
-    struct {
-        glm::ivec2 current_position; // main window coordinates
-        glm::vec2 down_position;     // main window coordinates
-        bool is_left_button_down = false;
-        bool is_right_button_down = false;
-        float scroll = 0.f;
-    } mouse_state;
-
-    // Editing state
-    struct {
-        bool matched_center = false;
-        bool matched_vertex = false;
-        int closest_vertex_index = NoElement;
-        int current_edit_element = NoElement;
-        BoundingCage::KeyFrameIterator current_active_keyframe;
-    } selection;
-
 };
 
 #endif // BOUNDING_POLYGON_WIDGET_H

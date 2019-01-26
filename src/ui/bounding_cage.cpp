@@ -388,10 +388,11 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
     }
 
     const double coeff = (index - cell->min_index()) / (cell->max_index() - cell->min_index());
-    Eigen::MatrixXd V = (1.0-coeff)*cell->_left_keyframe->vertices_3d() + coeff*cell->_right_keyframe->vertices_3d();
-    Eigen::RowVector3d ctr = (1.0-coeff)*cell->_left_keyframe->origin() + coeff*cell->_right_keyframe->origin();
+    Eigen::MatrixXd V = (1.0-coeff)*cell->_left_keyframe->bounding_box_vertices_3d() + coeff*cell->_right_keyframe->bounding_box_vertices_3d();
+    Eigen::RowVector3d origin = (1.0-coeff)*cell->_left_keyframe->origin() + coeff*cell->_right_keyframe->origin();
 
-    Eigen::MatrixXd A = V.rowwise() - ctr;
+
+    Eigen::MatrixXd A = V.rowwise() - origin;
     Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinV);
     Eigen::RowVector3d n = svd.matrixV().col(2).transpose();
     double sign = 1.0;
@@ -407,7 +408,7 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
     points2d.col(1) = A*coord_frame.row(1).transpose();
 
     Eigen::RowVector2d centroid2d = (1.0-coeff)*cell->_left_keyframe->centroid_2d() + coeff*cell->_right_keyframe->centroid_2d();
-    std::shared_ptr<KeyFrame> kf(new KeyFrame(ctr, coord_frame, points2d, centroid2d, cell, index, (BoundingCage*)this));
+    std::shared_ptr<KeyFrame> kf(new KeyFrame(origin, coord_frame, points2d, centroid2d, cell, index, (BoundingCage*)this));
     return KeyFrameIterator(kf);
 }
 
@@ -416,10 +417,10 @@ bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
     int end = cell->max_index();
     std::shared_ptr<KeyFrame> left_kf = cell->_left_keyframe, right_kf = cell->_right_keyframe;
 
-    assert(left_kf->vertices_2d().rows() == right_kf->vertices_2d().rows());
-    Eigen::MatrixXd CHV(left_kf->vertices_2d().rows() + right_kf->vertices_2d().rows(), 3);
-    CHV.block(0, 0, left_kf->vertices_2d().rows(), 3) = left_kf->vertices_3d();
-    CHV.block(left_kf->vertices_2d().rows(), 0, right_kf->vertices_2d().rows(), 3) = right_kf->vertices_3d();
+    assert(left_kf->bounding_box_vertices_2d().rows() == right_kf->bounding_box_vertices_2d().rows());
+    Eigen::MatrixXd CHV(left_kf->bounding_box_vertices_2d().rows() + right_kf->bounding_box_vertices_2d().rows(), 3);
+    CHV.block(0, 0, left_kf->bounding_box_vertices_2d().rows(), 3) = left_kf->bounding_box_vertices_3d();
+    CHV.block(left_kf->bounding_box_vertices_2d().rows(), 0, right_kf->bounding_box_vertices_2d().rows(), 3) = right_kf->bounding_box_vertices_3d();
 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
@@ -561,21 +562,12 @@ const Eigen::MatrixXd BoundingCage::mesh_vertices() {
 
     int count = 0;
     for (KeyFrame& kf : this->keyframes) {
-        Eigen::RowVector2d bbox_ctr = kf.centroid_2d();
-        Eigen::RowVector3d ctr = kf.origin();
-        Eigen::RowVector3d u_axis = kf.right();
-        Eigen::RowVector3d v_axis = kf.up();
-        double min_u = _keyframe_bounding_box[0], max_u = _keyframe_bounding_box[1],
-               min_v = _keyframe_bounding_box[2], max_v = _keyframe_bounding_box[3];
-        Eigen::RowVector3d ll = ctr + u_axis*(bbox_ctr[0]+min_u) + v_axis*(bbox_ctr[1]+min_v);
-        Eigen::RowVector3d lr = ctr + u_axis*(bbox_ctr[0]+max_u) + v_axis*(bbox_ctr[1]+min_v);
-        Eigen::RowVector3d ur = ctr + u_axis*(bbox_ctr[0]+max_u) + v_axis*(bbox_ctr[1]+max_v);
-        Eigen::RowVector3d ul = ctr + u_axis*(bbox_ctr[0]+min_u) + v_axis*(bbox_ctr[1]+max_v);
+        Eigen::MatrixXd bbox_v = kf.bounding_box_vertices_3d();
 
-        ret.row(count++) = ll;
-        ret.row(count++) = lr;
-        ret.row(count++) = ur;
-        ret.row(count++) = ul;
+        ret.row(count++) = bbox_v.row(0);
+        ret.row(count++) = bbox_v.row(1);
+        ret.row(count++) = bbox_v.row(2);
+        ret.row(count++) = bbox_v.row(3);
     }
 
     return ret;

@@ -137,7 +137,7 @@ struct BlitData {
 
 Bounding_Polygon_Widget::Bounding_Polygon_Widget(State& state) : state(state) {}
 
-glm::vec2 Bounding_Polygon_Widget::convert_position_mainwindow_to_keyframe(const glm::vec2& p) {
+glm::vec2 Bounding_Polygon_Widget::convert_position_mainwindow_to_keyframe(const glm::vec2& p) const {
     glm::vec2 window_ll = position;
     glm::vec2 window_ur = position + size;
 
@@ -150,7 +150,7 @@ glm::vec2 Bounding_Polygon_Widget::convert_position_mainwindow_to_keyframe(const
     return mapped_mouse * view.zoom + view.offset;
 }
 
-glm::vec2 Bounding_Polygon_Widget::convert_position_keyframe_to_ndc(const glm::vec2& p) {
+glm::vec2 Bounding_Polygon_Widget::convert_position_keyframe_to_ndc(const glm::vec2& p) const {
     glm::vec2 ret = p - view.offset;
     return ret / view.zoom;
 }
@@ -268,8 +268,6 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
 
         glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
         glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
-        std::vector<glm::vec2> bbox_v = bbox_vertices();
-        for (int i = 0; i < 4; i++) { bbox_v[i] -= ctr; }
 
         Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
         float min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
@@ -373,30 +371,14 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
 }
 
 
-
-std::vector<glm::vec2> Bounding_Polygon_Widget::bbox_vertices() {
-    Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
-    double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
-
-    glm::vec2 ctr = G2f(selection.current_active_keyframe->centroid_2d());
-    std::vector<glm::vec2> vertices;
-    vertices.push_back(ctr + glm::vec2(min_u, min_v));
-    vertices.push_back(ctr + glm::vec2(max_u, min_v));
-    vertices.push_back(ctr + glm::vec2(max_u, max_v));
-    vertices.push_back(ctr + glm::vec2(min_u, max_v));
-
-    return vertices;
-}
-
-
 void Bounding_Polygon_Widget::update_selection() {
     // Helper function to find the closest vertex in vertices to p
-    auto closest_vertex = [](const glm::vec2& p, const std::vector<glm::vec2>& vertices) -> std::pair<int, float> {
+    auto closest_vertex = [](const glm::vec2& p, const Eigen::MatrixXd& vertices) -> std::pair<int, float> {
         float min_dist = std::numeric_limits<float>::max();
         int index = -1;
 
-        for (int i = 0; i < vertices.size(); ++i) {
-            float d = glm::distance(vertices[i], p);
+        for (int i = 0; i < vertices.rows(); ++i) {
+            float d = glm::distance(G2f(vertices.row(i)), p);
             if (d < min_dist) {
                 index = i;
                 min_dist = d;
@@ -411,7 +393,7 @@ void Bounding_Polygon_Widget::update_selection() {
     glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y }; // In main window pixel space
     glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);                    // In keyframe ndc
 
-    std::pair<int, float> cv = closest_vertex(kf_mouse, bbox_vertices());
+    std::pair<int, float> cv = closest_vertex(kf_mouse, selection.current_active_keyframe->bounding_box_vertices_2d());
 
     selection.matched_vertex = std::get<1>(cv) < view.zoom * SelectionRadius;
     float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
@@ -420,51 +402,61 @@ void Bounding_Polygon_Widget::update_selection() {
     selection.closest_vertex_index = std::get<0>(cv);
 }
 
-void Bounding_Polygon_Widget::draw_polygon(const std::vector<glm::vec2>& pixel_space_points,
-                                           glm::vec4 color, float point_size, float line_width, PolygonDrawMode mode) {
-    glUseProgram(polygon.program);
-    glBindVertexArray(polygon.vao);
-
-    std::vector<glm::vec2> vertex_data;
-
-    for (int i = 0; i < pixel_space_points.size(); i++) {
-        vertex_data.push_back(convert_position_keyframe_to_ndc(pixel_space_points[i]));
-    }
-
-    std::vector<float> vertex_data_data;
-    for (const glm::vec2& v : vertex_data) {
-        vertex_data_data.push_back(v.x);
-        vertex_data_data.push_back(v.y);
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertex_data_data.size() * sizeof(float),
-                 vertex_data_data.data(), GL_STATIC_DRAW);
-
-    glPointSize(point_size);
-    glLineWidth(line_width);
-
-    glUniform4f(polygon.color_location, color.x, color.y, color.z, color.w);
-
-    switch (mode) {
-    case PolygonDrawMode::Points:
-        glDrawArrays(GL_POINTS, 0, vertex_data.size());
-        break;
-    case PolygonDrawMode::Lines:
-        glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
-        break;
-    case PolygonDrawMode::PointsAndLines:
-        glDrawArrays(GL_POINTS, 0, vertex_data.size());
-        glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
-        break;
-    default:
-        state.logger->error("Invalid PolygonDrawMode! This should never happen.");
-        state.logger->flush();
-        exit(1);
-    }
-}
-
 bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int current_vertex_id) {
+
+    // Helper function to render a closed polygon in one of 3 ways:
+    // 1) Just render the vertices
+    // 2) Just render the edges
+    // 3) Render the vertices and edges
+    enum PolygonDrawMode {
+        Points,
+        Lines,
+        PointsAndLines
+    };
+    auto draw_polygon = [&](const std::vector<glm::vec2>& pixel_space_points, glm::vec4 color,
+                            float point_size, float line_width, PolygonDrawMode mode) {
+        glUseProgram(polygon.program);
+        glBindVertexArray(polygon.vao);
+
+        std::vector<glm::vec2> vertex_data;
+
+        for (int i = 0; i < pixel_space_points.size(); i++) {
+            vertex_data.push_back(convert_position_keyframe_to_ndc(pixel_space_points[i]));
+        }
+
+        std::vector<float> vertex_data_data;
+        for (const glm::vec2& v : vertex_data) {
+            vertex_data_data.push_back(v.x);
+            vertex_data_data.push_back(v.y);
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, polygon.vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertex_data_data.size() * sizeof(float),
+                     vertex_data_data.data(), GL_STATIC_DRAW);
+
+        glPointSize(point_size);
+        glLineWidth(line_width);
+
+        glUniform4f(polygon.color_location, color.x, color.y, color.z, color.w);
+
+        switch (mode) {
+        case PolygonDrawMode::Points:
+            glDrawArrays(GL_POINTS, 0, vertex_data.size());
+            break;
+        case PolygonDrawMode::Lines:
+            glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
+            break;
+        case PolygonDrawMode::PointsAndLines:
+            glDrawArrays(GL_POINTS, 0, vertex_data.size());
+            glDrawArrays(GL_LINE_LOOP, 0, vertex_data.size());
+            break;
+        default:
+            state.logger->error("Invalid PolygonDrawMode! This should never happen.");
+            state.logger->flush();
+            exit(1);
+        }
+    };
+
     selection.current_active_keyframe = kf;
 
 
@@ -489,8 +481,6 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         glm::vec3 x_axis = glm::vec3(G3f(kf->right()));
         glm::vec3 y_axis = glm::vec3(G3f(kf->up()));
         glm::vec3 kf_center = glm::vec3(G3f(kf->origin()));
-        //glm::vec3 center = kf_center / glm::vec3(state.volume_rendering.parameters.volume_dimensions);
-
 
         glm::vec3 center = kf_center + view.offset.x * x_axis + view.offset.y * y_axis;
         glm::vec3 ll = center - x_axis * view.zoom - y_axis * view.zoom;

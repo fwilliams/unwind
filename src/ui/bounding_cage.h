@@ -327,19 +327,41 @@ public:
             return _centroid_2d;
         }
 
+        /// Get the 2d position of the centroid of this KeyFrame
+        ///
         const Eigen::RowVector3d centroid_3d() const {
             return _origin + right()*_centroid_2d[0] + up()*_centroid_2d[1];
         }
 
-        /// Get the ordered 3d points of the keyframe polygon boundary.
-        /// These points are just the 2d points projected onto the KeyFrame plane.
+        /// Get the 3d positions of the bounding box for this keyframe
         ///
-        Eigen::MatrixXd vertices_3d() const {
-            Eigen::MatrixXd points3d(_vertices_2d.rows(), 3);
-            for (int i = 0; i < _vertices_2d.rows(); i++) {
-                points3d.row(i) = _origin + _vertices_2d(i, 0) *_orientation.row(0) + _vertices_2d(i, 1) *_orientation.row(1);
-            }
-            return points3d;
+        const Eigen::MatrixXd bounding_box_vertices_3d() const {
+            Eigen::MatrixXd ret(4, 3);
+            Eigen::RowVector4d bbox = _cage->keyframe_bounding_box();
+            double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+            ret.row(0) = right()*min_u + up()*min_v;
+            ret.row(1) = right()*max_u + up()*min_v;
+            ret.row(2) = right()*max_u + up()*max_v;
+            ret.row(3) = right()*min_u + up()*max_v;
+
+            ret.rowwise() += centroid_3d();
+
+            return ret;
+        }
+
+        /// Get the 2d positions of the bounding box for this keyframe
+        ///
+        const Eigen::MatrixXd bounding_box_vertices_2d() const {
+            Eigen::MatrixXd ret(4, 2);
+            Eigen::RowVector4d bbox = _cage->keyframe_bounding_box();
+            double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+            ret << min_u, min_v,
+                   max_u, min_v,
+                   max_u, max_v,
+                   min_u, max_v;
+
+            ret.rowwise() += centroid_2d();
+            return ret;
         }
 
         /// Get the index value of this KeyFrame.
