@@ -34,60 +34,10 @@ void Bounding_Polygon_Menu::initialize() {
     viewer_viewport = Eigen::Vector4f(view_hsplit*window_width, view_vsplit*window_height,
                                       (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
     viewer->core.viewport = viewer_viewport;
-
-    /*
-    // Clear all meshes previously stored in the viewer so we have a clean slate
+    viewer->data().clear();
     for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
         viewer->erase_mesh(i);
     }
-    viewer->selected_data_index = mesh_overlay_id;
-
-    const Eigen::MatrixXd& TV = state.extracted_volume.TV;
-    const Eigen::MatrixXi& TF = state.extracted_volume.TF;
-    viewer->data().set_mesh(TV, TF);
-    viewer->core.align_camera_center(TV, TF);
-
-    viewer->append_mesh();
-    points_overlay_id = viewer->selected_data_index;
-
-    int push_mesh_id = mesh_overlay_id;
-    viewer->selected_data_index = mesh_overlay_id;
-    {
-        viewer->data().clear();
-        Eigen::MatrixXi E;
-        igl::edges(state.extracted_volume.TF, E);
-        const Eigen::RowVector3d color(0.75, 0.75, 0.75);
-        viewer->data().set_edges(state.extracted_volume.TV, E, color);
-
-        Eigen::MatrixXd P1(state.cage.skeleton_vertices().rows() - 1, 3),
-                P2(state.cage.skeleton_vertices().rows() - 1, 3);
-        for (int i = 0; i < state.cage.skeleton_vertices().rows() - 1; i++) {
-            P1.row(i) = state.cage.skeleton_vertices().row(i);
-            P2.row(i) = state.cage.skeleton_vertices().row(i + 1);
-        }
-        viewer->data().add_edges(P1, P2, ColorRGB::LIGHT_GREEN);
-        viewer->data().point_size = 10.f;
-
-        for (int i = 0; i < state.cage.smooth_skeleton_vertices().rows() - 1; i++) {
-            P1.row(i) = state.cage.smooth_skeleton_vertices().row(i);
-            P2.row(i) = state.cage.smooth_skeleton_vertices().row(i + 1);
-        }
-        viewer->data().add_edges(P1, P2, ColorRGB::RED);
-        viewer->data().point_size = 20.f;
-
-        viewer->selected_data_index = push_mesh_id;
-    }
-
-    // Draw the bounding cage mesh
-    viewer->append_mesh();
-    cage_mesh_overlay_id = viewer->selected_data_index;
-    {
-        viewer->data().clear();
-        viewer->data().set_face_based(true);
-        viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
-    }
-    */
-
 
     // Initialize the 2d cross section widget
     widget_2d.initialize(viewer);
@@ -201,14 +151,7 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     Eigen::Vector4f widget_3d_viewport(view_hsplit*window_width, view_vsplit*window_height,
                                        (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
-    if ((widget_3d_viewport-viewer_viewport).norm() < 1e-8) {
-        viewer_viewport = widget_3d_viewport;
-        viewer->core.viewport = viewer_viewport;
-        widget_3d.volume_renderer.resize_framebuffer(glm::ivec2(viewer_viewport[2], viewer_viewport[3]));
-    }
-    glViewport(widget_3d_viewport[0], widget_3d_viewport[1], widget_3d_viewport[2], widget_3d_viewport[3]);
-    widget_3d.post_draw();
-
+    ret = widget_3d.post_draw(G4f(widget_3d_viewport));
 
     ImGui::SetNextWindowBgAlpha(0.0f);
     float window_height_float = static_cast<float>(window_height);

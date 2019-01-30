@@ -14,15 +14,17 @@ public:
 
     void initialize(igl::opengl::glfw::Viewer* viewer);
     bool pre_draw(float current_cut_index);
-    bool post_draw();
+    bool post_draw(const glm::vec4& viewport);
 
     vr::VolumeRenderer volume_renderer;
 
 private:
+    void update_bounding_geometry();
+
     State& _state;
     igl::opengl::glfw::Viewer* _viewer;
 
-
+    glm::vec4 _last_viewport;
 };
 
 #endif // BOUNDING_WIDGET_3D_H

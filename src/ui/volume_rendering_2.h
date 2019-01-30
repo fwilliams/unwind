@@ -16,9 +16,7 @@ struct TfNode {
 class VolumeRenderer {
     glm::ivec3 _volume_dimensions;
     GLfloat _sampling_rate = 10.0f;
-
-    static constexpr size_t NUM_VERTICES = 8;
-    static constexpr size_t NUM_FACES = 12;
+    GLuint _num_bounding_indices = 0;
 
     struct GLState {
         struct RayEndpointsPass {
@@ -81,6 +79,8 @@ public:
     void set_transfer_function(const std::vector<TfNode>& transfer_function);
     void render_bounding_box(const glm::mat4 &model_matrix, const glm::mat4 &view_matrix, const glm::mat4 &proj_matrix);
     void render_volume(const glm::vec3& light_position);
+
+    void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
 };
 
 }

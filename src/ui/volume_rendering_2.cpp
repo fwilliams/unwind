@@ -272,7 +272,23 @@ void VolumeRenderer::resize_framebuffer(const glm::ivec2& viewport_size) {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void VolumeRenderer::set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_faces) {
+    _num_bounding_indices = num_faces*3;
+
+    glBindBuffer(GL_ARRAY_BUFFER, _gl_state.ray_endpoints_pass.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*num_vertices*3, vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _gl_state.ray_endpoints_pass.ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*num_faces*3, indices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    glBindVertexArray(0);
+}
+
 void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_shader, const char *picking_shader) {
+    constexpr GLsizei NUM_VERTICES = 8;
+    constexpr GLsizei NUM_FACES = 12;
     std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
         0.f, 0.f, 0.f,
         0.f, 0.f, 1.f,
@@ -297,6 +313,7 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
         1, 5, 7,
         1, 7, 3
     };
+    _num_bounding_indices = NUM_FACES*3;
 
     glGenVertexArrays(1, &_gl_state.ray_endpoints_pass.vao);
     glBindVertexArray(_gl_state.ray_endpoints_pass.vao);
@@ -314,7 +331,8 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*NUM_FACES*3, index_data.data(), GL_STATIC_DRAW);
 
     glBindVertexArray(0);
-
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     // Shader to render the bounding box entry and exit points
     igl::opengl::create_shader_program(EntryBoxVertexShader,
@@ -486,13 +504,13 @@ void VolumeRenderer::render_bounding_box(const glm::mat4& model_matrix, const gl
         glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.ray_endpoints_pass.entry_framebuffer);
         glClear(GL_COLOR_BUFFER_BIT);
         glCullFace(GL_FRONT);
-        glDrawElements(GL_TRIANGLES, NUM_FACES * 3, GL_UNSIGNED_INT, nullptr);
+        glDrawElements(GL_TRIANGLES, _num_bounding_indices, GL_UNSIGNED_INT, nullptr);
 
         // Render exit points of bounding box
         glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.ray_endpoints_pass.exit_framebuffer);
         glClear(GL_COLOR_BUFFER_BIT);
         glCullFace(GL_BACK);
-        glDrawElements(GL_TRIANGLES, NUM_FACES * 3, GL_UNSIGNED_INT, nullptr);
+        glDrawElements(GL_TRIANGLES, _num_bounding_indices * 3, GL_UNSIGNED_INT, nullptr);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

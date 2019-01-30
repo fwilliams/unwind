@@ -29,6 +29,10 @@ inline bool operator!=(const Eigen::Vector4f& lhs, const glm::vec4& rhs) {
 // d: type (f: float, i: int, d: double)
 
 #define E3i(glm_vector) Eigen::RowVector3i((glm_vector).x, (glm_vector).y, (glm_vector).z)
+#define E3f(glm_vector) Eigen::RowVector3f((glm_vector).x, (glm_vector).y, (glm_vector).z)
+#define E3d(glm_vector) Eigen::RowVector3d ((glm_vector).x, (glm_vector).y, (glm_vector).z)
+
+#define E4f(glm_vector) Eigen::RowVector4f((glm_vector).x, (glm_vector).y, (glm_vector).z, (glm_vector).w)
 
 #define G2f(eigen_vector) glm::vec2((eigen_vector).x(), (eigen_vector).y())
 #define G3f(eigen_vector) glm::vec3((eigen_vector).x(), (eigen_vector).y(), (eigen_vector).z())
