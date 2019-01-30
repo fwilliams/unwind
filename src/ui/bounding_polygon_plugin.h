@@ -5,6 +5,9 @@
 #include "bounding_polygon_widget.h"
 #include "volume_exporter.h"
 
+#include "bounding_widget_3d.h"
+
+
 struct State;
 
 class Bounding_Polygon_Menu : public FishUIViewerPlugin {
@@ -27,6 +30,8 @@ private:
     float view_hsplit = 0.5; // Horizontal split for the two menus (normalized distance
     float view_vsplit = 0.2; // Vertical split for the bottom menu (normalized distance from the bottom)
     Bounding_Polygon_Widget widget_2d;
+    Bounding_Widget_3d widget_3d;
+
     VolumeExporter exporter;
 
     State& state;

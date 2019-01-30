@@ -21,6 +21,7 @@ void bounding_cage_polygon(BoundingCage& cage, Eigen::MatrixXf& V, Eigen::Matrix
 Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
     : state(state)
     , widget_2d(Bounding_Polygon_Widget(state))
+    , widget_3d(Bounding_Widget_3d(state))
 {}
 
 
@@ -30,10 +31,11 @@ void Bounding_Polygon_Menu::initialize() {
     old_viewport = viewer->core.viewport;
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
-    viewer_viewport = Eigen::RowVector4f(view_hsplit*window_width, view_vsplit*window_height,
-                                         (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
+    viewer_viewport = Eigen::Vector4f(view_hsplit*window_width, view_vsplit*window_height,
+                                      (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
     viewer->core.viewport = viewer_viewport;
 
+    /*
     // Clear all meshes previously stored in the viewer so we have a clean slate
     for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
         viewer->erase_mesh(i);
@@ -84,9 +86,14 @@ void Bounding_Polygon_Menu::initialize() {
         viewer->data().set_face_based(true);
         viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
     }
+    */
+
 
     // Initialize the 2d cross section widget
     widget_2d.initialize(viewer);
+
+    // Initialize the 3d volume viewer
+    widget_3d.initialize(viewer);
 
     exporter.init(128, 128, 1024);
 
@@ -122,6 +129,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
 
+    /*
     glDisable(GL_CULL_FACE);
 
     size_t push_overlay_id = viewer->selected_data_index;
@@ -176,7 +184,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
         viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
         viewer->selected_data_index = push_overlay_id;
     }
-
+    */
     return ret;
 }
 
@@ -190,6 +198,17 @@ bool Bounding_Polygon_Menu::post_draw() {
     widget_2d.position = glm::vec2(0.f, view_vsplit*window_height);
     widget_2d.size = glm::vec2(window_width*view_hsplit, (1.0-view_vsplit)*window_height);
     ret = widget_2d.post_draw(state.cage.keyframe_for_index(current_cut_index), static_cast<int>(current_cut_index));
+
+    Eigen::Vector4f widget_3d_viewport(view_hsplit*window_width, view_vsplit*window_height,
+                                       (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
+    if ((widget_3d_viewport-viewer_viewport).norm() < 1e-8) {
+        viewer_viewport = widget_3d_viewport;
+        viewer->core.viewport = viewer_viewport;
+        widget_3d.volume_renderer.resize_framebuffer(glm::ivec2(viewer_viewport[2], viewer_viewport[3]));
+    }
+    glViewport(widget_3d_viewport[0], widget_3d_viewport[1], widget_3d_viewport[2], widget_3d_viewport[3]);
+    widget_3d.post_draw();
+
 
     ImGui::SetNextWindowBgAlpha(0.0f);
     float window_height_float = static_cast<float>(window_height);
