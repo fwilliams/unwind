@@ -41,7 +41,24 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     for (int i = 0; i < V.rows(); i++) { V.row(i) *= normalized_volume_dims; }
     _viewer->core.align_camera_center(V);
 
-    update_bounding_geometry(_state.cage.mesh_vertices(), _state.cage.mesh_faces());
+//    update_bounding_geometry(_state.cage.mesh_vertices(), _state.cage.mesh_faces());
+
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multipass framebuffer");
+//    for (int i = 0; i < 1; i++) {
+    glGenTextures(1, &_gl_state.texture[0]);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.texture[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenFramebuffers(1, &_gl_state.framebuffer[0]);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[0]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gl_state.texture[0], 0);
+//    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glPopDebugGroup();
 }
 
 void Bounding_Widget_3d::update_bounding_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
@@ -62,16 +79,23 @@ void Bounding_Widget_3d::update_bounding_geometry(const Eigen::MatrixXd& cage_V,
         F[i] = glm::ivec3(cage_F(i, 0), cage_F(i, 1), cage_F(i, 2));
     }
 
-    volume_renderer.set_bounding_geometry((GLfloat*)V.data(), num_vertices, (GLint*)F.data(), num_faces);
+//    volume_renderer.set_bounding_geometry((GLfloat*)V.data(), num_vertices, (GLint*)F.data(), num_faces);
 }
 bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
     if (glm::length(viewport - _last_viewport) < 1e-8) {
         _last_viewport = viewport;
-        volume_renderer.resize_framebuffer(glm::ivec2(viewport[2], viewport[3]));
+        glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
+        volume_renderer.resize_framebuffer(viewport_size);
         _viewer->core.viewport = E4f(viewport);
+
+//        for (int i = 0; i < 1; i++) {
+        glBindTexture(GL_TEXTURE_2D, _gl_state.texture[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB, GL_FLOAT, nullptr);
+//        }
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    update_bounding_geometry(_state.cage.mesh_vertices(), _state.cage.mesh_faces());
+//    update_bounding_geometry(_state.cage.mesh_vertices(), _state.cage.mesh_faces());
 
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
@@ -88,58 +112,107 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
         sorted_cells.push_back(it);
     }
     auto comp_cells = [&](BoundingCage::CellIterator c1, BoundingCage::CellIterator c2) -> bool {
-//        glm::vec3 c1l = G3f(c1->left_keyframe()->centroid_3d());
-//        glm::vec3 c1r = G3f(c1->right_keyframe()->centroid_3d());
-//        glm::vec3 c2l = G3f(c2->left_keyframe()->centroid_3d());
-//        glm::vec3 c2r = G3f(c2->right_keyframe()->centroid_3d());
-//        glm::vec3 cam_ctr = G3f(_viewer->core.camera_center);
-
         glm::vec4 volume_dims = glm::vec4(_state.volume_rendering.parameters.volume_dimensions, 1.0);
         glm::vec4 c1l = glm::vec4(G3f(c1->left_keyframe()->centroid_3d()), 1.0) / volume_dims;
         glm::vec4 c1r = glm::vec4(G3f(c1->right_keyframe()->centroid_3d()), 1.0) / volume_dims;
         glm::vec4 c2l = glm::vec4(G3f(c2->left_keyframe()->centroid_3d()), 1.0) / volume_dims;
         glm::vec4 c2r = glm::vec4(G3f(c2->right_keyframe()->centroid_3d()), 1.0) / volume_dims;
-        glm::vec4 cam_ctr = glm::vec4(0.0, 0.0, 0.0, 1.0); //glm::vec4(G3f(_viewer->core.camera_center), 1.0);
-//        glm::vec4 cam_ctr = glm::vec4(G3f(_viewer->core.camera_center), 1.0);
+
         c1l = view_matrix*model_matrix*c1l;
         c1r = view_matrix*model_matrix*c1r;
         c2l = view_matrix*model_matrix*c2l;
         c2r = view_matrix*model_matrix*c2r;
         float d1 = glm::max(glm::length2(glm::vec3(c1l)), glm::length2(glm::vec3(c1r)));
         float d2 = glm::max(glm::length2(glm::vec3(c2l)), glm::length2(glm::vec3(c2r)));
-//        float d1 = glm::max(glm::distance2(c1l, cam_ctr), glm::distance2(c1r, cam_ctr));
-//        float d2 = glm::max(glm::distance2(c2l, cam_ctr), glm::distance2(c2r, cam_ctr));
-
-        return d1 > d2;
+        return d1 < d2;
     };
-
-
     std::sort(sorted_cells.begin(), sorted_cells.end(), comp_cells);
 
-//    for (int i = 0; i < sorted_cells.size(); i++) {
-//        BoundingCage::CellIterator c1 = sorted_cells[i];
-//        glm::vec4 volume_dims = glm::vec4(_state.volume_rendering.parameters.volume_dimensions, 1.0);
-//        glm::vec4 c1l = glm::vec4(G3f(c1->left_keyframe()->centroid_3d()), 1.0) / volume_dims;
-//        glm::vec4 c1r = glm::vec4(G3f(c1->right_keyframe()->centroid_3d()), 1.0) / volume_dims;
-//        c1l = view_matrix*model_matrix*c1l;
-//        c1r = view_matrix*model_matrix*c1r;
-//        float d1 = glm::max(glm::length2(glm::vec3(c1l)), glm::length2(glm::vec3(c1r)));
 
-////        std::cout << std::setprecision(1) << sorted_cells[i]->left_keyframe()->index() << " ";
-//        std::cout << std::setprecision(2) << d1 << " ";
+
+
+    /*
+//    {
+//        auto cell = sorted_cells[0];
+//        Eigen::MatrixXd cV = cell->mesh_vertices();
+//        Eigen::MatrixXi cF = cell->mesh_faces();
+//        update_bounding_geometry(cV, cF);
+//        volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
+
+//        glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[current_buf]);
+//        volume_renderer.render_volume(light_position);
+
+//        last_buf = current_buf;
+//        current_buf = (current_buf + 1) % 2;
 //    }
-    std::cout << std::endl;
 
-    for (auto cell : sorted_cells) {
-        Eigen::MatrixXd cV = cell->mesh_vertices();
-        Eigen::MatrixXi cF = cell->mesh_faces();
-        update_bounding_geometry(cV, cF);
-        volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
-        volume_renderer.render_volume(light_position);
+//    for (int i = 1; i < sorted_cells.size() - 1; i++) {
+////        glClearColor(0.0, 0.0, 0.0, 0.0);
+////        glClear(GL_COLOR_BUFFER_BIT);
+//        auto cell = sorted_cells[i];
+//        Eigen::MatrixXd cV = cell->mesh_vertices();
+//        Eigen::MatrixXi cF = cell->mesh_faces();
+//        update_bounding_geometry(cV, cF);
+//        volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
+
+//        glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[current_buf]);
+//        volume_renderer.render_volume(light_position, _gl_state.texture[last_buf]);
+
+//        last_buf = current_buf;
+//        current_buf = (current_buf + 1) % 2;
+//    }
+    */
+
+
+    int current_buf = 0;
+    int last_buf = 0;
+
+
+//    glDisable(GL_CULL_FACE);
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multipass render");
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[0]);
+//    glClearColor(0.5, 0.6, 0.7, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "INCOMPLETE FRAMEBUFFER!!!!" << std::endl;
     }
+    volume_renderer.render_volume(light_position, 0, 0.f);
 
 
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    volume_renderer.render_volume(light_position, _gl_state.texture[0], 1.f);
 
+//    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[1]);
+//    glClearColor(0.0, 0.0, 0.0, 0.0);
+//    glClear(GL_COLOR_BUFFER_BIT);
+//    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+//    {
+//        auto cell = sorted_cells[sorted_cells.size()-2];
+//        Eigen::MatrixXd cV = cell->mesh_vertices();
+//        Eigen::MatrixXi cF = cell->mesh_faces();
+//        update_bounding_geometry(cV, cF);
+//        volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
+
+//        glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[0]);
+//        volume_renderer.render_volume(light_position, _gl_state.texture[1], 0.f);
+//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//        last_buf = current_buf;
+//        current_buf = (current_buf + 1) % 2;
+//    }
+
+//    {
+//        auto cell = sorted_cells[sorted_cells.size()-1];
+//        Eigen::MatrixXd cV = cell->mesh_vertices();
+//        Eigen::MatrixXi cF = cell->mesh_faces();
+//        update_bounding_geometry(cV, cF);
+//        volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
+
+//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//        volume_renderer.render_volume(light_position, _gl_state.texture[0], 1.f);
+//    }
+
+    glPopDebugGroup();
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
     return false;
 }

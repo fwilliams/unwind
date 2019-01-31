@@ -25,6 +25,11 @@ private:
     igl::opengl::glfw::Viewer* _viewer;
 
     glm::vec4 _last_viewport;
+
+    struct {
+        GLuint framebuffer[2];
+        GLuint texture[2];
+    } _gl_state;
 };
 
 #endif // BOUNDING_WIDGET_3D_H
