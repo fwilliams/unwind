@@ -156,6 +156,43 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::make_cell(std::shared_pt
     return ret;
 }
 
+const Eigen::MatrixXi BoundingCage::Cell::mesh_faces() const {
+    Eigen::MatrixXi F(12, 3);
+
+    F << 3, 0, 1,
+         3, 1, 2,
+         5, 4, 7,
+         5, 7, 6,
+         0, 3, 7,
+         0, 7, 4,
+         3, 6, 7,
+         6, 3, 2,
+         2, 5, 6,
+         5, 2, 1,
+         1, 0, 5,
+         5, 0, 4;
+
+    return F;
+}
+
+const Eigen::MatrixXd BoundingCage::Cell::mesh_vertices() const {
+
+    Eigen::MatrixXd lV = _left_keyframe->bounding_box_vertices_3d();
+    Eigen::MatrixXd rV = _right_keyframe->bounding_box_vertices_3d();
+
+    Eigen::MatrixXd V(8, 3);
+
+    V << lV(0, 0), lV(0, 1), lV(0, 2),
+         lV(1, 0), lV(1, 1), lV(1, 2),
+         lV(2, 0), lV(2, 1), lV(2, 2),
+         lV(3, 0), lV(3, 1), lV(3, 2),
+         rV(0, 0), rV(0, 1), rV(0, 2),
+         rV(1, 0), rV(1, 1), rV(1, 2),
+         rV(2, 0), rV(2, 1), rV(2, 2),
+         rV(3, 0), rV(3, 1), rV(3, 2);
+
+    return V;
+}
 
 std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_ptr<KeyFrame> keyframe) {
     // The index of the keyframe is out of range, since this method is called, internally,

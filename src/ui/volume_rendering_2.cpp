@@ -121,7 +121,7 @@ constexpr const char* VolumeRenderingFragmentShader = R"(
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
     if (entry == exit) {
-      out_color = vec4(0.0, 0.0, 0.0, 1.0);
+      out_color = vec4(0.0, 0.0, 0.0, 0.0);
       return;
     }
 
@@ -166,7 +166,7 @@ constexpr const char* VolumeRenderingFragmentShader = R"(
       }
     }
 
-    result.a = 1.0;
+    //result.a = 1.0;
     out_color = result;
   }
 )";
@@ -282,8 +282,6 @@ void VolumeRenderer::set_bounding_geometry(GLfloat* vertices, GLsizei num_vertic
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _gl_state.ray_endpoints_pass.ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*num_faces*3, indices, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
 }
 
 void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_shader, const char *picking_shader) {

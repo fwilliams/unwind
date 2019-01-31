@@ -19,7 +19,7 @@ public:
     vr::VolumeRenderer volume_renderer;
 
 private:
-    void update_bounding_geometry();
+    void update_bounding_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
 
     State& _state;
     igl::opengl::glfw::Viewer* _viewer;

@@ -38,6 +38,8 @@ void Bounding_Polygon_Menu::initialize() {
     for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
         viewer->erase_mesh(i);
     }
+    viewer->append_mesh();
+    viewer->selected_data_index = 0;
 
     // Initialize the 2d cross section widget
     widget_2d.initialize(viewer);
@@ -48,6 +50,26 @@ void Bounding_Polygon_Menu::initialize() {
     exporter.init(128, 128, 1024);
 
     state.logger->trace("Done initializing bounding polygon plugin!");
+
+//    Eigen::MatrixXd V(state.cage.num_cells()*8, 3);
+//    Eigen::MatrixXi F(state.cage.num_cells()*12, 3);
+//    int count = 0;
+//    viewer->data().clear();
+//    for (auto cell : state.cage.cells) {
+//        Eigen::MatrixXi cF = cell.mesh_faces();
+
+//        for (int i = 0; i < cF.rows(); i++) {
+//            for (int j = 0; j < cF.cols(); j++) {
+//                cF(i, j) += count*8;
+//            }
+//        }
+//        V.block(8*count, 0, 8, 3) = cell.mesh_vertices();
+//        F.block(12*count, 0, 12, 3) = cF;
+//        count += 1;
+//    }
+//    viewer->data().add_points(V, Eigen::RowVector3d(0.5, 0.6, 0.7));
+//    viewer->data().set_mesh(V, F);
+//    viewer->core.align_camera_center(V);
 }
 
 void Bounding_Polygon_Menu::deinitialize() {
@@ -78,6 +100,7 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
+
 
     /*
     glDisable(GL_CULL_FACE);

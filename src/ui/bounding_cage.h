@@ -97,11 +97,6 @@ public:
         std::shared_ptr<KeyFrame> _left_keyframe;
         std::shared_ptr<KeyFrame> _right_keyframe;
 
-        /// Indices of the boundary triangles in the
-        /// mesh of the BoundingCage which owns this Cell
-        ///
-        Eigen::MatrixXi _mesh_faces;
-
         /// Split the Cell into two cells divided by key_frame.
         /// If the index of key_frame is outside the cell, this method
         /// returns false and the Cell remains unchanged.
@@ -133,7 +128,9 @@ public:
                                                std::weak_ptr<Cell> _parent_cell=std::shared_ptr<Cell>());
 
     public:
-        const Eigen::MatrixXi& mesh_faces() const { return  _mesh_faces; }
+        const Eigen::MatrixXi mesh_faces() const;
+        const Eigen::MatrixXd mesh_vertices() const;
+
         const KeyFrameIterator left_keyframe() const { return KeyFrameIterator(_left_keyframe); }
         const KeyFrameIterator right_keyframe() const { return KeyFrameIterator(_right_keyframe); }
         double min_index() const { return _left_keyframe->index(); }
@@ -435,7 +432,7 @@ public:
             return keyframe != other.keyframe;
         }
 
-        std::shared_ptr<KeyFrame> operator->() {
+        std::shared_ptr<KeyFrame> operator->() const {
             return keyframe;
         }
 
@@ -488,6 +485,10 @@ public:
 
     const int num_keyframes() const {
         return _num_keyframes;
+    }
+
+    const int num_cells() const {
+        return _num_keyframes - 1;
     }
 
     /// Set the skeleton vertices to whatever the user provides.
