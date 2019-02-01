@@ -122,14 +122,16 @@ constexpr const char* VolumeRenderingFragmentShader = R"(
 
   void main() {
     if (hack > 0) {
-      if (texture(value_init_texture, uv).r < 1e-5) {
-        out_color = vec4(0.5, 0.5, 0.5, 1.0)
-      } else {
+        //float cc = texture(value_init_texture, uv).r;
+        //if (cc < 0.0001) {
+        //  out_color = vec4(0.5, 0.5, 1.0, 1.0);
+        //} else {
         out_color = vec4(texture(value_init_texture, uv).rgb, 1.0);
-      }
+        //}
+        //out_color = vec4(uv, 0.0, 1.0);
       return;
     } else {
-      out_color = vec4(0.6, 0.0, 0.5, 1.0);
+      out_color = vec4(uv, 0.0, 1.0);
       return;
     }
 

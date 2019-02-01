@@ -12,6 +12,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/norm.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include "volume_fragment_shader.h"
 #include "picking_fragment_shader.h"
@@ -50,11 +51,16 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glGenFramebuffers(1, &_gl_state.framebuffer[0]);
     glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[0]);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gl_state.texture[0], 0);
+
 //    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -82,7 +88,8 @@ void Bounding_Widget_3d::update_bounding_geometry(const Eigen::MatrixXd& cage_V,
 //    volume_renderer.set_bounding_geometry((GLfloat*)V.data(), num_vertices, (GLint*)F.data(), num_faces);
 }
 bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
-    if (glm::length(viewport - _last_viewport) < 1e-8) {
+//    std::cout << glm::to_string(viewport) << std::endl;
+    if (glm::length(viewport - _last_viewport) > 1e-8) {
         _last_viewport = viewport;
         glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
         volume_renderer.resize_framebuffer(viewport_size);
@@ -92,6 +99,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
         glBindTexture(GL_TEXTURE_2D, _gl_state.texture[0]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB, GL_FLOAT, nullptr);
 //        }
+        std::cout << "RESIZE!" << std::endl;
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
@@ -170,6 +178,8 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
 
 //    glDisable(GL_CULL_FACE);
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multipass render");
+    glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
+    glViewport(0, 0, viewport_size.x, viewport_size.y);
     glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[0]);
 //    glClearColor(0.5, 0.6, 0.7, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -178,7 +188,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
     }
     volume_renderer.render_volume(light_position, 0, 0.f);
 
-
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     volume_renderer.render_volume(light_position, _gl_state.texture[0], 1.f);
 
