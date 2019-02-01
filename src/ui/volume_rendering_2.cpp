@@ -121,24 +121,10 @@ constexpr const char* VolumeRenderingFragmentShader = R"(
   }
 
   void main() {
-    if (hack > 0) {
-        //float cc = texture(value_init_texture, uv).r;
-        //if (cc < 0.0001) {
-        //  out_color = vec4(0.5, 0.5, 1.0, 1.0);
-        //} else {
-        out_color = vec4(texture(value_init_texture, uv).rgb, 1.0);
-        //}
-        //out_color = vec4(uv, 0.0, 1.0);
-      return;
-    } else {
-      out_color = vec4(uv, 0.0, 1.0);
-      return;
-    }
-
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
     if (entry == exit) {
-      out_color = texture(value_init_texture, uv); // vec4(0.0, 0.0, 0.0, 0.0);
+      out_color = texture(value_init_texture, uv); // vec4(0.0);
       return;
     }
 
@@ -566,24 +552,24 @@ void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multi
     glBindVertexArray(_gl_state.volume_pass.vao);
 
     // Bind the entry points texture
-//    glActiveTexture(GL_TEXTURE0);
-//    glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.entry_texture);
-//    glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.entry_texture);
+    glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 0);
 
-//    // Bind the exit points texture
-//    glActiveTexture(GL_TEXTURE1);
-//    glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.exit_texture);
-//    glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 1);
+    // Bind the exit points texture
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.exit_texture);
+    glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 1);
 
-//    // Bind the volume texture
-//    glActiveTexture(GL_TEXTURE2);
-//    glBindTexture(GL_TEXTURE_3D, _gl_state.volume_pass.volume_texture);
-//    glUniform1i(_gl_state.volume_pass.uniform_location.volume_texture, 2);
+    // Bind the volume texture
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_3D, _gl_state.volume_pass.volume_texture);
+    glUniform1i(_gl_state.volume_pass.uniform_location.volume_texture, 2);
 
-//    // Bind the transfer function texture
-//    glActiveTexture(GL_TEXTURE3);
-//    glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
-//    glUniform1i(_gl_state.volume_pass.uniform_location.transfer_function, 3);
+    // Bind the transfer function texture
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
+    glUniform1i(_gl_state.volume_pass.uniform_location.transfer_function, 3);
 
     // Mutlipass texture
     GLuint tex = multipass_tex != 0 ? multipass_tex : _gl_state.volume_pass.value_init_texture;
@@ -596,15 +582,15 @@ void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multi
     glUniform1f(_gl_state.volume_pass.uniform_location.hack, hack);
 
 //    // Bind rendering parameters
-//    glm::vec3 volume_dims_rcp = glm::vec3(1.0) / glm::vec3(_volume_dimensions);
-//    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, _sampling_rate);
-//    glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1, glm::value_ptr(_volume_dimensions));
-//    glUniform3fv(_gl_state.volume_pass.uniform_location.volume_dimensions_rcp, 1, glm::value_ptr(volume_dims_rcp));
-//    glUniform3fv(_gl_state.volume_pass.uniform_location.light_position, 1, glm::value_ptr(light_position));
-//    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f);
-//    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_diffuse, 0.8f, 0.8f, 0.8f);
-//    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_specular, 1.f, 1.f, 1.f);
-//    glUniform1f(_gl_state.volume_pass.uniform_location.light_exponent_specular, 10.f);
+    glm::vec3 volume_dims_rcp = glm::vec3(1.0) / glm::vec3(_volume_dimensions);
+    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, _sampling_rate);
+    glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1, glm::value_ptr(_volume_dimensions));
+    glUniform3fv(_gl_state.volume_pass.uniform_location.volume_dimensions_rcp, 1, glm::value_ptr(volume_dims_rcp));
+    glUniform3fv(_gl_state.volume_pass.uniform_location.light_position, 1, glm::value_ptr(light_position));
+    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f);
+    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_diffuse, 0.8f, 0.8f, 0.8f);
+    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_specular, 1.f, 1.f, 1.f);
+    glUniform1f(_gl_state.volume_pass.uniform_location.light_exponent_specular, 10.f);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
 

@@ -168,12 +168,14 @@ bool Bounding_Polygon_Menu::post_draw() {
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
     glViewport(0, 0, window_width, window_height);
+
     widget_2d.position = glm::vec2(0.f, view_vsplit*window_height);
     widget_2d.size = glm::vec2(window_width*view_hsplit, (1.0-view_vsplit)*window_height);
     ret = widget_2d.post_draw(state.cage.keyframe_for_index(current_cut_index), static_cast<int>(current_cut_index));
 
     Eigen::Vector4f widget_3d_viewport(view_hsplit*window_width, view_vsplit*window_height,
                                        (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
+    viewer->core.viewport = widget_3d_viewport;
     ret = widget_3d.post_draw(G4f(widget_3d_viewport));
 
     ImGui::SetNextWindowBgAlpha(0.0f);
