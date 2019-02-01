@@ -42,7 +42,6 @@ class VolumeRenderer {
             GLuint program = 0;
             GLuint transfer_function_texture;
             GLuint volume_texture = 0;
-            GLuint value_init_texture = 0;
 
             GLuint vao;
 
@@ -62,11 +61,8 @@ class VolumeRenderer {
                 GLint light_color_diffuse = 0;
                 GLint light_color_specular = 0;
                 GLint light_exponent_specular = 0;
-
-                GLint hack = 0;
             } uniform_location;
         } volume_pass;
-
     } _gl_state;
 
 
@@ -84,7 +80,7 @@ public:
     void set_volume_data(const glm::ivec3& volume_dims, const double* texture_data);
     void set_transfer_function(const std::vector<TfNode>& transfer_function);
     void render_bounding_box(const glm::mat4 &model_matrix, const glm::mat4 &view_matrix, const glm::mat4 &proj_matrix);
-    void render_volume(const glm::vec3& light_position, GLuint multipass_tex=0, GLfloat hack = 0);
+    void render_volume(const glm::vec3& light_position, GLuint multipass_tex=0);
 
     void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
 };

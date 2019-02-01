@@ -72,8 +72,6 @@ constexpr const char* VolumeRenderingFragmentShader = R"(
   uniform vec3 volume_dimensions_rcp;
   uniform float sampling_rate;
 
-  uniform float hack;
-
   struct Light_Parameters {
     vec3 position;
     vec3 ambient_color;
@@ -264,13 +262,13 @@ void VolumeRenderer::set_transfer_function(const std::vector<TfNode> &transfer_f
 void VolumeRenderer::resize_framebuffer(const glm::ivec2& viewport_size) {
     // Entry point texture and frame buffer
     glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.entry_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, viewport_size.x, viewport_size.y, 0,
-        GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0,
+        GL_RGB, GL_FLOAT, nullptr);
 
     // Exit point texture and frame buffer
     glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.exit_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, viewport_size.x, viewport_size.y, 0,
-        GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0,
+        GL_RGB, GL_FLOAT, nullptr);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -386,14 +384,12 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
         _gl_state.volume_pass.program, "light_parameters.specular_color");
     _gl_state.volume_pass.uniform_location.light_exponent_specular = glGetUniformLocation(
         _gl_state.volume_pass.program, "light_parameters.specular_exponent");
-    _gl_state.volume_pass.uniform_location.hack = glGetUniformLocation(
-        _gl_state.volume_pass.program, "hack");
 
 
     // Entry point texture and frame buffer
     glGenTextures(1, &_gl_state.ray_endpoints_pass.entry_texture);
     glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.entry_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, viewport_size.x, viewport_size.y, 0, GL_RGBA,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -407,7 +403,7 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
     // Exit point texture and frame buffer
     glGenTextures(1, &_gl_state.ray_endpoints_pass.exit_texture);
     glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.exit_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, viewport_size.x, viewport_size.y, 0, GL_RGBA,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -417,20 +413,19 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
         _gl_state.ray_endpoints_pass.exit_texture, 0);
 
-    GLfloat derp[4] = {0.f, 0.f, 0.f, 0.f};
-    glGenTextures(1, &_gl_state.volume_pass.value_init_texture);
-    glBindTexture(GL_TEXTURE_2D, _gl_state.volume_pass.value_init_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 1, 1, 0, GL_RGBA, GL_FLOAT, derp);
 
     // Volume texture
     glGenTextures(1, &_gl_state.volume_pass.volume_texture);
     glBindTexture(GL_TEXTURE_3D, _gl_state.volume_pass.volume_texture);
+
+    GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     // Picking texture and framebuffer
 //    glGenTextures(1, &volume_rendering.picking_texture);
@@ -485,58 +480,68 @@ void VolumeRenderer::set_volume_data(const glm::ivec3 &volume_dims, const double
 void VolumeRenderer::render_bounding_box(const glm::mat4& model_matrix, const glm::mat4& view_matrix, const glm::mat4& proj_matrix) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box TEST");
     {
+        glm::vec4 color_transparent(0.0);
+        glm::vec3 normalized_volume_dimensions = glm::vec3(_volume_dimensions) / static_cast<float>(glm::compMax(_volume_dimensions));
+        glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+        glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
 
-        glEnable(GL_CULL_FACE);
+        // Back up face culling state so we can restore it when we're done
+        GLboolean face_culling_enabled = glIsEnabled(GL_CULL_FACE);
 
+        // Backup the previous viewport so we can restore it when we're done
         GLint old_viewport[4];
         glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+        // Get the width and height of the entry and exit point textures so we can set the viewport correctly
         GLint fb_tex_w, fb_tex_h;
         glBindTexture(GL_TEXTURE_2D, _gl_state.ray_endpoints_pass.exit_texture);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &fb_tex_w);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &fb_tex_h);
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        // We need face culling to render
+        glEnable(GL_CULL_FACE);
+
+        // Set the viewport to match the entry and exit framebuffer textures
         glViewport(0, 0, fb_tex_w, fb_tex_h);
 
+        // Bind the bounding geometry
         glBindVertexArray(_gl_state.ray_endpoints_pass.vao);
-        glBindBuffer(GL_ARRAY_BUFFER, _gl_state.ray_endpoints_pass.vbo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _gl_state.ray_endpoints_pass.ibo);
 
+        // Setup shader program to render ray entry points
         glUseProgram(_gl_state.ray_endpoints_pass.program);
-
-        glm::vec3 normalized_volume_dimensions = glm::vec3(_volume_dimensions) / static_cast<float>(glm::compMax(_volume_dimensions));
-        glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
-        glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
-
         glUniformMatrix4fv(_gl_state.ray_endpoints_pass.uniform_location.model_matrix, 1,
             GL_FALSE, glm::value_ptr(model_matrix * scaling * translate));
-
         glUniformMatrix4fv(_gl_state.ray_endpoints_pass.uniform_location.view_matrix, 1,
             GL_FALSE, glm::value_ptr(view_matrix));
-
         glUniformMatrix4fv(_gl_state.ray_endpoints_pass.uniform_location.projection_matrix,
             1, GL_FALSE, glm::value_ptr(proj_matrix));
 
         // Render entry points of bounding box
         glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.ray_endpoints_pass.entry_framebuffer);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
         glCullFace(GL_FRONT);
         glDrawElements(GL_TRIANGLES, _num_bounding_indices, GL_UNSIGNED_INT, nullptr);
 
         // Render exit points of bounding box
         glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.ray_endpoints_pass.exit_framebuffer);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
         glCullFace(GL_BACK);
         glDrawElements(GL_TRIANGLES, _num_bounding_indices * 3, GL_UNSIGNED_INT, nullptr);
 
+        // Restore OpenGL state
+        glBindVertexArray(0);
+        glUseProgram(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
         glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
+        if (face_culling_enabled == GL_FALSE) {
+            glDisable(GL_CULL_FACE);
+        }
     }
     glPopDebugGroup();
 }
 
-void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multipass_tex, GLfloat hack) {
+void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multipass_tex) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume TEST");
 
     //
@@ -571,17 +576,13 @@ void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multi
     glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
     glUniform1i(_gl_state.volume_pass.uniform_location.transfer_function, 3);
 
-    // Mutlipass texture
-    GLuint tex = multipass_tex != 0 ? multipass_tex : _gl_state.volume_pass.value_init_texture;
-//    std::cout << "tex is blank? " << (tex == _gl_state.volume_pass.value_init_texture) << ", hack = " << hack << std::endl;
+    // Optional Mutlipass texture
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, tex);
+    glBindTexture(GL_TEXTURE_2D, multipass_tex);
     glUniform1i(_gl_state.volume_pass.uniform_location.value_init_texture, 4);
 
-    // hack
-    glUniform1f(_gl_state.volume_pass.uniform_location.hack, hack);
 
-//    // Bind rendering parameters
+    // Bind rendering parameters
     glm::vec3 volume_dims_rcp = glm::vec3(1.0) / glm::vec3(_volume_dimensions);
     glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, _sampling_rate);
     glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1, glm::value_ptr(_volume_dimensions));
