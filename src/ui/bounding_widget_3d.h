@@ -3,7 +3,7 @@
 
 #include "state.h"
 #include "volume_rendering_2.h"
-
+#include "rendering_2d.h"
 
 namespace igl { namespace opengl { namespace glfw { class Viewer; }}}
 
@@ -14,12 +14,17 @@ public:
 
     void initialize(igl::opengl::glfw::Viewer* viewer);
     bool pre_draw(float current_cut_index);
-    bool post_draw(const glm::vec4& viewport);
+    bool post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);
 
     vr::VolumeRenderer volume_renderer;
+    Renderer2d renderer_2d;
 
 private:
-    void update_bounding_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
+    void update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
+    void update_2d_geometry(BoundingCage::KeyFrameIterator current_kf);
+
+    int cage_polyline_id;
+    int current_kf_polyline_id;
 
     State& _state;
     igl::opengl::glfw::Viewer* _viewer;

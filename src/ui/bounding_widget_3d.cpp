@@ -13,6 +13,7 @@
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "volume_fragment_shader.h"
 #include "picking_fragment_shader.h"
@@ -25,6 +26,10 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     glm::ivec2 viewport_size = glm::ivec2(_viewer->core.viewport[2], _viewer->core.viewport[3]);
     volume_renderer.init(viewport_size);
     volume_renderer.set_volume_data(_state.volume_rendering.parameters.volume_dimensions, _state.volume_data.data());
+
+    renderer_2d.init();
+    cage_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
+    current_kf_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
 
     // Fix the model view matrices so the camera is centered on the volume
     Eigen::MatrixXd V(8, 3);
@@ -63,7 +68,7 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     glPopDebugGroup();
 }
 
-void Bounding_Widget_3d::update_bounding_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
+void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
     Eigen::RowVector3d volume_size = E3d(_state.volume_rendering.parameters.volume_dimensions);
     std::size_t num_vertices = cage_V.rows();
     std::size_t num_faces = cage_F.rows();
@@ -81,10 +86,56 @@ void Bounding_Widget_3d::update_bounding_geometry(const Eigen::MatrixXd& cage_V,
 
     volume_renderer.set_bounding_geometry((GLfloat*)V.data(), num_vertices, (GLint*)F.data(), num_faces);
 }
-bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
+
+void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator current_kf) {
+    std::vector<GLfloat> vertices;
+
+    int num_vertices = 0;
+    for (BoundingCage::Cell& cell : _state.cage.cells) {
+        const glm::vec3 volume_size = _state.volume_rendering.parameters.volume_dimensions;
+
+        BoundingCage::KeyFrameIterator lkf = cell.left_keyframe(), rkf = cell.right_keyframe();
+        Eigen::MatrixXd lkfV = lkf->bounding_box_vertices_3d();
+        Eigen::MatrixXd rkfV = rkf->bounding_box_vertices_3d();
+
+        for (int i = 0; i < lkfV.rows(); i++) {
+            int next_i = (i + 1) % lkfV.rows();
+            for (int j = 0; j < 3; j++) { vertices.push_back(lkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { vertices.push_back(lkfV(next_i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { vertices.push_back(rkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { vertices.push_back(rkfV(next_i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { vertices.push_back(lkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { vertices.push_back(rkfV(i, j) / volume_size[j]); }
+
+            num_vertices += 6;
+        }
+    }
+
+    glm::vec4 cage_color(0.2, 0.2, 0.8, 0.5);
+    Renderer2d::PolylineStyle cage_style;
+    cage_style.primitive = Renderer2d::LINES;
+    cage_style.render_points = true;
+    cage_style.line_width = 1.0f;
+    cage_style.point_size = 4.0f;
+    renderer_2d.update_polyline_3d(cage_polyline_id, vertices.data(),cage_color, num_vertices, cage_style);
+
+    Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> kfV = current_kf->bounding_box_vertices_3d().cast<GLfloat>();
+    kfV.array().rowwise() /= E3f(_state.volume_rendering.parameters.volume_dimensions).array();
+    glm::vec4 kf_color(0.2, 0.8, 0.2, 0.3);
+    Renderer2d::PolylineStyle kf_style;
+    kf_style.primitive = Renderer2d::LINE_LOOP;
+    kf_style.render_points = false;
+    kf_style.line_width = 1.0f;
+    kf_style.point_size = 4.0f;
+    renderer_2d.update_polyline_3d(current_kf_polyline_id, kfV.data(), kf_color, kfV.rows(), kf_style);
+}
+
+bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf) {
     // Back up the old viewport so we can restore it
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+    update_2d_geometry(current_kf);
 
     glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
     glm::ivec2 viewport_pos = glm::ivec2(viewport[0], viewport[1]);
@@ -107,6 +158,11 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
     glm::mat4 view_matrix = GM4f(_viewer->core.view);
     glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
     glm::vec3 light_position = G3f(_viewer->core.light_position);
+
+    glm::vec3 normalized_volume_dimensions =
+            glm::vec3(volume_renderer.volume_dims()) / static_cast<float>(glm::compMax(volume_renderer.volume_dims()));
+    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
 
     // Sort the cells of the bounding cage front to back
     std::vector<BoundingCage::CellIterator> sorted_cells;
@@ -149,7 +205,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
             Eigen::MatrixXd cV = cell->mesh_vertices();
             Eigen::MatrixXi cF = cell->mesh_faces();
 
-            update_bounding_geometry(cV, cF);
+            update_volume_geometry(cV, cF);
             volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
 
             if (i == sorted_cells.size()-1) {
@@ -163,6 +219,8 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport) {
         }
     }
     glPopDebugGroup();
+
+    renderer_2d.draw(model_matrix*scaling*translate, view_matrix, proj_matrix);
 
     // Restore the previous viewport
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);

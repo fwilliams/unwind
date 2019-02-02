@@ -79,10 +79,9 @@ public:
 
     void set_volume_data(const glm::ivec3& volume_dims, const double* texture_data);
     void set_transfer_function(const std::vector<TfNode>& transfer_function);
+    void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
     void render_bounding_box(const glm::mat4 &model_matrix, const glm::mat4 &view_matrix, const glm::mat4 &proj_matrix);
     void render_volume(const glm::vec3& light_position, GLuint multipass_tex=0);
-
-    void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
 };
 
 }

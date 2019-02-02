@@ -478,7 +478,7 @@ void VolumeRenderer::set_volume_data(const glm::ivec3 &volume_dims, const double
 }
 
 void VolumeRenderer::render_bounding_box(const glm::mat4& model_matrix, const glm::mat4& view_matrix, const glm::mat4& proj_matrix) {
-    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box TEST");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
     {
         glm::vec4 color_transparent(0.0);
         glm::vec3 normalized_volume_dimensions = glm::vec3(_volume_dimensions) / static_cast<float>(glm::compMax(_volume_dimensions));
