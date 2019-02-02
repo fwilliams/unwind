@@ -25,6 +25,7 @@ private:
 
     int cage_polyline_id;
     int current_kf_polyline_id;
+    int skeleton_polyline_id;
 
     State& _state;
     igl::opengl::glfw::Viewer* _viewer;

@@ -30,6 +30,7 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     renderer_2d.init();
     cage_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
     current_kf_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
+    skeleton_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
 
     // Fix the model view matrices so the camera is centered on the volume
     Eigen::MatrixXd V(8, 3);
@@ -88,39 +89,38 @@ void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, c
 }
 
 void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator current_kf) {
-    std::vector<GLfloat> vertices;
+    typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
+    const Eigen::RowVector3f volume_size = E3f(_state.volume_rendering.parameters.volume_dimensions);
 
+    std::vector<GLfloat> cageV;
     int num_vertices = 0;
     for (BoundingCage::Cell& cell : _state.cage.cells) {
-        const glm::vec3 volume_size = _state.volume_rendering.parameters.volume_dimensions;
-
         BoundingCage::KeyFrameIterator lkf = cell.left_keyframe(), rkf = cell.right_keyframe();
         Eigen::MatrixXd lkfV = lkf->bounding_box_vertices_3d();
         Eigen::MatrixXd rkfV = rkf->bounding_box_vertices_3d();
 
         for (int i = 0; i < lkfV.rows(); i++) {
             int next_i = (i + 1) % lkfV.rows();
-            for (int j = 0; j < 3; j++) { vertices.push_back(lkfV(i, j) / volume_size[j]); }
-            for (int j = 0; j < 3; j++) { vertices.push_back(lkfV(next_i, j) / volume_size[j]); }
-            for (int j = 0; j < 3; j++) { vertices.push_back(rkfV(i, j) / volume_size[j]); }
-            for (int j = 0; j < 3; j++) { vertices.push_back(rkfV(next_i, j) / volume_size[j]); }
-            for (int j = 0; j < 3; j++) { vertices.push_back(lkfV(i, j) / volume_size[j]); }
-            for (int j = 0; j < 3; j++) { vertices.push_back(rkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(lkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(lkfV(next_i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(rkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(rkfV(next_i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(lkfV(i, j) / volume_size[j]); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(rkfV(i, j) / volume_size[j]); }
 
             num_vertices += 6;
         }
     }
-
     glm::vec4 cage_color(0.2, 0.2, 0.8, 0.5);
     Renderer2d::PolylineStyle cage_style;
     cage_style.primitive = Renderer2d::LINES;
     cage_style.render_points = true;
     cage_style.line_width = 1.0f;
     cage_style.point_size = 4.0f;
-    renderer_2d.update_polyline_3d(cage_polyline_id, vertices.data(),cage_color, num_vertices, cage_style);
+    renderer_2d.update_polyline_3d(cage_polyline_id, cageV.data(),cage_color, num_vertices, cage_style);
 
-    Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> kfV = current_kf->bounding_box_vertices_3d().cast<GLfloat>();
-    kfV.array().rowwise() /= E3f(_state.volume_rendering.parameters.volume_dimensions).array();
+    MatrixXfRm kfV = current_kf->bounding_box_vertices_3d().cast<GLfloat>();
+    kfV.array().rowwise() /= volume_size.array();
     glm::vec4 kf_color(0.2, 0.8, 0.2, 0.3);
     Renderer2d::PolylineStyle kf_style;
     kf_style.primitive = Renderer2d::LINE_LOOP;
@@ -128,6 +128,18 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     kf_style.line_width = 1.0f;
     kf_style.point_size = 4.0f;
     renderer_2d.update_polyline_3d(current_kf_polyline_id, kfV.data(), kf_color, kfV.rows(), kf_style);
+
+    MatrixXfRm skV(_state.cage.num_keyframes(), 3);
+    int count = 0;
+    for (const BoundingCage::KeyFrame& kf : _state.cage.keyframes) {
+        skV.row(count++) = kf.centroid_3d().cast<GLfloat>().array() / volume_size.array();
+    }
+    Renderer2d::PolylineStyle sk_style;
+    sk_style.primitive = Renderer2d::LINE_STRIP;
+    sk_style.render_points = false;
+    glm::vec4 sk_color(0.2, 0.2, 0.4, 0.5);
+    sk_style.line_width = 1.0f;
+    renderer_2d.update_polyline_3d(skeleton_polyline_id, skV.data(), sk_color, skV.rows(), sk_style);
 }
 
 bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf) {
@@ -220,6 +232,9 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
     }
     glPopDebugGroup();
 
+    glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
     renderer_2d.draw(model_matrix*scaling*translate, view_matrix, proj_matrix);
 
     // Restore the previous viewport

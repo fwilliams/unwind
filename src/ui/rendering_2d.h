@@ -17,10 +17,10 @@ public:
     };
 
     struct PolylineStyle {
-        LineSpec primitive;
-        bool render_points;
-        float line_width;
-        float point_size;
+        LineSpec primitive = LineSpec::POINTS;
+        bool render_points = false;
+        float line_width = 1.0;
+        float point_size = 1.0;
     };
 
     struct Polyline {
