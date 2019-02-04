@@ -24,7 +24,7 @@ Bounding_Widget_3d::Bounding_Widget_3d(State& state) : _state(state) {}
 void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     _viewer = viewer;
     glm::ivec2 viewport_size = glm::ivec2(_viewer->core.viewport[2], _viewer->core.viewport[3]);
-    volume_renderer.init(viewport_size);
+    volume_renderer.init(viewport_size, true /* multipass */);
     volume_renderer.set_volume_data(_state.volume_rendering.parameters.volume_dimensions, _state.volume_data.data());
 
     renderer_2d.init();
@@ -47,26 +47,6 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     Eigen::RowVector3d normalized_volume_dims = volume_dims / volume_dims.maxCoeff();
     for (int i = 0; i < V.rows(); i++) { V.row(i) *= normalized_volume_dims; }
     _viewer->core.align_camera_center(V);
-
-    // Generate two textures (used as a double buffer) to accumulate volume rendering
-    // across several passes.
-    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multipass framebuffer");
-    for (int i = 0; i < 2; i++) {
-        glGenTextures(1, &_gl_state.texture[i]);
-        glBindTexture(GL_TEXTURE_2D, _gl_state.texture[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, viewport_size.x, viewport_size.y, 0, GL_RGBA, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        glGenFramebuffers(1, &_gl_state.framebuffer[i]);
-        glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _gl_state.texture[i], 0);
-
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glPopDebugGroup();
 }
 
 void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
@@ -137,7 +117,7 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     Renderer2d::PolylineStyle sk_style;
     sk_style.primitive = Renderer2d::LINE_STRIP;
     sk_style.render_points = false;
-    glm::vec4 sk_color(0.2, 0.2, 0.4, 0.5);
+    glm::vec4 sk_color(0.8, 0.2, 0.2, 0.5);
     sk_style.line_width = 1.0f;
     renderer_2d.update_polyline_3d(skeleton_polyline_id, skV.data(), sk_color, skV.rows(), sk_style);
 }
@@ -157,24 +137,18 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
         _last_viewport = viewport;
         volume_renderer.resize_framebuffer(viewport_size);
         _state.logger->debug("Widget 3d resizing framebuffer textures");
-
-        for (int i = 0; i < 2; i++) {
-            glBindTexture(GL_TEXTURE_2D, _gl_state.texture[i]);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, viewport_size.x, viewport_size.y, 0, GL_RGBA, GL_FLOAT, nullptr);
-        }
-        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    // We need these to transform the geometry
-    glm::mat4 model_matrix = GM4f(_viewer->core.model);
-    glm::mat4 view_matrix = GM4f(_viewer->core.view);
-    glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
-    glm::vec3 light_position = G3f(_viewer->core.light_position);
-
+    // Geometry is in [0, 1]^3, rescale it to be centered and proportionally sized to the volume
     glm::vec3 normalized_volume_dimensions =
             glm::vec3(volume_renderer.volume_dims()) / static_cast<float>(glm::compMax(volume_renderer.volume_dims()));
     glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
     glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
+
+    glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
+    glm::mat4 view_matrix = GM4f(_viewer->core.view);
+    glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
+    glm::vec3 light_position = G3f(_viewer->core.light_position);
 
     // Sort the cells of the bounding cage front to back
     std::vector<BoundingCage::CellIterator> sorted_cells;
@@ -199,43 +173,19 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
     std::sort(sorted_cells.begin(), sorted_cells.end(), comp_cells);
 
 
-    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multipass render");
-    {
-        // Clear the multipass accumulation buffers
-        for (int i = 0; i < 2; i++) {
-            glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[i]);
-            const glm::vec4 color_transparent(0.0);
-            glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
-        }
-
-        // Render each convex cell in the bounding cage front to back
-        for (int i = 0; i < sorted_cells.size(); i++) {
-            const int current_buf = i % 2;
-            const int last_buf = (i+1) % 2;
-
-            auto cell = sorted_cells[i];
-            Eigen::MatrixXd cV = cell->mesh_vertices();
-            Eigen::MatrixXi cF = cell->mesh_faces();
-
-            update_volume_geometry(cV, cF);
-            volume_renderer.render_bounding_box(model_matrix, view_matrix, proj_matrix);
-
-            if (i == sorted_cells.size()-1) {
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
-            } else {
-                glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.framebuffer[current_buf]);
-                glViewport(0, 0, viewport_size.x, viewport_size.y);
-            }
-            volume_renderer.render_volume(light_position, _gl_state.texture[last_buf]);
-        }
-    }
-    glPopDebugGroup();
-
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
-    renderer_2d.draw(model_matrix*scaling*translate, view_matrix, proj_matrix);
+    renderer_2d.draw(model_matrix, view_matrix, proj_matrix);
+
+    volume_renderer.begin_multipass();
+    for (int i = 0; i < sorted_cells.size(); i++) {
+        auto cell = sorted_cells[i];
+        Eigen::MatrixXd cV = cell->mesh_vertices();
+        Eigen::MatrixXi cF = cell->mesh_faces();
+        update_volume_geometry(cV, cF);
+
+        bool final = (i == sorted_cells.size()-1);
+        volume_renderer.render_multipass(model_matrix, view_matrix, proj_matrix, light_position, final);
+    }
 
     // Restore the previous viewport
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);

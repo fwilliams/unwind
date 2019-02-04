@@ -18,6 +18,8 @@ class VolumeRenderer {
     GLfloat _sampling_rate = 10.0f;
     GLuint _num_bounding_indices = 0;
 
+    int _current_multipass_buf = -1;
+
     struct GLState {
         struct RayEndpointsPass {
             GLuint vao = 0;
@@ -51,6 +53,7 @@ class VolumeRenderer {
                 GLint volume_texture = 0;
                 GLint transfer_function = 0;
                 GLint value_init_texture = 0;
+                GLint final = 0;
 
                 GLint volume_dimensions = 0;
                 GLint volume_dimensions_rcp = 0;
@@ -63,6 +66,11 @@ class VolumeRenderer {
                 GLint light_exponent_specular = 0;
             } uniform_location;
         } volume_pass;
+
+        struct MultipassState {
+            GLuint framebuffer[2];
+            GLuint texture[2];
+        } multipass;
     } _gl_state;
 
 
@@ -74,14 +82,31 @@ public:
     void resize_framebuffer(const glm::ivec2& viewport_size);
 
     void init(const glm::ivec2& viewport_size,
+              bool use_multipass,
               const char* fragment_shader = nullptr,
               const char* picking_shader = nullptr);
 
     void set_volume_data(const glm::ivec3& volume_dims, const double* texture_data);
     void set_transfer_function(const std::vector<TfNode>& transfer_function);
+
+
     void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
+    // TODO: Allow setting multiple geometric objects
+    //    void set_bounding_geometry(const std::vector<GLfloat*>& vertices,
+    //                               const std::vector<GLsizei>& num_vertices,
+    //                               const std::vector<GLint*>& indices,
+    //                               const std::vector<GLsizei>& num_indices);
+
     void render_bounding_box(const glm::mat4 &model_matrix, const glm::mat4 &view_matrix, const glm::mat4 &proj_matrix);
     void render_volume(const glm::vec3& light_position, GLuint multipass_tex=0);
+
+
+    void begin_multipass();
+    void render_multipass(const glm::mat4 &model_matrix,
+                          const glm::mat4 &view_matrix,
+                          const glm::mat4 &proj_matrix,
+                          const glm::vec3& light_position,
+                          bool final);
 };
 
 }
