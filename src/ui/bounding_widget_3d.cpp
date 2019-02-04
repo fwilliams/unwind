@@ -162,12 +162,16 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
         glm::vec4 c2l = glm::vec4(G3f(c2->left_keyframe()->centroid_3d()), 1.0) / volume_dims;
         glm::vec4 c2r = glm::vec4(G3f(c2->right_keyframe()->centroid_3d()), 1.0) / volume_dims;
 
-        c1l = view_matrix*model_matrix*c1l;
-        c1r = view_matrix*model_matrix*c1r;
-        c2l = view_matrix*model_matrix*c2l;
-        c2r = view_matrix*model_matrix*c2r;
-        float d1 = glm::max(glm::length2(glm::vec3(c1l)), glm::length2(glm::vec3(c1r)));
-        float d2 = glm::max(glm::length2(glm::vec3(c2l)), glm::length2(glm::vec3(c2r)));
+        glm::vec4 cam_ctr = glm::vec4(G3f(_viewer->core.camera_center), 1.0);
+
+        c1l = model_matrix*c1l;
+        c1r = model_matrix*c1r;
+        c2l = model_matrix*c2l;
+        c2r = model_matrix*c2r;
+
+        float d1 = glm::max(glm::distance(c1l, cam_ctr), glm::distance(c1r, cam_ctr));
+        float d2 = glm::max(glm::distance(c2l, cam_ctr), glm::distance(c2r, cam_ctr));
+
         return d1 < d2;
     };
     std::sort(sorted_cells.begin(), sorted_cells.end(), comp_cells);
