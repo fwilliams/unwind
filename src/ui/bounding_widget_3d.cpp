@@ -178,7 +178,6 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
 
 
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
-    renderer_2d.draw(model_matrix, view_matrix, proj_matrix);
 
     volume_renderer.begin_multipass();
     for (int i = 0; i < sorted_cells.size(); i++) {
@@ -190,6 +189,8 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
         bool final = (i == sorted_cells.size()-1);
         volume_renderer.render_multipass(model_matrix, view_matrix, proj_matrix, light_position, final);
     }
+
+    renderer_2d.draw(model_matrix, view_matrix, proj_matrix);
 
     // Restore the previous viewport
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
