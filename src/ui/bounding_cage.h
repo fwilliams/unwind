@@ -8,6 +8,7 @@
 
 #include <spdlog/spdlog.h>
 
+
 class BoundingCage {
 public:
     class KeyFrame;
@@ -213,19 +214,19 @@ public:
         /// by transporting the frame from from_kf
         ///
         KeyFrame(const Eigen::RowVector3d& normal,
-                 const Eigen::RowVector3d& origin,
-                 const KeyFrame& from_kf,
+                 const Eigen::RowVector3d& center,
+                 const BoundingCage::KeyFrame& from_kf, const double angle,
                  const Eigen::MatrixXd& pts,
                  const Eigen::RowVector2d& centroid,
-                 std::shared_ptr<Cell> cell,
+                 std::shared_ptr<BoundingCage::Cell> cell,
                  double idx,
-                 BoundingCage *_cage);
+                 BoundingCage* cage);
 
         /// Explicit constructor:
         /// The local coordinate frame for this KeyFrame is provided explicitly
         ///
         KeyFrame(const Eigen::RowVector3d& origin,
-                 const Eigen::Matrix3d& coord_frame,
+                 const Eigen::Matrix3d& coord_frame, const double angle,
                  const Eigen::MatrixXd& pts,
                  const Eigen::RowVector2d& centroid,
                  std::shared_ptr<Cell> cell,
@@ -255,6 +256,9 @@ public:
 
         /// The index of this KeyFrame.
         double _index;
+
+        /// Store a torsion angle from -pi/2 to pi/2 radians which we use to interpolate
+        double _angle = 0.0;
 
         /// Pointers to the Cells bounidng this keyframe
         ///
@@ -289,20 +293,29 @@ public:
         /// Get the up basis vector of the coordinate system of this KeyFrame.
         ///
         Eigen::RowVector3d up() const {
-            return _orientation.row(1);
+            return orientation().row(1);
         }
 
         /// Get the right basis vector of the coordinate system of this KeyFrame.
         ///
         Eigen::RowVector3d right() const {
-            return _orientation.row(0);
+            return orientation().row(0);
+        }
+
+        double angle() const {
+            return _angle;
         }
 
         /// Get the local coordinate system of this KeyFrame.
         /// 2d positions, (x, y), of this keyframe represent coefficients
         /// along the first and second rows of this system.
         ///
-        const Eigen::Matrix3d& orientation() const {
+        const Eigen::Matrix3d orientation() const {
+            Eigen::AngleAxisd R(_angle, _orientation.row(2));
+            return (R *_orientation.transpose()).transpose();
+        }
+
+        const Eigen::Matrix3d orientation_not_rotated() const {
             return _orientation;
         }
 
@@ -320,14 +333,14 @@ public:
 
         /// Get the 2d position of the centroid of this KeyFrame
         ///
-        const Eigen::RowVector2d& centroid_2d() const {
+        const Eigen::RowVector2d centroid_2d() const {
             return _centroid_2d;
         }
 
         /// Get the 2d position of the centroid of this KeyFrame
         ///
         const Eigen::RowVector3d centroid_3d() const {
-            return _origin + right()*_centroid_2d[0] + up()*_centroid_2d[1];
+            return _origin + _orientation.row(0)*_centroid_2d[0] + _orientation.row(1)*_centroid_2d[1];
         }
 
         /// Get the 3d positions of the bounding box for this keyframe
@@ -371,6 +384,14 @@ public:
         /// polygon points preserve their relative vectors with respect to the center
         ///
         bool move_centroid_2d(Eigen::RowVector2d& new_center);
+
+        /// Rotate the coordinate frame counter-clockwise about the normal axis
+        ///
+        bool rotate_torsion_frame(double d_angle);
+
+        /// Set the rotation of the coordinate frame
+        ///
+        bool set_angle(double angle);
     };
 
     /// Bidirectional Iterator class used to traverse the linked list of KeyFrames

@@ -2,7 +2,7 @@
 #define __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__
 
 #include "fish_ui_viewer_plugin.h"
-#include "bounding_polygon_widget.h"
+#include "bounding_widget_2d.h"
 #include "volume_exporter.h"
 
 #include "bounding_widget_3d.h"

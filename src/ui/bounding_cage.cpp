@@ -11,9 +11,18 @@
 #include "state.h"
 
 // Parallel transport a coordinate system from a KeyFrame along a curve to a point with normal, to_n
-static Eigen::Matrix3d parallel_transport(const BoundingCage::KeyFrame& from_kf, Eigen::RowVector3d to_n) {
-    Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(from_kf.normal().normalized(), to_n.normalized()).matrix();
-    Eigen::Matrix3d coord_system = (R*from_kf.orientation().transpose()).transpose();
+//static Eigen::Matrix3d parallel_transport(const BoundingCage::KeyFrame& from_kf, Eigen::RowVector3d to_n) {
+//    Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(from_kf.normal().normalized(), to_n.normalized()).matrix();
+//    Eigen::Matrix3d coord_system = (R*from_kf.orientation().transpose()).transpose();
+//    for (int i = 0; i < coord_system.rows(); i++) { coord_system.row(i) /= coord_system.row(i).norm(); }
+//    return coord_system;
+//}
+
+
+static Eigen::Matrix3d parallel_transport(const Eigen::MatrixXd& kf_coord_frame, Eigen::RowVector3d to_n) {
+    Eigen::RowVector3d normal = kf_coord_frame.row(2);
+    Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(normal.normalized(), to_n.normalized()).matrix();
+    Eigen::Matrix3d coord_system = (R*kf_coord_frame.transpose()).transpose();
     for (int i = 0; i < coord_system.rows(); i++) { coord_system.row(i) /= coord_system.row(i).norm(); }
     return coord_system;
 }
@@ -64,9 +73,11 @@ static Eigen::Matrix3d local_coordinate_system(const Eigen::RowVector3d& normal)
 // | BoundingCage::KeyFrame methods | //
 // |                                | //
 // |================================| //
+
 BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                                  const Eigen::RowVector3d& center,
                                  const BoundingCage::KeyFrame& from_kf,
+                                 const double angle,
                                  const Eigen::MatrixXd& pts,
                                  const Eigen::RowVector2d& centroid,
                                  std::shared_ptr<BoundingCage::Cell> cell,
@@ -74,7 +85,8 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
                                  BoundingCage* cage) {
     _cage = cage;
     _index = idx;
-    _orientation = parallel_transport(from_kf, normal);
+    _orientation = parallel_transport(from_kf._orientation, normal);
+    _angle = angle;
     _centroid_2d = centroid;
     _origin = center;
     _vertices_2d = pts;
@@ -87,6 +99,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& normal,
 
 BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
                                  const Eigen::Matrix3d& coord_frame,
+                                 const double angle,
                                  const Eigen::MatrixXd& pts,
                                  const Eigen::RowVector2d& centroid,
                                  std::shared_ptr<BoundingCage::Cell> cell,
@@ -94,6 +107,7 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
                                  BoundingCage *cage) {
     _cage = cage;
     _index = idx;
+    _angle = angle;
     _orientation = coord_frame;
     _origin = center;
     _vertices_2d = pts;
@@ -111,11 +125,28 @@ bool BoundingCage::KeyFrame::move_centroid_2d(Eigen::RowVector2d& new_centroid_2
         return false;
     }
 
+//    Eigen::RowVector2d centroid_tx = Eigen::Rotation2Dd(-angle()) * Eigen::Vector2d(new_centroid_2d);
     _centroid_2d = new_centroid_2d;
     return true;
 }
 
+bool BoundingCage::KeyFrame::rotate_torsion_frame(double d_angle) {
+    if (!in_bounding_cage()) {
+        logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
+        return false;
+    }
 
+    _angle += d_angle;
+}
+
+bool BoundingCage::KeyFrame::set_angle(double angle) {
+    if (!in_bounding_cage()) {
+        logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
+        return false;
+    }
+
+    _angle = angle;
+}
 
 
 
@@ -236,7 +267,7 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
 
         // If we added a cell with a different normal than the left key-frame, we need to recompute the
         // the local coordinate frame of the right keyframe
-        _right_keyframe->_orientation = parallel_transport(*_right_child->_left_keyframe, _right_keyframe->normal());
+        _right_keyframe->_orientation = parallel_transport(_right_child->_left_keyframe->_orientation, _right_keyframe->_orientation.row(2));
 
         return keyframe;
 
@@ -330,7 +361,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
         Eigen::RowVector2d mid_centroid = 0.5 * (cell->_left_keyframe->centroid_2d() + cell->_right_keyframe->centroid_2d());
         Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+1) - SV_smooth.row(mid-1)).normalized();
         Eigen::MatrixXd mid_pts_2d = 0.5 * (cell->_left_keyframe->vertices_2d() + cell->_left_keyframe->vertices_2d());
-        std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->_left_keyframe, mid_pts_2d, mid_centroid, cell, mid, this));
+        std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->_left_keyframe, 0.0, mid_pts_2d, mid_centroid, cell, mid, this));
         assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
 
         if(split_internal(mid_keyframe)) {
@@ -376,9 +407,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     Eigen::RowVector2d centroid = poly_template.colwise().mean();
 
     Eigen::Matrix3d front_coord_system = local_coordinate_system(front_normal);
-    std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, poly_template, centroid,
+    std::shared_ptr<KeyFrame> front_keyframe(new KeyFrame(SV.row(0), front_coord_system, 0.0, poly_template, centroid,
                                                           std::shared_ptr<Cell>(), 0, this));
-    std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), *front_keyframe,
+    std::shared_ptr<KeyFrame> back_keyframe(new KeyFrame(back_normal, SV.row(SV.rows()-1), *front_keyframe, 0.0,
                                                          poly_template, centroid, std::shared_ptr<Cell>(),
                                                          SV.rows()-1, this));
     front_keyframe->_in_cage = true;
@@ -438,14 +469,16 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
     }
     n *= sign;
 
-    Eigen::Matrix3d coord_frame = parallel_transport(*cell->_left_keyframe, n);
+    double angle = (1.0-coeff)*cell->_left_keyframe->angle() + coeff*cell->_right_keyframe->angle();
+
+    Eigen::Matrix3d coord_frame = parallel_transport(cell->_left_keyframe->_orientation, n);
 
     Eigen::MatrixXd points2d(V.rows(), 2);
     points2d.col(0) = A*coord_frame.row(0).transpose();
     points2d.col(1) = A*coord_frame.row(1).transpose();
 
     Eigen::RowVector2d centroid2d = (1.0-coeff)*cell->_left_keyframe->centroid_2d() + coeff*cell->_right_keyframe->centroid_2d();
-    std::shared_ptr<KeyFrame> kf(new KeyFrame(origin, coord_frame, points2d, centroid2d, cell, index, (BoundingCage*)this));
+    std::shared_ptr<KeyFrame> kf(new KeyFrame(origin, coord_frame, angle, points2d, centroid2d, cell, index, (BoundingCage*)this));
     return KeyFrameIterator(kf);
 }
 

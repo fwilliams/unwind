@@ -50,26 +50,6 @@ void Bounding_Polygon_Menu::initialize() {
     exporter.init(128, 128, 1024);
 
     state.logger->trace("Done initializing bounding polygon plugin!");
-
-//    Eigen::MatrixXd V(state.cage.num_cells()*8, 3);
-//    Eigen::MatrixXi F(state.cage.num_cells()*12, 3);
-//    int count = 0;
-//    viewer->data().clear();
-//    for (auto cell : state.cage.cells) {
-//        Eigen::MatrixXi cF = cell.mesh_faces();
-
-//        for (int i = 0; i < cF.rows(); i++) {
-//            for (int j = 0; j < cF.cols(); j++) {
-//                cF(i, j) += count*8;
-//            }
-//        }
-//        V.block(8*count, 0, 8, 3) = cell.mesh_vertices();
-//        F.block(12*count, 0, 12, 3) = cF;
-//        count += 1;
-//    }
-//    viewer->data().add_points(V, Eigen::RowVector3d(0.5, 0.6, 0.7));
-//    viewer->data().set_mesh(V, F);
-//    viewer->core.align_camera_center(V);
 }
 
 void Bounding_Polygon_Menu::deinitialize() {
@@ -101,63 +81,6 @@ bool Bounding_Polygon_Menu::pre_draw() {
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
 
-
-    /*
-    glDisable(GL_CULL_FACE);
-
-    size_t push_overlay_id = viewer->selected_data_index;
-
-    viewer->selected_data_index = points_overlay_id;
-    {
-        viewer->data().clear();
-        viewer->data().line_width = 2.4f;
-
-        for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-            viewer->data().add_points(kf.centroid_3d(), ColorRGB::GREEN);
-            Eigen::MatrixXd V3d = kf.bounding_box_vertices_3d();
-            Eigen::RowVector3d clr = kf.index() == current_cut_index ?
-                        ColorRGB::ORANGERED : ColorRGB::RED;
-            for (int i = 0; i < V3d.rows(); i++) {
-                Eigen::RowVector3d c = (i == current_vertex ? ColorRGB::CYAN : clr);
-                viewer->data().add_points(V3d.row(i), c);
-            }
-        }
-
-        for (auto kf = state.cage.keyframes.rbegin(); kf != state.cage.keyframes.rend(); --kf) {
-            Eigen::Matrix3d cf = kf->orientation();
-            if (kf->index() != current_cut_index) {
-                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(0), ColorRGB::RED);
-                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(1), ColorRGB::GREEN);
-                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(2), ColorRGB::BLUE);
-            }
-            else {
-                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(0), ColorRGB::CYAN);
-                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(1), ColorRGB::YELLOW);
-                viewer->data().add_edges(kf->origin(), kf->origin() + 100.0 * cf.row(2), ColorRGB::MAGENTA);
-            }
-        }
-
-        viewer->data().point_size = 10.f;
-        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
-
-
-        viewer->data().add_points(kf->origin(), ColorRGB::RED);
-        viewer->data().add_points(kf->bounding_box_vertices_3d(), ColorRGB::ORANGERED);
-        viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(0), ColorRGB::CYAN);
-        viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(1), ColorRGB::YELLOW);
-        viewer->data().add_edges(kf->origin(), kf->origin() + 100 * kf->orientation().row(2), ColorRGB::MAGENTA);
-        viewer->selected_data_index = push_overlay_id;
-    }
-
-
-    viewer->selected_data_index = cage_mesh_overlay_id;
-    {
-        viewer->data().clear();
-        viewer->data().set_face_based(true);
-        viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
-        viewer->selected_data_index = push_overlay_id;
-    }
-    */
     return ret;
 }
 
@@ -263,6 +186,45 @@ bool Bounding_Polygon_Menu::post_draw() {
         exporter.write_texture_data_to_file("out_volume.raw");
         state.logger->debug("DONE");
     }
+
+    const double angle_3deg = M_2_PI / 120.0;
+    const double angle_10deg = M_2_PI / 36.0;
+    if (ImGui::Button("-3deg")) {
+        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
+        if (!kf->in_bounding_cage()) {
+            kf = state.cage.insert_keyframe(current_cut_index);
+        }
+        kf->rotate_torsion_frame(-angle_3deg);
+        glfwPostEmptyEvent();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("+3deg")) {
+        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
+        if (!kf->in_bounding_cage()) {
+            kf = state.cage.insert_keyframe(current_cut_index);
+        }
+        kf->rotate_torsion_frame(angle_3deg);
+        glfwPostEmptyEvent();
+    }
+
+    if (ImGui::Button("-10deg")) {
+        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
+        if (!kf->in_bounding_cage()) {
+            kf = state.cage.insert_keyframe(current_cut_index);
+        }
+        kf->rotate_torsion_frame(-angle_10deg);
+        glfwPostEmptyEvent();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("+10deg")) {
+        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
+        if (!kf->in_bounding_cage()) {
+            kf = state.cage.insert_keyframe(current_cut_index);
+        }
+        kf->rotate_torsion_frame(angle_10deg);
+        glfwPostEmptyEvent();
+    }
+
     ImGui::End();
     ImGui::Render();
 
