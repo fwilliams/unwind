@@ -119,13 +119,12 @@ BoundingCage::KeyFrame::KeyFrame(const Eigen::RowVector3d& center,
 }
 
 
-bool BoundingCage::KeyFrame::move_centroid_2d(Eigen::RowVector2d& new_centroid_2d) {
+bool BoundingCage::KeyFrame::move_centroid_2d(const Eigen::RowVector2d& new_centroid_2d) {
     if (!in_bounding_cage()) {
         logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
         return false;
     }
 
-//    Eigen::RowVector2d centroid_tx = Eigen::Rotation2Dd(-angle()) * Eigen::Vector2d(new_centroid_2d);
     _centroid_2d = new_centroid_2d;
     return true;
 }

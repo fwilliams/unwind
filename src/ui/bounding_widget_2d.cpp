@@ -216,8 +216,6 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
     glBindVertexArray(0);
 
 
-
-
     glGenTextures(1, &offscreen.texture);
     glBindTexture(GL_TEXTURE_2D, offscreen.texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, offscreen.texture_size.x,
@@ -267,42 +265,37 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
     if (mouse_state.is_left_button_down && selection.current_edit_element >= 0) {
         // current_mouse is in pixel coordinates
         glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
+
         // Zooming and panning
         mouse_state.down_position = current_mouse;
 
         BoundingCage::KeyFrameIterator kf = selection.current_active_keyframe;
-        glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
-        glm::vec2 ctr = G2f(kf->centroid_2d());
-
-
-        Eigen::Vector2d R = Eigen::Rotation2Dd(kf->angle()) * Eigen::Vector2d(1.0, 0.0);
-        Eigen::Vector2d U = Eigen::Rotation2Dd(kf->angle()) * Eigen::Vector2d(0.0, 1.0);
+        Eigen::RowVector2d kf_mouse = E2d(convert_position_mainwindow_to_keyframe(current_mouse));
         Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
-        float min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
-
-        glm::vec2 r_axis = G2f(R), u_axis = G2f(U);
-        glm::vec2 assign_mouse(glm::dot(kf_mouse - ctr, r_axis), glm::dot(kf_mouse - ctr, u_axis));
+        Eigen::RowVector2d assign_mouse = kf->rotated_coords(kf_mouse - kf->centroid_2d());
 
         switch (selection.closest_vertex_index) {
         case 0:
-            min_u = std::min(assign_mouse[0], max_u);
-            min_v = std::min(assign_mouse[1], max_v);
+            bbox[0] = std::min(assign_mouse[0], bbox[1]);
+            bbox[2] = std::min(assign_mouse[1], bbox[3]);
             break;
         case 1:
-            max_u = std::max(assign_mouse[0], min_u);
-            min_v = std::min(assign_mouse[1], max_v);
+            bbox[1] = std::max(assign_mouse[0], bbox[0]);
+            bbox[2] = std::min(assign_mouse[1], bbox[3]);
             break;
         case 2:
-            max_u = std::max(assign_mouse[0], min_u);
-            max_v = std::max(assign_mouse[1], min_v);
+            bbox[1] = std::max(assign_mouse[0], bbox[0]);
+            bbox[3] = std::max(assign_mouse[1], bbox[2]);
             break;
         case 3:
-            min_u = std::min(assign_mouse[0], max_u);
-            max_v = std::max(assign_mouse[1], min_v);
+            bbox[0] = std::min(assign_mouse[0], bbox[1]);
+            bbox[3] = std::max(assign_mouse[1], bbox[2]);
             break;
+        default:
+            state.logger->error("Bad vertex ID in selection. This should never happen. Aborting.");
+            exit(EXIT_FAILURE);
         }
-
-        state.cage.set_keyframe_bounding_box(Eigen::Vector4d(min_u, max_u, min_v, max_v));
+        state.cage.set_keyframe_bounding_box(bbox);
     }
 
     if (mouse_state.is_left_button_down && selection.current_edit_element == CenterElement) {
@@ -316,9 +309,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         }
 
         glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
-
-        Eigen::RowVector2d kf_mouse_eigen(kf_mouse.x, kf_mouse.y);
-        bool success = selection.current_active_keyframe->move_centroid_2d(kf_mouse_eigen);
+        bool success = selection.current_active_keyframe->move_centroid_2d(E2d(kf_mouse));
         if (!success) {
             // TODO: Handle this case if ever we decide to force the centroid to be inside the polygon
         }
@@ -404,14 +395,7 @@ void Bounding_Polygon_Widget::update_selection() {
     glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);                    // In keyframe ndc
 
     BoundingCage::KeyFrameIterator kf = selection.current_active_keyframe;
-    Eigen::MatrixXd bbox_v2d = kf->bounding_box_vertices_2d();
-    Eigen::Rotation2Dd R(kf->angle());
-    for (int i = 0; i < bbox_v2d.rows(); i++) {
-        Eigen::Vector2d r = bbox_v2d.row(i) - kf->centroid_2d();
-        r = R * r + kf->centroid_2d().transpose();
-        bbox_v2d.row(i) = r;
-    }
-    std::pair<int, float> cv = closest_vertex(kf_mouse, bbox_v2d);
+    std::pair<int, float> cv = closest_vertex(kf_mouse, kf->bounding_box_vertices_rotated_2d());
 
     selection.matched_vertex = std::get<1>(cv) < view.zoom * SelectionRadius;
     float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
@@ -504,19 +488,16 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
 
         glm::vec3 volume_dims = glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
-        Eigen::Matrix3d orient_theta = kf->orientation_not_rotated();
-        Eigen::RowVector3d r = orient_theta.row(0);
-        Eigen::RowVector3d u = orient_theta.row(1);
         Eigen::Vector2d offset(view.offset.x, view.offset.y);
         Eigen::Vector2d LL = Eigen::Vector2d(-1.0, -1.0) * view.zoom + offset;
         Eigen::Vector2d UL = Eigen::Vector2d(-1.0,  1.0) * view.zoom + offset;
         Eigen::Vector2d LR = Eigen::Vector2d( 1.0, -1.0) * view.zoom + offset;
         Eigen::Vector2d UR = Eigen::Vector2d( 1.0,  1.0) * view.zoom + offset;
 
-        Eigen::Vector3d LL3 = kf->origin() + LL[0]*r + LL[1]*u;
-        Eigen::Vector3d UL3 = kf->origin() + UL[0]*r + UL[1]*u;
-        Eigen::Vector3d LR3 = kf->origin() + LR[0]*r + LR[1]*u;
-        Eigen::Vector3d UR3 = kf->origin() + UR[0]*r + UR[1]*u;
+        Eigen::Vector3d LL3 = kf->origin() + LL[0]*kf->right_3d() + LL[1]*kf->up_3d();
+        Eigen::Vector3d UL3 = kf->origin() + UL[0]*kf->right_3d() + UL[1]*kf->up_3d();
+        Eigen::Vector3d LR3 = kf->origin() + LR[0]*kf->right_3d() + LR[1]*kf->up_3d();
+        Eigen::Vector3d UR3 = kf->origin() + UR[0]*kf->right_3d() + UR[1]*kf->up_3d();
 
         glm::vec3 ll = G3f(LL3) / volume_dims;
         glm::vec3 ul = G3f(UL3) / volume_dims;
@@ -544,40 +525,24 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     //
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
     {
-        glm::vec2 centroid_2d = G2f(kf->centroid_2d());
+        const glm::vec2 centroid_2d = G2f(kf->centroid_2d());
+        const glm::vec2 r_axis = G2f(kf->right_rotated_2d()), u_axis = G2f(kf->up_rotated_2d());
 
-        if (selection.matched_center) {
-            std::vector<glm::vec2> selected_vertices_2d;
-            selected_vertices_2d.push_back(centroid_2d);
-            draw_polygon(selected_vertices_2d, selected_center_point_color, selected_center_point_size, 1.f, PolygonDrawMode::Points, true /* keyframe_space */);
-        } else {
-            std::vector<glm::vec2> selected_vertices_2d;
-            selected_vertices_2d.push_back(centroid_2d);
-            draw_polygon(selected_vertices_2d, center_point_color, center_point_size, 1.f, PolygonDrawMode::Points, true /* keyframe_space */);
-        }
+        // Render the center of the bounding box
+        float ctr_point_size = selection.matched_center ? selected_center_point_size : center_point_size;
+        glm::vec4 ctr_color = selection.matched_center ? selected_center_point_color : center_point_color;
+        std::vector<glm::vec2> selected_vertices_2d;
+        selected_vertices_2d.push_back(centroid_2d);
+        draw_polygon(selected_vertices_2d, ctr_color, ctr_point_size, 1.f, PolygonDrawMode::Points, true /* keyframe_space */);
 
-        Eigen::Vector4d bbox = state.cage.keyframe_bounding_box();
-        Eigen::Vector2d R = Eigen::Rotation2Dd(kf->angle()) * Eigen::Vector2d(1.0, 0.0);
-        Eigen::Vector2d U = Eigen::Rotation2Dd(kf->angle()) * Eigen::Vector2d(0.0, 1.0);
-        float min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
-
-        glm::vec2 r_axis = G2f(R), u_axis = G2f(U);
-
-        glm::vec2 ll = r_axis*min_u + u_axis*min_v;
-        glm::vec2 lr = r_axis*max_u + u_axis*min_v;
-        glm::vec2 ur = r_axis*max_u + u_axis*max_v;
-        glm::vec2 ul = r_axis*min_u + u_axis*max_v;
-
+        // Render the rotated bounding box
+        Eigen::MatrixXd bbox_v = kf->bounding_box_vertices_rotated_2d();
         std::vector<glm::vec2> bbox_vertices;
-        bbox_vertices.push_back(centroid_2d + ll);
-        bbox_vertices.push_back(centroid_2d + lr);
-        bbox_vertices.push_back(centroid_2d + ur);
-        bbox_vertices.push_back(centroid_2d + ul);
-
+        for (int i = 0; i < bbox_v.rows(); i++) { bbox_vertices.push_back(G2f(bbox_v.row(i))); }
         glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
-
         draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines, true /* keyframe_space */);
 
+        // Render the up and right axes
         std::vector<glm::vec2> vertical_line =   { centroid_2d - 100000.f*u_axis, centroid_2d + 100000.f*u_axis };
         std::vector<glm::vec2> horizontal_line = { centroid_2d - 100000.f*r_axis, centroid_2d + 100000.f*r_axis };
         draw_polygon(vertical_line, glm::vec4(0.7f, 0.2f, 0.2f, 1.0f), 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
@@ -599,9 +564,6 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         int width;
         int height;
         glfwGetWindowSize(viewer->window, &width, &height);
-        float w = static_cast<float>(width);
-        float h = static_cast<float>(height);
-
 
         glUseProgram(blit.program);
         glBindVertexArray(blit.vao);
@@ -650,9 +612,6 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
     }
     glPopDebugGroup();
     glEnable(GL_DEPTH_TEST);
-
-    //    ImGui::SliderFloat2("Window Size", glm::value_ptr(size), 0.f, h);
-    //    ImGui::SliderFloat2("Window Position", glm::value_ptr(position), 0.f, h);
 
     return false;
 }

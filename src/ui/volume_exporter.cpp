@@ -159,8 +159,8 @@ void VolumeExporter::draw(BoundingCage& cage, GLuint volume_texture, glm::ivec3 
 
         BoundingCage::KeyFrameIterator kf = cage.keyframe_for_index(index);
 
-        glm::vec3 u_axis = glm::vec3(G3f(kf->right()));
-        glm::vec3 v_axis = glm::vec3(G3f(kf->up()));
+        glm::vec3 u_axis = glm::vec3(G3f(kf->right_rotated_3d()));
+        glm::vec3 v_axis = glm::vec3(G3f(kf->up_rotated_3d()));
         glm::vec3 kf_center = glm::vec3(G3f(kf->origin()));
         glm::vec2 ctr = G2f(kf->centroid_2d());
 

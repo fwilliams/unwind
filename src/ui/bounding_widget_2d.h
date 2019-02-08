@@ -64,6 +64,7 @@ private:
         bool is_left_button_down = false;
         bool is_right_button_down = false;
         float scroll = 0.f;
+        bool is_ctrl_down = false;
     } mouse_state;
 
     // State tracking what elements are being edited

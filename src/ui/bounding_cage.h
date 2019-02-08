@@ -264,8 +264,9 @@ public:
         ///
         std::weak_ptr<Cell> _left_cell;
         std::weak_ptr<Cell> _right_cell;
-        std::shared_ptr<Cell> left_cell() { return _left_cell.lock(); }
-        std::shared_ptr<Cell> right_cell() { return _right_cell.lock(); }
+        std::shared_ptr<Cell> left_cell() const { return _left_cell.lock(); }
+        std::shared_ptr<Cell> right_cell() const { return _right_cell.lock(); }
+
         /// Logger for this class
         ///
         std::shared_ptr<spdlog::logger> logger;
@@ -274,34 +275,64 @@ public:
 
         /// Returns true if this KeyFrame is part of the bounding cage
         ///
-        bool in_bounding_cage() {
+        bool in_bounding_cage() const {
             return _in_cage;
         }
 
         /// True if this KeyFrame is at one of the endpoints of its BoundingCage
         ///
-        bool is_endpoint() {
+        bool is_endpoint() const {
             return in_bounding_cage() && (!left_cell() || !right_cell());
         }
 
         /// Get the normal of the plane of this KeyFrame.
+        /// This is independent of the torsion angle since torsion is applied
+        /// in the plane defined by this normal
         ///
         Eigen::RowVector3d normal() const {
             return _orientation.row(2);
         }
 
-        /// Get the up basis vector of the coordinate system of this KeyFrame.
+        /// Get the right of the coordinate system with torsion rotation applied.
         ///
-        Eigen::RowVector3d up() const {
-            return orientation().row(1);
+        Eigen::RowVector3d right_rotated_3d() const {
+            return orientation_rotated().row(0);
         }
 
-        /// Get the right basis vector of the coordinate system of this KeyFrame.
+        /// Get the up vector of the coordinate system with torsion rotation applied.
         ///
-        Eigen::RowVector3d right() const {
+        Eigen::RowVector3d up_rotated_3d() const {
+            return orientation_rotated().row(1);
+        }
+
+        /// Get the right vector of the coordinate system of this KeyFrame without
+        /// the torsion rotation applied.
+        ///
+        Eigen::RowVector3d right_3d() const {
             return orientation().row(0);
         }
 
+        /// Get the up vector of the coordinate system of this KeyFrame without
+        /// the torsion rotation applied.
+        ///
+        Eigen::RowVector3d up_3d() const {
+            return orientation().row(1);
+        }
+
+        /// Get the right vector of the KeyFrame in 2D after applying the torsion rotation
+        ///
+        Eigen::RowVector2d right_rotated_2d() const {
+            return Eigen::Rotation2Dd(_angle) * Eigen::Vector2d(1.0, -.0);
+        }
+
+        /// Get the up vector of the KeyFrame in 2D after applying the torsion rotation
+        ///
+        Eigen::RowVector2d up_rotated_2d() const {
+            return Eigen::Rotation2Dd(_angle) * Eigen::Vector2d(0.0, 1.0);
+        }
+
+        /// Return the torsion angle applied to this keyframe
+        ///
         double angle() const {
             return _angle;
         }
@@ -310,23 +341,28 @@ public:
         /// 2d positions, (x, y), of this keyframe represent coefficients
         /// along the first and second rows of this system.
         ///
-        const Eigen::Matrix3d orientation() const {
+        const Eigen::Matrix3d orientation_rotated() const {
             Eigen::AngleAxisd R(_angle, _orientation.row(2));
             return (R *_orientation.transpose()).transpose();
         }
 
-        const Eigen::Matrix3d orientation_not_rotated() const {
+        /// Get the coordinate frame of this keyframe without the torsion
+        /// rotation applies. Each row of the returned matrix is a basis vector
+        /// for coordinate system. The first row is the "right" direction, the
+        /// second row is the "up" direction, and the third is the "normal" direction.
+        ///
+        const Eigen::Matrix3d orientation() const {
             return _orientation;
         }
 
-        /// Get the center of the KeyFrame.
+        /// Get the center of the KeyFrame in 3D
         ///
         const Eigen::RowVector3d& origin() const {
             return _origin;
         }
 
         /// Get the ordered 2d points of the KeyFrame polygon boundary.
-        ///
+        /// TODO: Kill this!
         const Eigen::MatrixXd& vertices_2d() const {
             return _vertices_2d;
         }
@@ -343,16 +379,17 @@ public:
             return _origin + _orientation.row(0)*_centroid_2d[0] + _orientation.row(1)*_centroid_2d[1];
         }
 
-        /// Get the 3d positions of the bounding box for this keyframe
+        /// Get the 3d positions of the bounding box for this keyframe without
+        /// applying the torsion rotation
         ///
         const Eigen::MatrixXd bounding_box_vertices_3d() const {
             Eigen::MatrixXd ret(4, 3);
             Eigen::RowVector4d bbox = _cage->keyframe_bounding_box();
             double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
-            ret.row(0) = right()*min_u + up()*min_v;
-            ret.row(1) = right()*max_u + up()*min_v;
-            ret.row(2) = right()*max_u + up()*max_v;
-            ret.row(3) = right()*min_u + up()*max_v;
+            ret.row(0) = right_rotated_3d()*min_u + up_rotated_3d()*min_v;
+            ret.row(1) = right_rotated_3d()*max_u + up_rotated_3d()*min_v;
+            ret.row(2) = right_rotated_3d()*max_u + up_rotated_3d()*max_v;
+            ret.row(3) = right_rotated_3d()*min_u + up_rotated_3d()*max_v;
 
             ret.rowwise() += centroid_3d();
 
@@ -360,11 +397,12 @@ public:
         }
 
         /// Get the 2d positions of the bounding box for this keyframe
-        ///
+        /// without applying the torsion rotation
+        /// TODO: Maybe kill this
         const Eigen::MatrixXd bounding_box_vertices_2d() const {
             Eigen::MatrixXd ret(4, 2);
-            Eigen::RowVector4d bbox = _cage->keyframe_bounding_box();
-            double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+            const Eigen::RowVector4d bbox = _cage->keyframe_bounding_box();
+            const double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
             ret << min_u, min_v,
                    max_u, min_v,
                    max_u, max_v,
@@ -372,6 +410,30 @@ public:
 
             ret.rowwise() += centroid_2d();
             return ret;
+        }
+
+        /// Get the 2d positions of the bounding box for this keyframe rotated
+        /// by the torsion angle
+        ///
+        const Eigen::MatrixXd bounding_box_vertices_rotated_2d() const {
+            Eigen::MatrixXd ret(4, 2);
+            const Eigen::RowVector2d r = right_rotated_2d();
+            const Eigen::RowVector2d u = up_rotated_2d();
+
+            Eigen::RowVector4d bbox = _cage->keyframe_bounding_box();
+            double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+            ret.row(0) = r*min_u + u*min_v + centroid_2d();
+            ret.row(1) = r*max_u + u*min_v + centroid_2d();
+            ret.row(2) = r*max_u + u*max_v + centroid_2d();
+            ret.row(3) = r*min_u + u*max_v + centroid_2d();
+
+            return ret;
+        }
+
+        /// Return the position of the vector v rotated by the torsion angle
+        ///
+        const Eigen::RowVector2d rotated_coords(const Eigen::RowVector2d& v) const {
+            return Eigen::RowVector2d(right_rotated_2d().dot(v), up_rotated_2d().dot(v));
         }
 
         /// Get the index value of this KeyFrame.
@@ -383,7 +445,7 @@ public:
         /// Move the center point of the KeyFrame in its xy plane. If relative is set, then the
         /// polygon points preserve their relative vectors with respect to the center
         ///
-        bool move_centroid_2d(Eigen::RowVector2d& new_center);
+        bool move_centroid_2d(const Eigen::RowVector2d& new_center);
 
         /// Rotate the coordinate frame counter-clockwise about the normal axis
         ///
