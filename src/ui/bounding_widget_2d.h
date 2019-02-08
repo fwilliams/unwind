@@ -20,6 +20,9 @@ public:
     bool mouse_up(int button, int modifier);
     bool mouse_scroll(float delta_y);
 
+    bool key_down(int key, int modifiers);
+    bool key_up(int key, int modifiers);
+
     bool post_draw(BoundingCage::KeyFrameIterator it, int current_vertex_id);
 
 
@@ -64,7 +67,9 @@ private:
         bool is_left_button_down = false;
         bool is_right_button_down = false;
         float scroll = 0.f;
-        bool is_ctrl_down = false;
+        float down_angle = 0.f; // Angle where we put the mouse down
+        bool is_rotate_modifier_down = false;
+        int which_modifier = 0;
     } mouse_state;
 
     // State tracking what elements are being edited

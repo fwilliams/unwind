@@ -19,6 +19,9 @@ public:
     bool mouse_up(int button, int modifier) override;
     bool mouse_scroll(float delta_y) override;
 
+    bool key_down(int key, int modifiers) override;
+    bool key_up(int key, int modifiers) override;
+
     bool post_draw() override;
     bool pre_draw() override;
 

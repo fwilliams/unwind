@@ -75,6 +75,14 @@ bool Bounding_Polygon_Menu::mouse_scroll(float delta_y) {
 }
 
 
+bool Bounding_Polygon_Menu::key_down(int button, int modifier) {
+    return widget_2d.key_down(button, modifier) || FishUIViewerPlugin::key_down(button, modifier);
+}
+
+bool Bounding_Polygon_Menu::key_up(int button, int modifier) {
+    return widget_2d.key_up(button, modifier) || FishUIViewerPlugin::key_up(button, modifier);
+}
+
 bool Bounding_Polygon_Menu::pre_draw() {
     bool ret = FishUIViewerPlugin::pre_draw();
 

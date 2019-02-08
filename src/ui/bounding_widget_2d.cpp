@@ -231,12 +231,27 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+bool Bounding_Polygon_Widget::key_down(int key, int modifiers) {
+    if (!mouse_state.is_rotate_modifier_down && (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)) {
+        mouse_state.is_rotate_modifier_down = true;
+        mouse_state.which_modifier = key;
+    }
+    return false;
+}
+
+bool Bounding_Polygon_Widget::key_up(int key, int modifiers) {
+    if (mouse_state.is_rotate_modifier_down && key == mouse_state.which_modifier) {
+        mouse_state.is_rotate_modifier_down = false;
+        mouse_state.which_modifier = 0;
+    }
+    return false;
+}
+
 bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
     glm::ivec2 window_size;
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
-
     if (!point_in_widget(mouse_state.current_position)) {
         return false;
     }
@@ -256,6 +271,32 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         view.offset += delta_mouse_kf;
 
         //view.offset = glm::clamp(view.offset, glm::vec2(-1.f), glm::vec2(1.f));
+
+        return true;
+    }
+
+    if (mouse_state.is_left_button_down && mouse_state.is_rotate_modifier_down) {
+        BoundingCage::KeyFrameIterator kf = selection.current_active_keyframe;
+
+        // current_mouse is in pixel coordinates
+        glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
+
+        glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
+        glm::vec2 kf_mouse_o = convert_position_mainwindow_to_keyframe(mouse_state.down_position);
+        glm::vec2 v = kf_mouse - G2f(kf->centroid_2d());
+        glm::vec2 vo = kf_mouse_o - G2f(kf->centroid_2d());
+
+        vo = vo / glm::length(vo);
+        v = v / glm::length(v);
+
+        float sign = -glm::sign(glm::dot(glm::vec3(0.0, 0.0, 1.0), glm::cross(glm::vec3(v, 1.0), glm::vec3(vo, 1.0))));
+        double cos_theta = glm::dot(vo, v);
+        double theta = sign * acos(std::min(std::max(cos_theta, -1.0), 1.0));
+
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->set_angle(mouse_state.down_angle + theta);
 
         return true;
     }
@@ -339,6 +380,10 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
 
         if (left_mouse && selection.matched_center) {
             selection.current_edit_element = CenterElement;
+        }
+
+        if (left_mouse && mouse_state.is_rotate_modifier_down) {
+            mouse_state.down_angle = selection.current_active_keyframe->angle();
         }
     }
 
@@ -547,6 +592,25 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         std::vector<glm::vec2> horizontal_line = { centroid_2d - 100000.f*r_axis, centroid_2d + 100000.f*r_axis };
         draw_polygon(vertical_line, glm::vec4(0.7f, 0.2f, 0.2f, 1.0f), 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
         draw_polygon(horizontal_line, glm::vec4(0.2f, 0.7f, 0.2f, 1.0f), 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
+
+        // Render rotation handle
+        if (mouse_state.is_rotate_modifier_down) {
+            glm::ivec2 window_size;
+            glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
+            glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
+            glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
+
+            std::vector<glm::vec2> handle_line = { centroid_2d, kf_mouse };
+            glm::vec4 handle_color = glm::vec4(0.7f, 0.7f, 0.2f, 1.0f);
+            draw_polygon(handle_line, handle_color, 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
+
+            if (mouse_state.is_left_button_down) {
+                glm::vec2 kf_mouse_o = convert_position_mainwindow_to_keyframe(mouse_state.down_position);
+                std::vector<glm::vec2> handle_line_o = { centroid_2d, kf_mouse_o };
+                glm::vec4 handle_color_o = glm::vec4(0.2f, 0.7f, 0.7f, 1.0f);
+                draw_polygon(handle_line_o, handle_color_o, 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
+            }
+        }
     }
     glPopDebugGroup();
 
