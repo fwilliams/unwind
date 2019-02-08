@@ -286,6 +286,9 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         glm::vec2 v = kf_mouse - G2f(kf->centroid_2d());
         glm::vec2 vo = kf_mouse_o - G2f(kf->centroid_2d());
 
+        if (glm::length(vo) < 1e-3 || glm::length(v) < 1e-3) {
+            return true;
+        }
         vo = vo / glm::length(vo);
         v = v / glm::length(v);
 

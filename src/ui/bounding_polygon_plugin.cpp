@@ -195,10 +195,11 @@ bool Bounding_Polygon_Menu::post_draw() {
         state.logger->debug("DONE");
     }
 
+    BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
+
     const double angle_3deg = M_2_PI / 120.0;
     const double angle_10deg = M_2_PI / 36.0;
     if (ImGui::Button("-3deg")) {
-        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
         if (!kf->in_bounding_cage()) {
             kf = state.cage.insert_keyframe(current_cut_index);
         }
@@ -207,7 +208,6 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
     ImGui::SameLine();
     if (ImGui::Button("+3deg")) {
-        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
         if (!kf->in_bounding_cage()) {
             kf = state.cage.insert_keyframe(current_cut_index);
         }
@@ -216,7 +216,6 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
     if (ImGui::Button("-10deg")) {
-        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
         if (!kf->in_bounding_cage()) {
             kf = state.cage.insert_keyframe(current_cut_index);
         }
@@ -225,14 +224,18 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
     ImGui::SameLine();
     if (ImGui::Button("+10deg")) {
-        BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
         if (!kf->in_bounding_cage()) {
             kf = state.cage.insert_keyframe(current_cut_index);
         }
         kf->rotate_torsion_frame(angle_10deg);
         glfwPostEmptyEvent();
     }
-
+    if (ImGui::Button("Reset Rotation")) {
+        if (kf->in_bounding_cage()) {
+            kf->set_angle(0.0);
+        }
+        glfwPostEmptyEvent();
+    }
     ImGui::End();
     ImGui::Render();
 
