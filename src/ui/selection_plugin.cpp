@@ -111,10 +111,10 @@ void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
 }
 
 void Selection_Menu::draw_setup() {
-    if (viewer->core.viewport != _state.target_viewport_size) {
+    if (viewer->core.viewport != target_viewport_size) {
         resize_framebuffer_textures(
             glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
-        _state.target_viewport_size = G4f(viewer->core.viewport);
+        target_viewport_size = G4f(viewer->core.viewport);
     }
 
     if (number_features_is_dirty) {
@@ -398,8 +398,6 @@ bool Selection_Menu::post_draw() {
             else {
                 ImGui::Text("Current highlighted id: %i", current_selected_feature);
             }
-
-            ImGui::Text("Frame Counter: %lu", _state.frame_counter);
         }
 
         ImGui::Text("%s", "Transfer Function");

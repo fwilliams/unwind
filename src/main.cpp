@@ -119,8 +119,6 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
 }
 
 bool post_draw(igl::opengl::glfw::Viewer& viewer) {
-    _state.frame_counter++;
-
     switch (_state.application_state) {
         case Application_State::Segmentation:
             selection_menu.draw();

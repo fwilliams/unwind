@@ -72,6 +72,8 @@ private:
 
     // Sorted list of selected features
     std::vector<uint32_t> total_selection_list;
+
+    glm::vec4 target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
 };
 
 #endif // __FISH_DEFORMATION_SELECTION_MENU__

@@ -322,14 +322,12 @@ void Meshing_Menu::extract_surface_mesh() {
 }
 
 
-Eigen::VectorXd Meshing_Menu::export_selected_volume(
-                                                const std::vector<uint32_t>& feature_list)
+Eigen::VectorXd Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list)
 {
     _state.logger->debug("Feature list size: {}", feature_list.size());
     Eigen::VectorXd data = _state.volume_data;
 
-    std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(
-        _state.num_features, 0.f);
+    std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_features, 0.f);
 
     std::vector<uint32_t> good_arcs;
     for (uint32_t f : feature_list) {

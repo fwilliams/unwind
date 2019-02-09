@@ -61,10 +61,6 @@ struct State {
 
     Eigen::VectorXd skeleton_masking_volume;
 
-    glm::vec4 target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
-    uint64_t frame_counter = 0;
-    const int Delta_Frame_Count_Until_Resize = 10;
-
     // Output of the dilation and tetrahedralization
     struct DilatedTetMesh {
         Eigen::MatrixXd TV;
