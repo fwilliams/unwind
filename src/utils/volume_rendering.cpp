@@ -447,23 +447,29 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
     volume_rendering.transfer_function.is_dirty = true;
 }
 
-void upload_volume_data(GLuint volume_texture, const glm::ivec3& tex_size,
-                        double* texture_data, int size)
-{
-    std::vector<uint8_t> volume_data(size);
-    std::transform(
-        texture_data,
-        texture_data + size,
-        volume_data.begin(),
-        [](double d) {
-            return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max());
-        }
-    );
 
-    glBindTexture(GL_TEXTURE_3D, volume_texture);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, tex_size[0], tex_size[1], tex_size[2], 0,
-        GL_RED, GL_UNSIGNED_BYTE, volume_data.data());
-    glBindTexture(GL_TEXTURE_3D, 0);
+void destroy(Volume_Rendering& volume_rendering) {
+    std::vector<GLuint> buffers = { volume_rendering.bounding_box.vbo, volume_rendering.bounding_box.ibo };
+    std::vector<GLuint> textures = {
+        volume_rendering.bounding_box.entry_texture,
+        volume_rendering.bounding_box.exit_texture,
+        volume_rendering.transfer_function.texture,
+        volume_rendering.picking_texture,
+    };
+    std::vector<GLuint> framebuffers = {
+        volume_rendering.bounding_box.entry_framebuffer,
+        volume_rendering.bounding_box.exit_texture,
+        volume_rendering.picking_framebuffer
+    };
+
+    glDeleteBuffers(buffers.size(), buffers.data());
+    glDeleteTextures(textures.size(), textures.data());
+    glDeleteFramebuffers(framebuffers.size(), framebuffers.data());
+    glDeleteProgram(volume_rendering.program.program_object);
+    glDeleteProgram(volume_rendering.picking_program.program_object);
+    glDeleteProgram(volume_rendering.bounding_box.program);
+
+    volume_rendering = Volume_Rendering();
 }
 
 void update_transfer_function(Transfer_Function& transfer_function) {

@@ -14,6 +14,7 @@ public:
     Selection_Menu(State& state);
 
     void initialize();
+    void deinitialize();
     void draw_setup();
     void draw();
 
@@ -71,9 +72,6 @@ private:
 
     bool should_select = false;
     bool selection_list_is_dirty = true;
-
-    // Sorted list of selected features
-    std::vector<uint32_t> total_selection_list;
 
     glm::vec4 target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
 };

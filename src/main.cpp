@@ -71,6 +71,10 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
         switch (previous_state) {
         case Application_State::BoundingPolygon:
           bounding_polygon_menu.deinitialize();
+          break;
+        case Application_State::Segmentation:
+          selection_menu.deinitialize();
+            break;
         }
 
         viewer.plugins.clear();

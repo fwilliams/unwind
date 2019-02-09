@@ -109,7 +109,12 @@ void EndPoint_Selection_Menu::initialize() {
     for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
         viewer->erase_mesh(i);
     }
-    mesh_overlay_id = 0;
+    viewer->data().clear();
+
+    viewer->data_list.clear();
+    viewer->append_mesh();
+
+    mesh_overlay_id = static_cast<int>(viewer->selected_data_index);
     viewer->selected_data_index = mesh_overlay_id;
 
     const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;

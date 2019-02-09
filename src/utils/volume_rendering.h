@@ -97,8 +97,7 @@ struct Volume_Rendering {
 void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_size,
     const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
 
-void upload_volume_data(GLuint volume_texture, const glm::ivec3& tex_size,
-    double* texture_data, int size);
+void destroy(Volume_Rendering& volume_rendering);
 
 void update_transfer_function(Transfer_Function& transfer_function);
 

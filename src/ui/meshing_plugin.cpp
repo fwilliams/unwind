@@ -120,7 +120,7 @@ void Meshing_Menu::initialize() {
         is_meshing = true;
         glfwPostEmptyEvent();
 
-        std::vector<uint32_t> feature_list = _state.fishes[_state.current_fish].feature_list;
+        std::vector<uint32_t> feature_list = _state.selected_features;
         // The feature list used in export_selected_volume uses a zero-based indexing, we use
         // 0 for the non-feature, so we have to convert into the zero-based indexing here
         std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(),
@@ -146,6 +146,8 @@ void Meshing_Menu::initialize() {
     extracted_surface.F_thin.resize(0, 0);
     extracted_surface.V_fat.resize(0, 0);
     extracted_surface.F_fat.resize(0, 0);
+
+    _state.dilated_tet_mesh.clear();
 
     _state.logger->info("Starting meshing background thread...");
     bg_thread = std::thread(thread_fun);
@@ -323,8 +325,6 @@ void Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_l
 {
     _state.logger->debug("Feature list size: {}", feature_list.size());
     skeleton_masking_volume.resize(_state.low_res_volume.volume_data.size());
-
-    std::cout << _state.num_selected_features << " vs " << _state.fishes[_state.current_fish].feature_list.size() << std::endl;
     std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_selected_features, 0.f);
 
     std::vector<uint32_t> good_arcs;

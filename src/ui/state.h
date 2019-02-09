@@ -56,20 +56,15 @@ struct State {
         }
     };
 
+    // Initial volume data loaded in the first screen
     LoadedVolume low_res_volume;
     LoadedVolume hi_res_volume;
 
-
+    // Topological features
     int num_selected_features = 10;
     contourtree::TopologicalFeatures topological_features;
+    std::vector<uint32_t> selected_features;
 
-
-
-    struct Fish_Status {
-        std::vector<uint32_t> feature_list;
-    };
-    std::vector<Fish_Status> fishes;
-    size_t current_fish = 0;
 
     // Output of the dilation and tetrahedralization
     struct DilatedTetMesh {
@@ -80,6 +75,14 @@ struct State {
 
         // Geodesic distances stored at each tet vertex
         Eigen::VectorXd geodesic_dists;
+
+        void clear() {
+            TV.resize(0, 0);
+            TF.resize(0, 0);
+            TT.resize(0, 0);
+            connected_components.resize(0);
+            geodesic_dists.resize(0);
+        }
     } dilated_tet_mesh;
 
     // Selected pairs of endpoints

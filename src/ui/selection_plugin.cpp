@@ -21,6 +21,12 @@
 
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
+void Selection_Menu::deinitialize() {
+    volumerendering::destroy(volume_rendering);
+    std::vector<GLuint> buffers = { _gl_state.contour_information_ssbo, _gl_state.selection_list_ssbo };
+    glDeleteBuffers(buffers.size(), buffers.data());
+}
+
 void Selection_Menu::initialize() {
     volumerendering::initialize(volume_rendering,
         glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]),
@@ -53,14 +59,46 @@ void Selection_Menu::initialize() {
     const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
     const float md = static_cast<float>(maxDim);
 
-    volume_rendering.parameters.normalized_volume_dimensions = {
+    const glm::vec3 normalized_volume_dims = {
       volume_rendering.parameters.volume_dimensions[0] / md,
       volume_rendering.parameters.volume_dimensions[1] / md,
       volume_rendering.parameters.volume_dimensions[2] / md
     };
+    volume_rendering.parameters.normalized_volume_dimensions = normalized_volume_dims;
 
-    _state.fishes.resize(1);
-    _state.current_fish = 0;
+    _state.selected_features.clear();
+    number_features_is_dirty = true;
+    selection_list_is_dirty = false;
+    target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
+
+    double w = normalized_volume_dims[0]/2.0, h = normalized_volume_dims[1]/2.0, d = normalized_volume_dims[2]/2.0;
+    Eigen::MatrixXd volume_bbox_v(8, 3);
+    volume_bbox_v <<
+        -w, -h, -d,
+        -w, -h,  d,
+        -w,  h, -d,
+        -w,  h,  d,
+         w, -h, -d,
+         w, -h,  d,
+         w,  h, -d,
+         w,  h,  d;
+
+    Eigen::MatrixXi volume_bbox_i(12, 3);
+    volume_bbox_i <<
+        0, 6, 4,
+        0, 2, 6,
+        0, 3, 2,
+        0, 1, 3,
+        2, 7, 6,
+        2, 3, 7,
+        4, 6, 7,
+        4, 7, 5,
+        0, 4, 5,
+        0, 5, 1,
+        1, 5, 7,
+        1, 7, 3;
+
+    viewer->core.align_camera_center(volume_bbox_v, volume_bbox_i);
 }
 
 void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
@@ -83,11 +121,7 @@ void Selection_Menu::draw_setup() {
     }
 
     if (number_features_is_dirty) {
-        total_selection_list.clear();
-        for (State::Fish_Status& s : _state.fishes) {
-            s.feature_list.clear();
-        }
-        total_selection_list.clear();
+        _state.selected_features.clear();
         selection_list_is_dirty = true;
 
         std::vector<contourtree::Feature> features =
@@ -109,18 +143,18 @@ void Selection_Menu::draw_setup() {
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
-            buffer_data.data(), GL_DYNAMIC_READ);
+            buffer_data.data(), GL_DYNAMIC_DRAW);
 
         number_features_is_dirty = false;
     }
 
     if (selection_list_is_dirty) {
-        std::vector<uint32_t> selected = _state.fishes[_state.current_fish].feature_list;
+        std::vector<uint32_t> selected = _state.selected_features;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
-            selected.data(), GL_DYNAMIC_READ);
+            selected.data(), GL_DYNAMIC_DRAW);
 
         selection_list_is_dirty = false;
     }
@@ -133,8 +167,6 @@ void Selection_Menu::draw() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glClearColor(0.f, 0.f, 0.f, 0.f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (volume_rendering.transfer_function.is_dirty) {
         glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
@@ -147,7 +179,6 @@ void Selection_Menu::draw() {
     render_bounding_box(volume_rendering, GM4f(viewer->core.model),
         GM4f(viewer->core.view), GM4f(viewer->core.proj));
 
-    glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(volume_rendering.program.program_object);
@@ -188,28 +219,27 @@ void Selection_Menu::draw() {
 
     if (should_select) {
         if (current_selected_feature != 0) {
-            auto update = [f = current_selected_feature](std::vector<uint32_t>& indices) {
+            auto update = [&](std::vector<uint32_t>& indices) {
                 assert(std::is_sorted(indices.begin(), indices.end()));
                 auto it = std::lower_bound(indices.begin(), indices.end(),
-                    static_cast<uint32_t>(f));
+                    static_cast<uint32_t>(current_selected_feature));
 
                 if (it == indices.end()) {
                     // The index was not found
-                    indices.push_back(f);
+                    indices.push_back(current_selected_feature);
                 }
-                else if (*it == f) {
+                else if (*it == current_selected_feature) {
                     // We found the feature
                     indices.erase(it);
                 }
                 else {
                     // We did not find the feature
-                    indices.insert(it, f);
+                    indices.insert(it, current_selected_feature);
                 }
                 assert(std::is_sorted(indices.begin(), indices.end()));
             };
 
-            update(total_selection_list);
-            update(_state.fishes[_state.current_fish].feature_list);
+            update(_state.selected_features);
 
             selection_list_is_dirty = true;
         }
@@ -262,8 +292,8 @@ bool Selection_Menu::post_draw() {
     ImGui::Separator();
 
     std::string list = std::accumulate(
-        _state.fishes[_state.current_fish].feature_list.begin(),
-        _state.fishes[_state.current_fish].feature_list.end(), std::string(),
+        _state.selected_features.begin(),
+        _state.selected_features.end(), std::string(),
         [](std::string s, int i) { return s + std::to_string(i) + ", "; });
     // Remove the last ", "
     list = list.substr(0, list.size() - 2);
@@ -271,50 +301,52 @@ bool Selection_Menu::post_draw() {
     ImGui::Text("Selected features: %s", list.c_str());
 
     if (ImGui::Button("Clear Selected Features", ImVec2(-1, 0))) {
-        total_selection_list.clear();
-    }
-    ImGui::NewLine();
-
-    ImGui::Separator();
-    ImGui::PushItemWidth(-1);
-    ImGui::Text("Current fish: %ld / %ld", _state.current_fish + 1,
-        _state.fishes.size());
-    bool pressed_prev = ImGui::Button("< Prev Fish");
-    ImGui::SameLine();
-    bool pressed_next = ImGui::Button("Next Fish >");
-    ImGui::SameLine();
-    bool pressed_delete = ImGui::Button("Delete Fish");
-
-    if (pressed_prev) {
-        bool is_fish_empty = _state.fishes[_state.current_fish].feature_list.empty();
-        bool is_in_last_fish = _state.current_fish == _state.fishes.size() - 1;
-        if (is_fish_empty && is_in_last_fish) {
-            pressed_delete = true;
-        }
-        else {
-            _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
-        }
+        _state.selected_features.clear();
         selection_list_is_dirty = true;
     }
-    if (pressed_next) {
-        _state.current_fish++;
-        // We reached the end
-        if (_state.current_fish == _state.fishes.size()) {
-            _state.fishes.push_back({});
-        }
+//    ImGui::NewLine();
 
-        selection_list_is_dirty = true;
-    }
+//    ImGui::Separator();
+//    ImGui::PushItemWidth(-1);
+//    ImGui::Text("Current fish: %ld / %ld", _state.current_fish + 1,
+//        _state.fishes.size());
+//    bool pressed_prev = ImGui::Button("< Prev Fish");
+//    ImGui::SameLine();
+//    bool pressed_next = ImGui::Button("Next Fish >");
+//    ImGui::SameLine();
+//    bool pressed_delete = ImGui::Button("Delete Fish");
 
-    // We don't want to delete the last fish
-    if (pressed_delete && _state.fishes.size() > 1) {
-        _state.fishes.erase(_state.fishes.begin() + _state.current_fish);
-        _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
+//    if (pressed_prev) {
+//        bool is_fish_empty = _state.selected_features.empty();
+//        bool is_in_last_fish = _state.current_fish == _state.fishes.size() - 1;
+//        if (is_fish_empty && is_in_last_fish) {
+//            pressed_delete = true;
+//        }
+//        else {
+//            _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
+//        }
+//        selection_list_is_dirty = true;
+//    }
+//    if (pressed_next) {
+//        _state.current_fish++;
+//        // We reached the end
+//        if (_state.current_fish == _state.fishes.size()) {
+//            _state.fishes.push_back({});
+//        }
 
-        selection_list_is_dirty = true;
-    }
+//        selection_list_is_dirty = true;
+//    }
 
-    ImGui::NewLine();
+//    // We don't want to delete the last fish
+//    if (pressed_delete && _state.fishes.size() > 1) {
+//        _state.fishes.erase(_state.fishes.begin() + _state.current_fish);
+//        _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
+
+//        selection_list_is_dirty = true;
+//    }
+
+//    ImGui::NewLine();
+
     ImGui::Separator();
 
     ImGui::NewLine();

@@ -171,7 +171,7 @@ constexpr const char* ContourTreeFragmentShader = R"(
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
     if (entry == exit) {
-      out_color = vec4(0.0, 0.0, 0.0, 1.0);
+      out_color = vec4(0.0);
       return;
     }
 
@@ -231,7 +231,7 @@ constexpr const char* ContourTreeFragmentShader = R"(
       }
     }
     
-    result.a = 1.0;
+    //result.a = 1.0;
     out_color = result;
   }
 )";
