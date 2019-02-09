@@ -65,8 +65,8 @@ void Selection_Menu::initialize() {
         _state.low_res_volume.volume_data.data(), _state.low_res_volume.volume_data.size());
 
     // Index volume
-    glGenTextures(1, &_state.index_volume);
-    glBindTexture(GL_TEXTURE_3D, _state.index_volume);
+    glGenTextures(1, &_state.low_res_volume.index_texture);
+    glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -171,7 +171,7 @@ void Selection_Menu::draw() {
 
     // The default volume renderer already uses GL_TEXTURE0 through GL_TEXTURE3
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_3D, _state.index_volume);
+    glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
     glUniform1i(_gl_state.uniform_locations_rendering.index_volume, 4);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
@@ -192,7 +192,7 @@ void Selection_Menu::draw() {
 
     glUseProgram(_state.volume_rendering.picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_3D, _state.index_volume);
+    glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
     glUniform1i(_gl_state.uniform_locations_picking.index_volume, 4);
 
     glm::vec3 picking = pick_volume_location(_state.volume_rendering,

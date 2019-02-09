@@ -61,7 +61,6 @@ struct State {
 
 
     int num_features = 10;
-    GLuint index_volume = 0;
 
     contourtree::TopologicalFeatures topological_features;
 
