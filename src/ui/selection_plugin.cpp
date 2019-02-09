@@ -43,8 +43,8 @@ void Selection_Menu::initialize() {
     );
 
     // SSBO
-    glGenBuffers(1, &_state.contour_information_ssbo);
-    glGenBuffers(1, &_state.selection_list_ssbo);
+    glGenBuffers(1, &_gl_state.contour_information_ssbo);
+    glGenBuffers(1, &_gl_state.selection_list_ssbo);
 
     _state.volume_rendering.parameters.volume_dimensions = {
         _state.volume_file.w, _state.volume_file.h, _state.volume_file.d
@@ -142,7 +142,7 @@ void Selection_Menu::draw_setup() {
             }
         }
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _state.contour_information_ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
             buffer_data.data(), GL_DYNAMIC_READ);
 
@@ -153,7 +153,7 @@ void Selection_Menu::draw_setup() {
         std::vector<uint32_t> selected = _state.fishes[_state.current_fish].feature_list;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _state.selection_list_ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
             selected.data(), GL_DYNAMIC_READ);
 
@@ -192,11 +192,11 @@ void Selection_Menu::draw() {
     glBindTexture(GL_TEXTURE_3D, _state.index_volume);
     glUniform1i(_state.uniform_locations_rendering.index_volume, 4);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _state.contour_information_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _state.contour_information_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _gl_state.contour_information_ssbo);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _state.selection_list_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _state.selection_list_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.selection_list_ssbo);
 
     glUniform1i(_state.uniform_locations_rendering.color_by_identifier,
         color_by_id ? 1 : 0);

@@ -55,7 +55,6 @@ struct State {
     } uniform_locations_picking;
 
     contourtree::TopologicalFeatures topological_features;
-    GLuint contour_information_ssbo;
 
     Eigen::VectorXd volume_data;
     std::vector<unsigned int> index_volume_data;
@@ -73,7 +72,6 @@ struct State {
     // Sorted list of selected features
     std::vector<uint32_t> total_selection_list;
     bool selection_list_is_dirty = true;
-    GLuint selection_list_ssbo;
 
 
     Eigen::VectorXd skeleton_masking_volume;

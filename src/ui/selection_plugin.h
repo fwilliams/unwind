@@ -5,6 +5,8 @@
 
 #include <glm/glm.hpp>
 
+#include <glad/glad.h>
+
 struct State;
 
 class Selection_Menu : public FishUIViewerPlugin {
@@ -47,6 +49,11 @@ private:
     bool show_error_popup = false;
     std::string error_title;
     std::string error_message;
+
+    struct {
+        GLuint selection_list_ssbo;
+        GLuint contour_information_ssbo;
+    } _gl_state;
 };
 
 #endif // __FISH_DEFORMATION_SELECTION_MENU__
