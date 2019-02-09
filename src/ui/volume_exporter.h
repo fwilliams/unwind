@@ -49,5 +49,5 @@ public:
 
     void init(GLsizei w, GLsizei h, GLsizei d);
 
-    void draw(BoundingCage& cage, GLuint volume_texture, glm::ivec3 volume_dims);
+    void update(BoundingCage& cage, GLuint volume_texture, glm::ivec3 volume_dims);
 };

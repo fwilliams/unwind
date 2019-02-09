@@ -127,7 +127,6 @@ void VolumeExporter::init(GLsizei w, GLsizei h, GLsizei d) {
     glGenTextures(1, &render_texture);
     set_export_dims(w, h, d);
 
-    // Do we actually need this?
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
@@ -136,7 +135,7 @@ void VolumeExporter::init(GLsizei w, GLsizei h, GLsizei d) {
 
 }
 
-void VolumeExporter::draw(BoundingCage& cage, GLuint volume_texture, glm::ivec3 volume_dims) {
+void VolumeExporter::update(BoundingCage& cage, GLuint volume_texture, glm::ivec3 volume_dims) {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
     GLint old_viewport[4];

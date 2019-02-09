@@ -25,33 +25,6 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     _viewer = viewer;
     glm::ivec2 viewport_size = glm::ivec2(_viewer->core.viewport[2], _viewer->core.viewport[3]);
 
-    {
-        glGenTextures(1, &_volume_texture);
-        glBindTexture(GL_TEXTURE_3D, _volume_texture);
-
-        GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glm::ivec3 volume_dims = _state.volume_rendering.parameters.volume_dimensions;
-        double* texture_data = _state.volume_data.data();
-        std::size_t num_elements = volume_dims[0]*volume_dims[1]*volume_dims[2];
-        std::vector<std::uint8_t> volume_data(num_elements);
-        std::transform(
-            texture_data,
-            texture_data + num_elements,
-            volume_data.begin(),
-            [](double d) { return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max()); }
-        );
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volume_dims[0], volume_dims[1], volume_dims[2], 0,
-                     GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<void*>(volume_data.data()));
-        glBindTexture(GL_TEXTURE_3D, 0);
-    }
-
     volume_renderer.init(viewport_size);
 
     renderer_2d.init();
@@ -208,7 +181,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
 
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
 
-    volume_renderer.begin(volume_dims, _volume_texture);
+    volume_renderer.begin(volume_dims, _state.volume_rendering.volume_texture);
     for (int i = 0; i < sorted_cells.size(); i++) {
         auto cell = sorted_cells[i];
         Eigen::MatrixXd cV = cell->mesh_vertices();
