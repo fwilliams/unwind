@@ -30,6 +30,8 @@ enum class Application_State {
 struct State {
     static constexpr bool Debugging = false;
 
+    typedef Eigen::Matrix<unsigned int, Eigen::Dynamic, 1> VectorXui;
+
     Application_State application_state = Application_State::Initial_File_Selection;
 
     void set_application_state(Application_State new_state) {
@@ -37,17 +39,24 @@ struct State {
         glfwPostEmptyEvent();
     }
 
+    struct LoadedVolume {
+        DatFile metadata;
+        Eigen::VectorXi index_data;
+        VectorXui volume_data;
+
+        GLuint volume_texture;
+        GLuint index_texture;
+    };
+
     DatFile volume_file;
-
     int num_features = 10;
-
     GLuint index_volume = 0;
 
     contourtree::TopologicalFeatures topological_features;
 
 
     Eigen::VectorXd volume_data;
-    std::vector<unsigned int> index_volume_data;
+    VectorXui index_volume_data;
     volumerendering::Volume_Rendering volume_rendering;
 
 
