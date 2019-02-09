@@ -37,7 +37,6 @@ struct State {
         glfwPostEmptyEvent();
     }
 
-    std::string volume_base_name;
     DatFile volume_file;
 
     int num_features = 10;
@@ -67,6 +66,9 @@ struct State {
         Eigen::MatrixXi TT;
         Eigen::MatrixXi TF;
         Eigen::VectorXi connected_components;
+
+        // Geodesic distances stored at each tet vertex
+        Eigen::VectorXd geodesic_dists;
     } dilated_tet_mesh;
 
     // Selected pairs of endpoints
@@ -74,8 +76,7 @@ struct State {
 
     BoundingCage cage;
 
-    // Geodesic distances
-    Eigen::VectorXd geodesic_dists;
+
 
     std::shared_ptr<spdlog::logger> logger;
 };

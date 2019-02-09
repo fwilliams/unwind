@@ -332,8 +332,8 @@ void EndPoint_Selection_Menu::extract_skeleton() {
         Eigen::MatrixXd skeleton_vertices;
 
         const bool normalized = true;
-        geodesic_distances(TV, TT, state.endpoint_pairs, state.geodesic_dists, normalized);
-        compute_skeleton(TV, TT, state.geodesic_dists,
+        geodesic_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
+        compute_skeleton(TV, TT, state.dilated_tet_mesh.geodesic_dists,
             state.endpoint_pairs, state.dilated_tet_mesh.connected_components,
             100, skeleton_vertices);
 

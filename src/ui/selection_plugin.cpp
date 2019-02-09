@@ -61,8 +61,7 @@ void Selection_Menu::initialize() {
       _state.volume_rendering.parameters.volume_dimensions[2] / md
     };
 
-    load_rawfile(_state.volume_base_name + ".raw",
-        E3i(_state.volume_rendering.parameters.volume_dimensions), _state.volume_data, true);
+
     volumerendering::upload_volume_data(_state.volume_rendering.volume_texture,
         _state.volume_rendering.parameters.volume_dimensions,
         _state.volume_data.data(), _state.volume_data.size());
@@ -72,23 +71,9 @@ void Selection_Menu::initialize() {
     glBindTexture(GL_TEXTURE_3D, _state.index_volume);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    const int voxel = _state.volume_file.w * _state.volume_file.h * _state.volume_file.d;
-    const int num_bytes = voxel * sizeof(uint32_t);
-
-    //std::vector<char> data(num_bytes);
-
-    std::ifstream file;
-    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    file.open(_state.volume_base_name + ".part.raw", std::ifstream::binary);
-
-    _state.index_volume_data.resize(num_bytes / 4);
-    file.read(reinterpret_cast<char*>(_state.index_volume_data.data()), num_bytes);
-
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, _state.volume_file.w, _state.volume_file.h,
         _state.volume_file.d, 0, GL_RED_INTEGER, GL_UNSIGNED_INT,
         reinterpret_cast<char*>(_state.index_volume_data.data()));
