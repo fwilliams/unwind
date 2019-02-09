@@ -7,7 +7,7 @@
 #include <glm/glm.hpp>
 
 
-class Renderer2d {
+class PointLineRenderer {
 public:
     enum LineSpec {
         POINTS = GL_POINTS,

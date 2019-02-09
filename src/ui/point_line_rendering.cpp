@@ -1,4 +1,4 @@
-#include "rendering_2d.h"
+#include "point_line_rendering.h"
 
 #include <igl/opengl/create_shader_program.h>
 
@@ -36,7 +36,7 @@ void main() {
 }
 )";
 
-void Renderer2d::init() {
+void PointLineRenderer::init() {
     igl::opengl::create_shader_program(PolygonVertexShader,
                                        PolygonFragmentShader,
                                        {{ "in_position", 0}, {"in_color", 1}},
@@ -47,7 +47,7 @@ void Renderer2d::init() {
     _gl_state.uniform_location.proj = glGetUniformLocation(_gl_state.program, "proj");
 }
 
-bool Renderer2d::update_polyline_3d(int polyline_id, GLfloat* vertices, GLfloat* colors, GLsizei num_vertices, PolylineStyle style) {
+bool PointLineRenderer::update_polyline_3d(int polyline_id, GLfloat* vertices, GLfloat* colors, GLsizei num_vertices, PolylineStyle style) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "update_polyline_3d");
     if (polyline_id >= _polylines.size() || polyline_id < 0) {
         return false;
@@ -76,7 +76,7 @@ bool Renderer2d::update_polyline_3d(int polyline_id, GLfloat* vertices, GLfloat*
     glPopDebugGroup();
 }
 
-bool Renderer2d::update_polyline_3d(int polyline_id, GLfloat* vertices, glm::vec4 color, GLsizei num_vertices, PolylineStyle style) {
+bool PointLineRenderer::update_polyline_3d(int polyline_id, GLfloat* vertices, glm::vec4 color, GLsizei num_vertices, PolylineStyle style) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "update_polyline_3d");
     if (polyline_id >= _polylines.size() || polyline_id < 0) {
         return false;
@@ -106,7 +106,7 @@ bool Renderer2d::update_polyline_3d(int polyline_id, GLfloat* vertices, glm::vec
 }
 
 
-int Renderer2d::add_polyline_3d(GLfloat* vertices, GLfloat* colors, GLsizei num_vertices, PolylineStyle style) {
+int PointLineRenderer::add_polyline_3d(GLfloat* vertices, GLfloat* colors, GLsizei num_vertices, PolylineStyle style) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "add_polyline_3d");
 
     Polyline polyline;
@@ -153,7 +153,7 @@ int Renderer2d::add_polyline_3d(GLfloat* vertices, GLfloat* colors, GLsizei num_
     return polyline_id;
 }
 
-int Renderer2d::add_polyline_3d(GLfloat* vertices, glm::vec4 color, GLsizei num_vertices, PolylineStyle style) {
+int PointLineRenderer::add_polyline_3d(GLfloat* vertices, glm::vec4 color, GLsizei num_vertices, PolylineStyle style) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "add_polyline_3d");
 
     Polyline polyline;
@@ -194,7 +194,7 @@ int Renderer2d::add_polyline_3d(GLfloat* vertices, glm::vec4 color, GLsizei num_
 }
 
 
-void Renderer2d::draw(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix) {
+void PointLineRenderer::draw(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix) {
     GLfloat old_line_width, old_point_size;
     GLboolean old_line_smooth;
     glGetFloatv(GL_LINE_WIDTH, &old_line_width);
@@ -227,7 +227,7 @@ void Renderer2d::draw(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 p
 
         glDrawArrays(primitive_type, 0, polyline.num_vertices);
 
-        if (primitive_type != Renderer2d::POINTS && polyline.style.render_points) {
+        if (primitive_type != PointLineRenderer::POINTS && polyline.style.render_points) {
             glDrawArrays(GL_POINTS, 0, polyline.num_vertices);
         }
     }

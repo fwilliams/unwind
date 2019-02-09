@@ -3,7 +3,7 @@
 
 #include "state.h"
 #include "volume_rendering_2.h"
-#include "rendering_2d.h"
+#include "point_line_rendering.h"
 
 namespace igl { namespace opengl { namespace glfw { class Viewer; }}}
 
@@ -17,7 +17,7 @@ public:
     bool post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);
 
     VolumeRenderer volume_renderer;
-    Renderer2d renderer_2d;
+    PointLineRenderer renderer_2d;
 
 private:
     void update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);

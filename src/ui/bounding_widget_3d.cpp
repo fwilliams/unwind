@@ -28,9 +28,9 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     volume_renderer.set_volume_data(_state.volume_rendering.parameters.volume_dimensions, _state.volume_data.data());
 
     renderer_2d.init();
-    cage_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
-    current_kf_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
-    skeleton_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, Renderer2d::PolylineStyle());
+    cage_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, PointLineRenderer::PolylineStyle());
+    current_kf_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, PointLineRenderer::PolylineStyle());
+    skeleton_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, PointLineRenderer::PolylineStyle());
 
     // Fix the model view matrices so the camera is centered on the volume
     Eigen::MatrixXd V(8, 3);
@@ -92,8 +92,8 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
         }
     }
     glm::vec4 cage_color(0.2, 0.2, 0.8, 0.5);
-    Renderer2d::PolylineStyle cage_style;
-    cage_style.primitive = Renderer2d::LINES;
+    PointLineRenderer::PolylineStyle cage_style;
+    cage_style.primitive = PointLineRenderer::LINES;
     cage_style.render_points = true;
     cage_style.line_width = 1.0f;
     cage_style.point_size = 4.0f;
@@ -102,8 +102,8 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     MatrixXfRm kfV = current_kf->bounding_box_vertices_3d().cast<GLfloat>();
     kfV.array().rowwise() /= volume_size.array();
     glm::vec4 kf_color(0.2, 0.8, 0.2, 0.3);
-    Renderer2d::PolylineStyle kf_style;
-    kf_style.primitive = Renderer2d::LINE_LOOP;
+    PointLineRenderer::PolylineStyle kf_style;
+    kf_style.primitive = PointLineRenderer::LINE_LOOP;
     kf_style.render_points = false;
     kf_style.line_width = 1.0f;
     kf_style.point_size = 4.0f;
@@ -114,8 +114,8 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     for (const BoundingCage::KeyFrame& kf : _state.cage.keyframes) {
         skV.row(count++) = kf.centroid_3d().cast<GLfloat>().array() / volume_size.array();
     }
-    Renderer2d::PolylineStyle sk_style;
-    sk_style.primitive = Renderer2d::LINE_STRIP;
+    PointLineRenderer::PolylineStyle sk_style;
+    sk_style.primitive = PointLineRenderer::LINE_STRIP;
     sk_style.render_points = false;
     glm::vec4 sk_color(0.8, 0.2, 0.2, 0.5);
     sk_style.line_width = 1.0f;
