@@ -31,6 +31,8 @@ private:
     igl::opengl::glfw::Viewer* _viewer;
 
     glm::vec4 _last_viewport;
+
+    GLuint _volume_texture;
 };
 
 #endif // BOUNDING_WIDGET_3D_H

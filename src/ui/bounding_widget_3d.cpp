@@ -24,8 +24,35 @@ Bounding_Widget_3d::Bounding_Widget_3d(State& state) : _state(state) {}
 void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     _viewer = viewer;
     glm::ivec2 viewport_size = glm::ivec2(_viewer->core.viewport[2], _viewer->core.viewport[3]);
-    volume_renderer.init(viewport_size, true /* multipass */);
-    volume_renderer.set_volume_data(_state.volume_rendering.parameters.volume_dimensions, _state.volume_data.data());
+
+    {
+        glGenTextures(1, &_volume_texture);
+        glBindTexture(GL_TEXTURE_3D, _volume_texture);
+
+        GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glm::ivec3 volume_dims = _state.volume_rendering.parameters.volume_dimensions;
+        double* texture_data = _state.volume_data.data();
+        std::size_t num_elements = volume_dims[0]*volume_dims[1]*volume_dims[2];
+        std::vector<std::uint8_t> volume_data(num_elements);
+        std::transform(
+            texture_data,
+            texture_data + num_elements,
+            volume_data.begin(),
+            [](double d) { return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max()); }
+        );
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volume_dims[0], volume_dims[1], volume_dims[2], 0,
+                     GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<void*>(volume_data.data()));
+        glBindTexture(GL_TEXTURE_3D, 0);
+    }
+
+    volume_renderer.init(viewport_size);
 
     renderer_2d.init();
     cage_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, PointLineRenderer::PolylineStyle());
@@ -33,20 +60,22 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
     skeleton_polyline_id = renderer_2d.add_polyline_3d(nullptr, nullptr, 0, PointLineRenderer::PolylineStyle());
 
     // Fix the model view matrices so the camera is centered on the volume
-    Eigen::MatrixXd V(8, 3);
-    V << -.5f, -.5f, -.5f,
-         -.5f, -.5f,  .5f,
-         -.5f,  .5f, -.5f,
-         -.5f,  .5f,  .5f,
-          .5f, -.5f, -.5f,
-          .5f, -.5f,  .5f,
-          .5f,  .5f, -.5f,
-          .5f,  .5f,  .5f;
-    glm::ivec3 voldims = _state.volume_rendering.parameters.volume_dimensions;
-    Eigen::RowVector3d volume_dims(voldims[0], voldims[1], voldims[2]);
-    Eigen::RowVector3d normalized_volume_dims = volume_dims / volume_dims.maxCoeff();
-    for (int i = 0; i < V.rows(); i++) { V.row(i) *= normalized_volume_dims; }
-    _viewer->core.align_camera_center(V);
+    {
+        Eigen::MatrixXd V(8, 3);
+        V << -.5f, -.5f, -.5f,
+             -.5f, -.5f,  .5f,
+             -.5f,  .5f, -.5f,
+             -.5f,  .5f,  .5f,
+              .5f, -.5f, -.5f,
+              .5f, -.5f,  .5f,
+              .5f,  .5f, -.5f,
+              .5f,  .5f,  .5f;
+        glm::ivec3 voldims = _state.volume_rendering.parameters.volume_dimensions;
+        Eigen::RowVector3d volume_dims(voldims[0], voldims[1], voldims[2]);
+        Eigen::RowVector3d normalized_volume_dims = volume_dims / volume_dims.maxCoeff();
+        for (int i = 0; i < V.rows(); i++) { V.row(i) *= normalized_volume_dims; }
+        _viewer->core.align_camera_center(V);
+    }
 }
 
 void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
@@ -140,8 +169,8 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
     }
 
     // Geometry is in [0, 1]^3, rescale it to be centered and proportionally sized to the volume
-    glm::vec3 normalized_volume_dimensions =
-            glm::vec3(volume_renderer.volume_dims()) / static_cast<float>(glm::compMax(volume_renderer.volume_dims()));
+    glm::ivec3 volume_dims = _state.volume_rendering.parameters.volume_dimensions;
+    glm::vec3 normalized_volume_dimensions = glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
     glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
     glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
 
@@ -179,7 +208,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
 
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
 
-    volume_renderer.begin_multipass();
+    volume_renderer.begin(volume_dims, _volume_texture);
     for (int i = 0; i < sorted_cells.size(); i++) {
         auto cell = sorted_cells[i];
         Eigen::MatrixXd cV = cell->mesh_vertices();
@@ -187,7 +216,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
         update_volume_geometry(cV, cF);
 
         bool final = (i == sorted_cells.size()-1);
-        volume_renderer.render_multipass(model_matrix, view_matrix, proj_matrix, light_position, final);
+        volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, final);
     }
 
     renderer_2d.draw(model_matrix, view_matrix, proj_matrix);

@@ -205,71 +205,6 @@ constexpr const char* RAY_ENDPOINT_PASS_FRAGMENT_SHADER = R"(
   }
 )";
 
-constexpr const char* SLICE_VERTEX_SHADER = R"(
-#version 150
-// Create two triangles that are filling the entire screen [-1, 1]
-vec2 positions[6] = vec2[](
-    vec2(-1.0, -1.0),
-    vec2( 1.0, -1.0),
-    vec2( 1.0,  1.0),
-
-    vec2(-1.0, -1.0),
-    vec2( 1.0,  1.0),
-    vec2(-1.0,  1.0)
-);
-
-
-uniform vec3 ll;
-uniform vec3 lr;
-uniform vec3 ul;
-uniform vec3 ur;
-
-out vec3 uv;
-
-void main() {
-    vec2 p = positions[gl_VertexID];
-    gl_Position = vec4(p, 0.0, 1.0);
-
-    switch (gl_VertexID) {
-        case 0:
-        case 3:
-            uv = ll;
-            break;
-        case 1:
-            uv = lr;
-            break;
-        case 2:
-        case 4:
-            uv = ur;
-            break;
-        case 5:
-            uv = ul;
-            break;
-    }
-}
-)";
-
-constexpr const char* SLICE_FRAGMENT_SHADER = R"(
-#version 150
-in vec3 uv;
-
-out vec4 out_color;
-
-uniform sampler3D tex;
-uniform sampler1D tf;
-
-void main() {
-    // All areas outside the actual texture area should be black
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        out_color = vec4(0.0, 0.0, 0.0, 1.0);
-    }
-    else {
-        float v = texture(tex, uv).r;
-        out_color = vec4(vec3(v * 1.5), 1.0);
-    }
-}
-)";
-
 } // namespace
 
 
@@ -280,7 +215,6 @@ void VolumeRenderer::destroy() {
         _gl_state.ray_endpoints_pass.entry_texture,
         _gl_state.ray_endpoints_pass.exit_texture,
         _gl_state.volume_pass.transfer_function_texture,
-        _gl_state.volume_pass.volume_texture,
         _gl_state.multipass.texture[0],
         _gl_state.multipass.texture[1]
     };
@@ -309,20 +243,6 @@ void VolumeRenderer::destroy() {
     glDeleteProgram(_gl_state.ray_endpoints_pass.program);
     glDeleteProgram(_gl_state.volume_pass.program);
 }
-
-GLuint VolumeRenderer::set_volume_texture(GLuint volume_tex, bool delete_previous) {
-
-    GLuint old_tex = _gl_state.volume_pass.volume_texture;
-    if (delete_previous) {
-        glDeleteTextures(1, &old_tex);
-        old_tex = 0;
-    }
-
-    _gl_state.volume_pass.volume_texture = volume_tex;
-
-    return old_tex;
-}
-
 
 void VolumeRenderer::set_transfer_function(const std::vector<TfNode> &transfer_function) {
     /* The input transfer_function is a sequence of nodes on a graph as shown below.
@@ -419,7 +339,7 @@ void VolumeRenderer::set_bounding_geometry(GLfloat* vertices, GLsizei num_vertic
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void VolumeRenderer::init(const glm::ivec2 &viewport_size, bool use_multipass, const char *fragment_shader, const char *picking_shader) {
+void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_shader, const char *picking_shader) {
     constexpr GLsizei NUM_VERTICES = 8;
     constexpr GLsizei NUM_FACES = 12;
     std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
@@ -548,19 +468,6 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, bool use_multipass, c
         _gl_state.ray_endpoints_pass.exit_texture, 0);
 
 
-    // Volume texture
-    glGenTextures(1, &_gl_state.volume_pass.volume_texture);
-    glBindTexture(GL_TEXTURE_3D, _gl_state.volume_pass.volume_texture);
-
-    GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
     // Picking texture and framebuffer
 //    glGenTextures(1, &volume_rendering.picking_texture);
 //    glBindTexture(GL_TEXTURE_2D, volume_rendering.picking_texture);
@@ -594,7 +501,6 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, bool use_multipass, c
 
 
     // Generate multipass buffers if enabled
-    if (!use_multipass) { return; }
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Init VolumeRenderer Multipass");
     for (int i = 0; i < 2; i++) {
         glGenTextures(1, &_gl_state.multipass.texture[i]);
@@ -614,25 +520,7 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, bool use_multipass, c
     glPopDebugGroup();
 }
 
-void VolumeRenderer::set_volume_data(const glm::ivec3 &volume_dims, const double *texture_data) {
-    _volume_dimensions = volume_dims;
-
-    std::size_t num_elements = volume_dims[0]*volume_dims[1]*volume_dims[2];
-    std::vector<std::uint8_t> volume_data(num_elements);
-    std::transform(
-        texture_data,
-        texture_data + num_elements,
-        volume_data.begin(),
-        [](double d) { return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max()); }
-    );
-    glBindTexture(GL_TEXTURE_3D, _gl_state.volume_pass.volume_texture);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volume_dims[0], volume_dims[1], volume_dims[2], 0,
-                 GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<void*>(volume_data.data()));
-    glBindTexture(GL_TEXTURE_3D, 0);
-
-}
-
-void VolumeRenderer::render_bounding_box(const glm::mat4& model_matrix, const glm::mat4& view_matrix, const glm::mat4& proj_matrix) {
+void VolumeRenderer::ray_endpoint_pass(const glm::mat4& model_matrix, const glm::mat4& view_matrix, const glm::mat4& proj_matrix) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
     {
         const glm::vec4 color_transparent(0.0);
@@ -693,7 +581,7 @@ void VolumeRenderer::render_bounding_box(const glm::mat4& model_matrix, const gl
     glPopDebugGroup();
 }
 
-void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multipass_tex) {
+void VolumeRenderer::volume_pass(const glm::vec3& light_position, const glm::ivec3& volume_dims, GLuint volume_tex, GLuint multipass_tex) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume TEST");
 
     //
@@ -720,7 +608,7 @@ void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multi
 
     // Bind the volume texture
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_3D, _gl_state.volume_pass.volume_texture);
+    glBindTexture(GL_TEXTURE_3D, volume_tex);
     glUniform1i(_gl_state.volume_pass.uniform_location.volume_texture, 2);
 
     // Bind the transfer function texture
@@ -734,9 +622,9 @@ void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multi
     glUniform1i(_gl_state.volume_pass.uniform_location.value_init_texture, 4);
 
     // Bind rendering parameters
-    glm::vec3 volume_dims_rcp = glm::vec3(1.0) / glm::vec3(_volume_dimensions);
+    glm::vec3 volume_dims_rcp = glm::vec3(1.0) / glm::vec3(volume_dims);
 
-    GLfloat t_incr = 1.0 / glm::length(glm::vec3(_volume_dimensions));
+    GLfloat t_incr = 1.0 / glm::length(glm::vec3(volume_dims));
 //    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, _sampling_rate);
     glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, t_incr);
     glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1, glm::value_ptr(_volume_dimensions));
@@ -754,14 +642,14 @@ void VolumeRenderer::render_volume(const glm::vec3& light_position, GLuint multi
     glPopDebugGroup();
 }
 
-void VolumeRenderer::begin_multipass() {
+void VolumeRenderer::begin(const glm::ivec3& volume_dims, GLuint tex) {
     if (_gl_state.multipass.framebuffer[0] == 0) {
         assert("VolumeRenderer not initialized with multipass enabled" && false);
         exit(EXIT_FAILURE);
         return;
     }
 
-    if (_current_multipass_buf >= 0) {
+    if (_current_multipass_buf >= 0 || _current_volume_tex != 0) {
         assert("VolumeRenderer begin_multipass_called without calling render_multipass with final flag" && false);
         exit(EXIT_FAILURE);
         return;
@@ -775,14 +663,16 @@ void VolumeRenderer::begin_multipass() {
     }
 
     _current_multipass_buf = 0;
+    _current_volume_tex = tex;
+    _current_volume_dims = volume_dims;
 }
 
-void VolumeRenderer::render_multipass(
+void VolumeRenderer::render_pass(
         const glm::mat4 &model_matrix, const glm::mat4 &view_matrix,
         const glm::mat4 &proj_matrix, const glm::vec3 &light_position,
         bool final) {
 
-    if (_current_multipass_buf < 0) {
+    if (_current_multipass_buf < 0 || _current_volume_tex == 0) {
         assert("VolumeRenderer render_multipass called  without calling begin_multipass" && false);
         exit(EXIT_FAILURE);
         return;
@@ -802,18 +692,20 @@ void VolumeRenderer::render_multipass(
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &fb_tex_h);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    render_bounding_box(model_matrix, view_matrix, proj_matrix);
+    ray_endpoint_pass(model_matrix, view_matrix, proj_matrix);
 
+    GLuint volume_tex = _current_volume_tex;
     if (final) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         _current_multipass_buf = -1;
+        _current_volume_tex = 0;
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.multipass.framebuffer[current_buf]);
         glViewport(0, 0, fb_tex_w, fb_tex_h);
         _current_multipass_buf = last_buf;
     }
 
-    render_volume(light_position, _gl_state.multipass.texture[last_buf]);
+    volume_pass(light_position, _current_volume_dims, volume_tex, _gl_state.multipass.texture[last_buf]);
 
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
     glPopDebugGroup();
