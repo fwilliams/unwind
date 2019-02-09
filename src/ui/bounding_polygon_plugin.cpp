@@ -188,7 +188,7 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
     ImGui::SameLine();
     if (ImGui::Button("Export Volume")) {
-        exporter.update(state.cage, state.volume_rendering.volume_texture, G3i(state.low_res_volume.dims()));
+        exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
         state.logger->debug("EXPORT");
         exporter.write_texture_data_to_file("out_volume.raw");
         state.logger->debug("DONE");

@@ -181,7 +181,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
 
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
 
-    volume_renderer.begin(volume_dims, _state.volume_rendering.volume_texture);
+    volume_renderer.begin(volume_dims, _state.low_res_volume.volume_texture);
     for (int i = 0; i < sorted_cells.size(); i++) {
         auto cell = sorted_cells[i];
         Eigen::MatrixXd cV = cell->mesh_vertices();

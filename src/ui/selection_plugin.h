@@ -4,8 +4,8 @@
 #include "fish_ui_viewer_plugin.h"
 
 #include <glm/glm.hpp>
-
 #include <glad/glad.h>
+#include <utils/volume_rendering.h>
 
 struct State;
 
@@ -24,6 +24,8 @@ private:
     void resize_framebuffer_textures(glm::ivec2 framebuffer_size);
 
     State& _state;
+
+    volumerendering::Volume_Rendering volume_rendering;
 
     glm::vec2 clicked_mouse_position = { 0.f, 0.f };
     bool is_currently_interacting = false;

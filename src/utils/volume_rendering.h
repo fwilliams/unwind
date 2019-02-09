@@ -51,8 +51,6 @@ struct Parameters {
 };
 
 struct Volume_Rendering {
-    GLuint volume_texture = 0;
-
     Bounding_Box bounding_box;
     Transfer_Function transfer_function;
     Parameters parameters;
@@ -107,10 +105,10 @@ void update_transfer_function(Transfer_Function& transfer_function);
 void render_bounding_box(const Volume_Rendering& volume_rendering, glm::mat4 model_matrix,
     glm::mat4 view_matrix, glm::mat4 proj_matrix);
 
-void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position);
+void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position, GLuint volume_texture);
 
 glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
-    glm::ivec2 mouse_position);
+    glm::ivec2 mouse_position, GLuint volume_texture);
 
 } // namespace volumerendering
 

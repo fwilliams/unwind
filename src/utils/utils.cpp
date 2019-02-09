@@ -124,7 +124,7 @@ void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi&
   tet_mesh_faces(TT, TF, true /*flip*/);
 }
 
-bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXd& out, bool normalize) {
+bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXf& out, bool normalize) {
     const size_t num_bytes = dims[0] * dims[1] * dims[2];
 
     char* data = new char[num_bytes];

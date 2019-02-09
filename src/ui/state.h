@@ -42,7 +42,7 @@ struct State {
     struct LoadedVolume {
         DatFile metadata;
         VectorXui index_data;
-        Eigen::VectorXd volume_data;
+        Eigen::VectorXf volume_data;
 
         GLuint volume_texture;
         GLuint index_texture;
@@ -60,11 +60,9 @@ struct State {
     LoadedVolume hi_res_volume;
 
 
-    int num_features = 10;
-
+    int num_selected_features = 10;
     contourtree::TopologicalFeatures topological_features;
 
-    volumerendering::Volume_Rendering volume_rendering;
 
 
     struct Fish_Status {
@@ -72,9 +70,6 @@ struct State {
     };
     std::vector<Fish_Status> fishes;
     size_t current_fish = 0;
-
-
-    Eigen::VectorXd skeleton_masking_volume;
 
     // Output of the dilation and tetrahedralization
     struct DilatedTetMesh {

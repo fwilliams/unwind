@@ -31,7 +31,9 @@ private:
     std::atomic_bool is_meshing;
     std::atomic_bool done_meshing;
 
-    Eigen::VectorXd export_selected_volume(const std::vector<uint32_t>& feature_list);
+    Eigen::VectorXf skeleton_masking_volume;
+
+    void export_selected_volume(const std::vector<uint32_t>& feature_list);
     void tetrahedralize_surface_mesh();
     void dilate_volume();
     void extract_surface_mesh();

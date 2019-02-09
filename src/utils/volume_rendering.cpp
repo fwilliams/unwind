@@ -415,21 +415,6 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
         volume_rendering.bounding_box.exit_texture, 0);
 
-    // Volume texture
-    glGenTextures(1, &volume_rendering.volume_texture);
-    glBindTexture(GL_TEXTURE_3D, volume_rendering.volume_texture);
-    GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-    //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
 
     // Picking texture and framebuffer
     glGenTextures(1, &volume_rendering.picking_texture);
@@ -597,7 +582,7 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
     glPopDebugGroup();
 }
 
-void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position) {
+void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position, GLuint volume_texture) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
     //
     //  Setup
@@ -625,7 +610,7 @@ void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_pos
 
     // Volume texture
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_3D, volume_rendering.volume_texture);
+    glBindTexture(GL_TEXTURE_3D, volume_texture);
     glUniform1i(volume_rendering.program.uniform_location.volume_texture, 2);
 
     // Transfer function texture
@@ -662,7 +647,7 @@ void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_pos
 }
 
 glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
-                               glm::ivec2 mouse_position)
+                               glm::ivec2 mouse_position, GLuint volume_texture)
 {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
     glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.picking_framebuffer);
@@ -683,7 +668,7 @@ glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
 
     // Volume texture
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_3D, volume_rendering.volume_texture);
+    glBindTexture(GL_TEXTURE_3D, volume_texture);
     glUniform1i(volume_rendering.picking_program.uniform_location.volume_texture, 2);
 
     // Transfer function texture

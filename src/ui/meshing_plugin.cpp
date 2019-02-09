@@ -19,7 +19,7 @@
 
 namespace {
 
-void volume_to_dexels(const Eigen::VectorXd& scalars, Eigen::RowVector3i volume_size,
+void volume_to_dexels(const Eigen::VectorXf& scalars, Eigen::RowVector3i volume_size,
                       vor3d::CompressedVolume& dexels)
 {
     const int w = volume_size[0], h = volume_size[1], d = volume_size[2];
@@ -125,7 +125,7 @@ void Meshing_Menu::initialize() {
         // 0 for the non-feature, so we have to convert into the zero-based indexing here
         std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(),
             [](uint32_t v) { return v - 1; });
-        _state.skeleton_masking_volume = export_selected_volume(feature_list);
+        export_selected_volume(feature_list);
 
         dilate_volume();
         if (extracted_surface.V_fat.rows() == 0) {
@@ -196,7 +196,7 @@ bool Meshing_Menu::post_draw() {
 
 void Meshing_Menu::dilate_volume() {
     vor3d::CompressedVolume input;
-    volume_to_dexels(_state.skeleton_masking_volume, _state.low_res_volume.dims(), input);
+    volume_to_dexels(skeleton_masking_volume, _state.low_res_volume.dims(), input);
 
     vor3d::VoronoiMorphoVorPower op = vor3d::VoronoiMorphoVorPower();
     double time_1;
@@ -298,7 +298,7 @@ void Meshing_Menu::extract_surface_mesh() {
                     SV[readcount] = -1.0;
                 }
                 else {
-                    SV[readcount] = _state.skeleton_masking_volume[appendcount];
+                    SV[readcount] = skeleton_masking_volume[appendcount];
                     appendcount += 1;
                 }
                 GP.row(readcount) = Eigen::RowVector3d(xi, yi, zi);
@@ -313,19 +313,18 @@ void Meshing_Menu::extract_surface_mesh() {
 
 
     if (extracted_surface.V_thin.rows() < 4 || extracted_surface.F_thin.rows() < 4) {
-        // TODO: Raise an error
+        _state.logger->error("Extracted mesh has too few tets, aborting!");
+        exit(EXIT_FAILURE);
     }
-    //  igl::writeOBJ("fat.obj", extracted_surface.V_fat, extracted_surface.F_fat);
-    //  igl::writeOBJ("thin.obj", extracted_surface.V, extracted_surface.F);
 }
 
 
-Eigen::VectorXd Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list)
+void Meshing_Menu::export_selected_volume(const std::vector<uint32_t>& feature_list)
 {
     _state.logger->debug("Feature list size: {}", feature_list.size());
-    Eigen::VectorXd data = _state.low_res_volume.volume_data;
+    skeleton_masking_volume.resize(_state.low_res_volume.volume_data.size());
 
-    std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_features, 0.f);
+    std::vector<contourtree::Feature> features = _state.topological_features.getFeatures(_state.num_selected_features, 0.f);
 
     std::vector<uint32_t> good_arcs;
     for (uint32_t f : feature_list) {
@@ -336,15 +335,13 @@ Eigen::VectorXd Meshing_Menu::export_selected_volume(const std::vector<uint32_t>
     }
     std::sort(good_arcs.begin(), good_arcs.end());
 
-    for (int i = 0; i < data.size(); ++i) {
+    for (int i = 0; i < skeleton_masking_volume.size(); ++i) {
         unsigned int idx = _state.low_res_volume.index_data[i];
         if (std::binary_search(good_arcs.begin(), good_arcs.end(), idx)) {
-            data[i] = 1.0;
+            skeleton_masking_volume[i] = 1.0;
         }
         else {
-            data[i] = -1.0;
+            skeleton_masking_volume[i] = -1.0;
         }
     }
-
-    return data;
 }

@@ -22,59 +22,42 @@
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::initialize() {
-    volumerendering::initialize(_state.volume_rendering,
+    volumerendering::initialize(volume_rendering,
         glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]),
         ContourTreeFragmentShader, ContourTreePickingFragmentShader);
 
     _gl_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
-        _state.volume_rendering.program.program_object, "index_volume"
+        volume_rendering.program.program_object, "index_volume"
     );
     _gl_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
-        _state.volume_rendering.program.program_object, "color_by_identifier"
+        volume_rendering.program.program_object, "color_by_identifier"
     );
     _gl_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
-        _state.volume_rendering.program.program_object, "selection_emphasis_type"
+        volume_rendering.program.program_object, "selection_emphasis_type"
     );
     _gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
-        _state.volume_rendering.program.program_object, "highlight_factor"
+        volume_rendering.program.program_object, "highlight_factor"
     );
     _gl_state.uniform_locations_picking.index_volume = glGetUniformLocation(
-        _state.volume_rendering.picking_program.program_object, "index_volume"
+        volume_rendering.picking_program.program_object, "index_volume"
     );
 
     // SSBO
     glGenBuffers(1, &_gl_state.contour_information_ssbo);
     glGenBuffers(1, &_gl_state.selection_list_ssbo);
 
-    glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
-    _state.volume_rendering.parameters.volume_dimensions = volume_dims;
-    _state.volume_rendering.parameters.volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(volume_dims);
+    const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
+    volume_rendering.parameters.volume_dimensions = volume_dims;
+    volume_rendering.parameters.volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(volume_dims);
 
-    int maxDim = glm::compMax(_state.volume_rendering.parameters.volume_dimensions);
-    float md = static_cast<float>(maxDim);
+    const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
+    const float md = static_cast<float>(maxDim);
 
-    _state.volume_rendering.parameters.normalized_volume_dimensions = {
-      _state.volume_rendering.parameters.volume_dimensions[0] / md,
-      _state.volume_rendering.parameters.volume_dimensions[1] / md,
-      _state.volume_rendering.parameters.volume_dimensions[2] / md
+    volume_rendering.parameters.normalized_volume_dimensions = {
+      volume_rendering.parameters.volume_dimensions[0] / md,
+      volume_rendering.parameters.volume_dimensions[1] / md,
+      volume_rendering.parameters.volume_dimensions[2] / md
     };
-
-
-    volumerendering::upload_volume_data(_state.volume_rendering.volume_texture,
-        _state.volume_rendering.parameters.volume_dimensions,
-        _state.low_res_volume.volume_data.data(), _state.low_res_volume.volume_data.size());
-
-    // Index volume
-    glGenTextures(1, &_state.low_res_volume.index_texture);
-    glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, volume_dims[0], volume_dims[1], volume_dims[2],
-            0, GL_RED_INTEGER, GL_UNSIGNED_INT, reinterpret_cast<char*>(_state.low_res_volume.index_data.data()));
-    glBindTexture(GL_TEXTURE_3D, 0);
 
     _state.fishes.resize(1);
     _state.current_fish = 0;
@@ -82,12 +65,12 @@ void Selection_Menu::initialize() {
 
 void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
     // Entry point texture and frame buffer
-    glBindTexture(GL_TEXTURE_2D, _state.volume_rendering.bounding_box.entry_texture);
+    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.entry_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
         GL_RGBA, GL_FLOAT, nullptr);
 
     // Exit point texture and frame buffer
-    glBindTexture(GL_TEXTURE_2D, _state.volume_rendering.bounding_box.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.exit_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
         GL_RGBA, GL_FLOAT, nullptr);
 }
@@ -108,7 +91,7 @@ void Selection_Menu::draw_setup() {
         selection_list_is_dirty = true;
 
         std::vector<contourtree::Feature> features =
-            _state.topological_features.getFeatures(_state.num_features, 0.f);
+            _state.topological_features.getFeatures(_state.num_selected_features, 0.f);
 
         uint32_t size = _state.topological_features.ctdata.noArcs;
 
@@ -153,21 +136,21 @@ void Selection_Menu::draw() {
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (_state.volume_rendering.transfer_function.is_dirty) {
+    if (volume_rendering.transfer_function.is_dirty) {
         glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
-        update_transfer_function(_state.volume_rendering.transfer_function);
-        _state.volume_rendering.transfer_function.is_dirty = false;
+        update_transfer_function(volume_rendering.transfer_function);
+        volume_rendering.transfer_function.is_dirty = false;
         glPopDebugGroup();
     }
 
 
-    render_bounding_box(_state.volume_rendering, GM4f(viewer->core.model),
+    render_bounding_box(volume_rendering, GM4f(viewer->core.model),
         GM4f(viewer->core.view), GM4f(viewer->core.proj));
 
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glUseProgram(_state.volume_rendering.program.program_object);
+    glUseProgram(volume_rendering.program.program_object);
 
     // The default volume renderer already uses GL_TEXTURE0 through GL_TEXTURE3
     glActiveTexture(GL_TEXTURE4);
@@ -188,15 +171,16 @@ void Selection_Menu::draw() {
 
     glUniform1f(_gl_state.uniform_locations_rendering.highlight_factor, highlight_factor);
 
-    render_volume(_state.volume_rendering, G3f(viewer->core.light_position));
+    render_volume(volume_rendering, G3f(viewer->core.light_position), _state.low_res_volume.volume_texture);
 
-    glUseProgram(_state.volume_rendering.picking_program.program_object);
+    glUseProgram(volume_rendering.picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
     glUniform1i(_gl_state.uniform_locations_picking.index_volume, 4);
 
-    glm::vec3 picking = pick_volume_location(_state.volume_rendering,
-        { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y });
+    glm::vec3 picking = pick_volume_location(volume_rendering,
+        { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y },
+                                             _state.low_res_volume.volume_texture);
 
     glUseProgram(0);
 
@@ -271,7 +255,7 @@ bool Selection_Menu::post_draw() {
 
     ImGui::Text("Number of features:");
     ImGui::PushItemWidth(-1);
-    if (ImGui::SliderInt("Number of features", &_state.num_features, 1, 100)) {
+    if (ImGui::SliderInt("Number of features", &_state.num_selected_features, 1, 100)) {
         number_features_is_dirty = true;
     }
     ImGui::NewLine();
@@ -386,7 +370,7 @@ bool Selection_Menu::post_draw() {
 
         constexpr const float Radius = 10.f;
 
-        volumerendering::Transfer_Function& tf = _state.volume_rendering.transfer_function;
+        volumerendering::Transfer_Function& tf = volume_rendering.transfer_function;
 
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
 

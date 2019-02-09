@@ -56,6 +56,47 @@ bool Initial_File_Selection_Menu::post_draw() {
             is_loading = false;
             done_loading = false;
             _state.set_application_state(Application_State::Segmentation);
+
+            // Volume texture
+            glGenTextures(1, &_state.low_res_volume.volume_texture);
+            glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.volume_texture);
+            GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+            //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            const Eigen::RowVector3i volume_dims = _state.low_res_volume.dims();
+            float* texture_data = _state.low_res_volume.volume_data.data();
+            size_t size = _state.low_res_volume.num_voxels();
+            std::vector<uint8_t> volume_data(size);
+            std::transform(
+                texture_data,
+                texture_data + size,
+                volume_data.begin(),
+                [](float d) {
+                    return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max());
+                }
+            );
+            glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volume_dims[0], volume_dims[1], volume_dims[2], 0,
+                GL_RED, GL_UNSIGNED_BYTE, volume_data.data());
+
+            // Index volume
+            glGenTextures(1, &_state.low_res_volume.index_texture);
+            glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+            glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, volume_dims[0], volume_dims[1], volume_dims[2],
+                    0, GL_RED_INTEGER, GL_UNSIGNED_INT, reinterpret_cast<char*>(_state.low_res_volume.index_data.data()));
+            glBindTexture(GL_TEXTURE_3D, 0);
         }
     }
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
