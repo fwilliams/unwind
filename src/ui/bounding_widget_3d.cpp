@@ -122,7 +122,7 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     renderer_2d.update_polyline_3d(skeleton_polyline_id, skV.data(), sk_color, skV.rows(), sk_style);
 }
 
-bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf) {
+bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf, bool draw_straight) {
     // Back up the old viewport so we can restore it
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);

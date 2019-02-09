@@ -8,10 +8,14 @@
 #include <algorithm>
 #include <iostream>
 
+#include "bounding_cage.h"
+
+
+namespace {
 
 // Vertex shader that is used to trigger the volume rendering by rendering a static
 // screen-space filling quad.
-constexpr const char* VolumeRenderingVertexShader = R"(
+constexpr const char* VOLUME_PASS_VERTEX_SHADER = R"(
 #version 150
    // Create two triangles that are filling the entire screen [-1, 1]
    vec2 positions[6] = vec2[](
@@ -55,7 +59,7 @@ constexpr const char* VolumeRenderingVertexShader = R"(
 // 6. Perform front-to-back compositing
 // 7. Stop if either the ray is exhausted or the combined transparency is above an
 //    early-ray termination threshold (0.99 in this case)
-constexpr const char* VolumeRenderingFragmentShader = R"(
+constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
   #version 150
   in vec2 uv;
   out vec4 out_color;
@@ -175,7 +179,7 @@ constexpr const char* VolumeRenderingFragmentShader = R"(
 )";
 
 // Shader transforming the vertices from model coordinates to clip space
-constexpr const char* EntryBoxVertexShader = R"(
+constexpr const char* RAY_ENDPOINT_PASS_VERTEX_SHADER = R"(
     #version 150
     in vec3 in_position;
     out vec3 color;
@@ -191,7 +195,7 @@ constexpr const char* EntryBoxVertexShader = R"(
 )";
 
 // Using Krueger-Westermann rendering encodes the position of the vertex as its color
-constexpr const char* EntryBoxFragmentShader = R"(
+constexpr const char* RAY_ENDPOINT_PASS_FRAGMENT_SHADER = R"(
   #version 150
   in vec3 color;
   out vec4 out_color;
@@ -200,6 +204,74 @@ constexpr const char* EntryBoxFragmentShader = R"(
     out_color = vec4(color, 1.0);
   }
 )";
+
+constexpr const char* SLICE_VERTEX_SHADER = R"(
+#version 150
+// Create two triangles that are filling the entire screen [-1, 1]
+vec2 positions[6] = vec2[](
+    vec2(-1.0, -1.0),
+    vec2( 1.0, -1.0),
+    vec2( 1.0,  1.0),
+
+    vec2(-1.0, -1.0),
+    vec2( 1.0,  1.0),
+    vec2(-1.0,  1.0)
+);
+
+
+uniform vec3 ll;
+uniform vec3 lr;
+uniform vec3 ul;
+uniform vec3 ur;
+
+out vec3 uv;
+
+void main() {
+    vec2 p = positions[gl_VertexID];
+    gl_Position = vec4(p, 0.0, 1.0);
+
+    switch (gl_VertexID) {
+        case 0:
+        case 3:
+            uv = ll;
+            break;
+        case 1:
+            uv = lr;
+            break;
+        case 2:
+        case 4:
+            uv = ur;
+            break;
+        case 5:
+            uv = ul;
+            break;
+    }
+}
+)";
+
+constexpr const char* SLICE_FRAGMENT_SHADER = R"(
+#version 150
+in vec3 uv;
+
+out vec4 out_color;
+
+uniform sampler3D tex;
+uniform sampler1D tf;
+
+void main() {
+    // All areas outside the actual texture area should be black
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    else {
+        float v = texture(tex, uv).r;
+        out_color = vec4(vec3(v * 1.5), 1.0);
+    }
+}
+)";
+
+} // namespace
+
 
 
 void VolumeRenderer::destroy() {
@@ -401,8 +473,8 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, bool use_multipass, c
     glBindVertexArray(0);
 
     // Shader to render the bounding box entry and exit points
-    igl::opengl::create_shader_program(EntryBoxVertexShader,
-                                       EntryBoxFragmentShader,
+    igl::opengl::create_shader_program(RAY_ENDPOINT_PASS_VERTEX_SHADER,
+                                       RAY_ENDPOINT_PASS_FRAGMENT_SHADER,
                                        {{ "in_position", 0 }},
                                        _gl_state.ray_endpoints_pass.program);
     _gl_state.ray_endpoints_pass.uniform_location.model_matrix = glGetUniformLocation(
@@ -417,8 +489,8 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, bool use_multipass, c
 
 
     // Shader to render the actual volume
-    igl::opengl::create_shader_program(VolumeRenderingVertexShader,
-                                       VolumeRenderingFragmentShader, {},
+    igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
+                                       VOLUME_PASS_FRAGMENT_SHADER, {},
                                        _gl_state.volume_pass.program);
     _gl_state.volume_pass.uniform_location.entry_texture = glGetUniformLocation(
         _gl_state.volume_pass.program, "entry_texture");
@@ -705,7 +777,6 @@ void VolumeRenderer::begin_multipass() {
     _current_multipass_buf = 0;
 }
 
-
 void VolumeRenderer::render_multipass(
         const glm::mat4 &model_matrix, const glm::mat4 &view_matrix,
         const glm::mat4 &proj_matrix, const glm::vec3 &light_position,
@@ -747,3 +818,9 @@ void VolumeRenderer::render_multipass(
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
     glPopDebugGroup();
 }
+
+
+
+
+
+

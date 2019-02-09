@@ -5,10 +5,76 @@
 #include <igl/opengl/create_shader_program.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <fstream>
+
 
 struct TfNode {
     float t;
     glm::vec4 rgba;
+};
+
+class VolumeTexture {
+    GLuint _tex;
+    glm::ivec3 _volume_dimensions;
+
+public:
+    GLint texture() const { return _tex; }
+    const glm::ivec3& volume_dimensions() { return _volume_dimensions; }
+
+    void init() {
+        glGenTextures(1, &_tex);
+        glBindTexture(GL_TEXTURE_3D, _tex);
+
+        GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glBindTexture(GL_TEXTURE_3D, 0);
+    }
+
+    void destroy() {
+        glDeleteTextures(1, &_tex);
+    }
+
+    bool set_data(const glm::ivec3& voldims, GLenum format, GLenum internal_format, GLenum type, void* data) {
+        if (_tex == 0) {
+            return false;
+        }
+
+        _volume_dimensions = voldims;
+
+        glBindTexture(GL_TEXTURE_3D, _tex);
+        glTexImage3D(GL_TEXTURE_3D, 0, internal_format, voldims[0], voldims[1], voldims[2], 0, format, type, data);
+        glBindTexture(GL_TEXTURE_3D, 0);
+
+        return true;
+    }
+
+    bool resize(const glm::ivec3& voldims, GLenum format, GLenum internal_format, GLenum type) {
+        return set_data(voldims, format, internal_format, type, nullptr);
+    }
+
+    bool write_to_file(std::string filename, GLenum format) {
+        if (_tex == 0) {
+            return false;
+        }
+
+        std::vector<float> out_data(_volume_dimensions[0]*_volume_dimensions[1]*_volume_dimensions[2]);
+        glBindTexture(GL_TEXTURE_3D, _tex);
+        glGetTexImage(GL_TEXTURE_3D, 0, format, GL_FLOAT, (void*)out_data.data());
+        glBindTexture(GL_TEXTURE_3D, 0);
+
+        std::ofstream fout;
+        fout.open(filename, std::ios::binary);
+        fout.write(reinterpret_cast<char*>(out_data.data()), sizeof(float)*out_data.size());
+        fout.close();
+
+        return true;
+    }
 };
 
 class VolumeRenderer {
@@ -71,8 +137,6 @@ class VolumeRenderer {
         } multipass;
     } _gl_state;
 
-
-
 public:
     const GLState& gl_state() const { return _gl_state; }
     const glm::ivec3& volume_dims() const { return _volume_dimensions; }
@@ -110,5 +174,6 @@ public:
                           const glm::vec3& light_position,
                           bool final);
 };
+
 
 #endif // VOLUME_RENDERING_2_H

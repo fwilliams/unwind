@@ -29,7 +29,7 @@ constexpr const char* VertexShader = R"(
 )";
 
 // Using Krueger-Westermann rendering encodes the position of the vertex as its color
-constexpr const char* EntryBoxFragmentShader = R"(
+constexpr const char* RAY_ENDPOINT_PASS_FRAGMENT_SHADER = R"(
 #version 150
   in vec3 color;
   out vec4 out_color;
@@ -42,7 +42,7 @@ constexpr const char* EntryBoxFragmentShader = R"(
 
 // Vertex shader that is used to trigger the volume rendering by rendering a static
 // screen-space filling quad.
-constexpr const char* VolumeRenderingVertexShader = R"(
+constexpr const char* VOLUME_PASS_VERTEX_SHADER = R"(
 #version 150
      // Create two triangles that are filling the entire screen [-1, 1]
      vec2 positions[6] = vec2[](
@@ -76,7 +76,7 @@ constexpr const char* VolumeRenderingVertexShader = R"(
 // 6. Perform front-to-back compositing
 // 7. Stop if either the ray is exhausted or the combined transparency is above an
 //    early-ray termination threshold (0.99 in this case)
-constexpr const char* VolumeRenderingFragmentShader = R"(
+constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
 #version 150
   in vec2 uv;
   out vec4 out_color;
@@ -308,7 +308,7 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
 
     volume_rendering.bounding_box.program = igl::opengl::create_shader_program(
         VertexShader,
-        EntryBoxFragmentShader,
+        RAY_ENDPOINT_PASS_FRAGMENT_SHADER,
         { { "in_position", 0 } }
     );
 
@@ -321,8 +321,8 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
 
 
     // If the user specified a fragment shader, use that, otherwise, use the default one
-    igl::opengl::create_shader_program(VolumeRenderingVertexShader,
-        fragment_shader ? fragment_shader : VolumeRenderingFragmentShader, {},
+    igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
+        fragment_shader ? fragment_shader : VOLUME_PASS_FRAGMENT_SHADER, {},
         volume_rendering.program.program_object);
 
     volume_rendering.program.uniform_location.entry_texture = glGetUniformLocation(
@@ -354,7 +354,7 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
             volume_rendering.program.program_object, "light_parameters.specular_exponent"
         );
 
-    igl::opengl::create_shader_program(VolumeRenderingVertexShader,
+    igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
         picking_shader ? picking_shader : VolumeRenderingPickingFragmentShader, {},
         volume_rendering.picking_program.program_object);
 
