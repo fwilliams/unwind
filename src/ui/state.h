@@ -58,10 +58,6 @@ struct State {
     std::vector<Fish_Status> fishes;
     size_t current_fish = 0;
 
-    // Sorted list of selected features
-    std::vector<uint32_t> total_selection_list;
-    bool selection_list_is_dirty = true;
-
 
     Eigen::VectorXd skeleton_masking_volume;
 

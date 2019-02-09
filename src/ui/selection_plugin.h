@@ -68,6 +68,10 @@ private:
     } _gl_state;
 
     bool should_select = false;
+    bool selection_list_is_dirty = true;
+
+    // Sorted list of selected features
+    std::vector<uint32_t> total_selection_list;
 };
 
 #endif // __FISH_DEFORMATION_SELECTION_MENU__

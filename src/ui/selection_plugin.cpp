@@ -118,12 +118,12 @@ void Selection_Menu::draw_setup() {
     }
 
     if (number_features_is_dirty) {
-        _state.total_selection_list.clear();
+        total_selection_list.clear();
         for (State::Fish_Status& s : _state.fishes) {
             s.feature_list.clear();
         }
-        _state.total_selection_list.clear();
-        _state.selection_list_is_dirty = true;
+        total_selection_list.clear();
+        selection_list_is_dirty = true;
 
         std::vector<contourtree::Feature> features =
             _state.topological_features.getFeatures(_state.num_features, 0.f);
@@ -149,7 +149,7 @@ void Selection_Menu::draw_setup() {
         number_features_is_dirty = false;
     }
 
-    if (_state.selection_list_is_dirty) {
+    if (selection_list_is_dirty) {
         std::vector<uint32_t> selected = _state.fishes[_state.current_fish].feature_list;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
 
@@ -157,7 +157,7 @@ void Selection_Menu::draw_setup() {
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
             selected.data(), GL_DYNAMIC_READ);
 
-        _state.selection_list_is_dirty = false;
+        selection_list_is_dirty = false;
     }
 }
 
@@ -242,10 +242,10 @@ void Selection_Menu::draw() {
                 assert(std::is_sorted(indices.begin(), indices.end()));
             };
 
-            update(_state.total_selection_list);
+            update(total_selection_list);
             update(_state.fishes[_state.current_fish].feature_list);
 
-            _state.selection_list_is_dirty = true;
+            selection_list_is_dirty = true;
         }
 
         should_select = false;
@@ -305,7 +305,7 @@ bool Selection_Menu::post_draw() {
     ImGui::Text("Selected features: %s", list.c_str());
 
     if (ImGui::Button("Clear Selected Features", ImVec2(-1, 0))) {
-        _state.total_selection_list.clear();
+        total_selection_list.clear();
     }
     ImGui::NewLine();
 
@@ -328,7 +328,7 @@ bool Selection_Menu::post_draw() {
         else {
             _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
         }
-        _state.selection_list_is_dirty = true;
+        selection_list_is_dirty = true;
     }
     if (pressed_next) {
         _state.current_fish++;
@@ -337,7 +337,7 @@ bool Selection_Menu::post_draw() {
             _state.fishes.push_back({});
         }
 
-        _state.selection_list_is_dirty = true;
+        selection_list_is_dirty = true;
     }
 
     // We don't want to delete the last fish
@@ -345,7 +345,7 @@ bool Selection_Menu::post_draw() {
         _state.fishes.erase(_state.fishes.begin() + _state.current_fish);
         _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
 
-        _state.selection_list_is_dirty = true;
+        selection_list_is_dirty = true;
     }
 
     ImGui::NewLine();
