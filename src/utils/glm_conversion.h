@@ -37,6 +37,7 @@ inline bool operator!=(const Eigen::Vector4f& lhs, const glm::vec4& rhs) {
 
 #define G2f(eigen_vector) glm::vec2((eigen_vector).x(), (eigen_vector).y())
 #define G3f(eigen_vector) glm::vec3((eigen_vector).x(), (eigen_vector).y(), (eigen_vector).z())
+#define G3i(eigen_vector) glm::ivec3((eigen_vector).x(), (eigen_vector).y(), (eigen_vector).z())
 #define G4f(eigen_vector) glm::vec4((eigen_vector).x(), (eigen_vector).y(), (eigen_vector).z(), (eigen_vector).w())
 #define GM3f(eigen_matrix) glm::mat3(                                                    \
     (eigen_matrix).row(0)[0], (eigen_matrix).row(1)[0], (eigen_matrix).row(2)[0],        \

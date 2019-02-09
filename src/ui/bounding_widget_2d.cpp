@@ -534,7 +534,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         glUseProgram(plane.program);
         glBindVertexArray(empty_vao);
 
-        glm::vec3 volume_dims = glm::vec3(state.volume_rendering.parameters.volume_dimensions);
+        glm::vec3 volume_dims = G3f(state.low_res_volume.dims()); //glm::vec3(state.volume_rendering.parameters.volume_dimensions);
 
         Eigen::Vector2d offset(view.offset.x, view.offset.y);
         Eigen::Vector2d LL = Eigen::Vector2d(-1.0, -1.0) * view.zoom + offset;

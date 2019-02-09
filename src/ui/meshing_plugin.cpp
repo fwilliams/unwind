@@ -19,9 +19,10 @@
 
 namespace {
 
-void volume_to_dexels(const Eigen::VectorXd& scalars, int w, int h, int d,
+void volume_to_dexels(const Eigen::VectorXd& scalars, Eigen::RowVector3i volume_size,
                       vor3d::CompressedVolume& dexels)
 {
+    const int w = volume_size[0], h = volume_size[1], d = volume_size[2];
     dexels = vor3d::CompressedVolume(Eigen::Vector3d(0.0, 0.0, 0.0),
         Eigen::Vector3d(d, h, w), 1.0, 0);
 
@@ -195,8 +196,7 @@ bool Meshing_Menu::post_draw() {
 
 void Meshing_Menu::dilate_volume() {
     vor3d::CompressedVolume input;
-    volume_to_dexels(_state.skeleton_masking_volume, _state.volume_file.w,
-        _state.volume_file.h, _state.volume_file.d, input);
+    volume_to_dexels(_state.skeleton_masking_volume, _state.low_res_volume.dims(), input);
 
     vor3d::VoronoiMorphoVorPower op = vor3d::VoronoiMorphoVorPower();
     double time_1;
@@ -204,8 +204,7 @@ void Meshing_Menu::dilate_volume() {
     vor3d::CompressedVolume output;
     op.dilation(input, output, 3, time_1, time_2);
 
-    dexels_to_mesh(2 * _state.volume_file.w, output, extracted_surface.V_fat,
-        extracted_surface.F_fat);
+    dexels_to_mesh(2 * _state.low_res_volume.dims()[0], output, extracted_surface.V_fat, extracted_surface.F_fat);
 }
 
 
@@ -282,9 +281,8 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
 
 
 void Meshing_Menu::extract_surface_mesh() {
-    const int w = _state.volume_file.w;
-    const int h = _state.volume_file.h;
-    const int d = _state.volume_file.d;
+    const Eigen::RowVector3i volume_dims = _state.low_res_volume.dims();
+    const int w = volume_dims[0], h = volume_dims[1], d = volume_dims[2];
 
     // Grid positions and scalar values
     Eigen::MatrixXd GP((w + 2)*(h + 2)*(d + 2), 3);

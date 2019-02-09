@@ -46,20 +46,25 @@ struct State {
 
         GLuint volume_texture;
         GLuint index_texture;
+
+        const Eigen::RowVector3i dims() const {
+            return Eigen::RowVector3i(metadata.w, metadata.h, metadata.d);
+        }
+
+        const size_t num_voxels() const {
+            return metadata.w*metadata.h*metadata.d;
+        }
     };
 
     LoadedVolume low_res_volume;
     LoadedVolume hi_res_volume;
 
-    DatFile volume_file;
+
     int num_features = 10;
     GLuint index_volume = 0;
 
     contourtree::TopologicalFeatures topological_features;
 
-
-//    Eigen::VectorXd volume_data;
-//    VectorXui index_volume_data;
     volumerendering::Volume_Rendering volume_rendering;
 
 

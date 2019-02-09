@@ -82,14 +82,12 @@ bool Initial_File_Selection_Menu::post_draw() {
             std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + ui.output_prefix + "-sample";
 
             // low res version
-            _state.volume_file = DatFile(volume_output_files_prefix + ".dat");
+            _state.low_res_volume.metadata = DatFile(volume_output_files_prefix + ".dat");
             _state.topological_features.loadData(volume_output_files_prefix);
             
-            Eigen::RowVector3i volume_dims(_state.volume_file.w, _state.volume_file.h, _state.volume_file.d);
-            load_rawfile(volume_output_files_prefix+ ".raw", volume_dims, _state.low_res_volume.volume_data, true);
+            load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, true);
 
-            const int voxel = _state.volume_file.w * _state.volume_file.h * _state.volume_file.d;
-            const int num_bytes = voxel * sizeof(uint32_t);
+            const size_t num_bytes = _state.low_res_volume.num_voxels() * sizeof(uint32_t);
             std::ifstream file;
             file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
             file.open(volume_output_files_prefix + ".part.raw", std::ifstream::binary);

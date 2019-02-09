@@ -43,7 +43,7 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
               .5f, -.5f,  .5f,
               .5f,  .5f, -.5f,
               .5f,  .5f,  .5f;
-        glm::ivec3 voldims = _state.volume_rendering.parameters.volume_dimensions;
+        glm::ivec3 voldims = G3i(_state.low_res_volume.dims());
         Eigen::RowVector3d volume_dims(voldims[0], voldims[1], voldims[2]);
         Eigen::RowVector3d normalized_volume_dims = volume_dims / volume_dims.maxCoeff();
         for (int i = 0; i < V.rows(); i++) { V.row(i) *= normalized_volume_dims; }
@@ -52,7 +52,7 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
 }
 
 void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
-    Eigen::RowVector3d volume_size = E3d(_state.volume_rendering.parameters.volume_dimensions);
+    Eigen::RowVector3d volume_size = _state.low_res_volume.dims().cast<double>();
     std::size_t num_vertices = cage_V.rows();
     std::size_t num_faces = cage_F.rows();
     std::vector<glm::vec3> V(num_vertices);
@@ -72,7 +72,7 @@ void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, c
 
 void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator current_kf) {
     typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
-    const Eigen::RowVector3f volume_size = E3f(_state.volume_rendering.parameters.volume_dimensions);
+    const Eigen::RowVector3f volume_size = _state.low_res_volume.dims().cast<float>();
 
     std::vector<GLfloat> cageV;
     int num_vertices = 0;
@@ -142,7 +142,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
     }
 
     // Geometry is in [0, 1]^3, rescale it to be centered and proportionally sized to the volume
-    glm::ivec3 volume_dims = _state.volume_rendering.parameters.volume_dimensions;
+    glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
     glm::vec3 normalized_volume_dimensions = glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
     glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
     glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
@@ -158,7 +158,7 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
         sorted_cells.push_back(it);
     }
     auto comp_cells = [&](BoundingCage::CellIterator c1, BoundingCage::CellIterator c2) -> bool {
-        glm::vec4 volume_dims = glm::vec4(_state.volume_rendering.parameters.volume_dimensions, 1.0);
+        glm::vec4 volume_dims = glm::vec4(G3i(_state.low_res_volume.dims()), 1.0);
         glm::vec4 c1l = glm::vec4(G3f(c1->left_keyframe()->centroid_3d()), 1.0) / volume_dims;
         glm::vec4 c1r = glm::vec4(G3f(c1->right_keyframe()->centroid_3d()), 1.0) / volume_dims;
         glm::vec4 c2l = glm::vec4(G3f(c2->left_keyframe()->centroid_3d()), 1.0) / volume_dims;

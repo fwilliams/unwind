@@ -46,11 +46,9 @@ void Selection_Menu::initialize() {
     glGenBuffers(1, &_gl_state.contour_information_ssbo);
     glGenBuffers(1, &_gl_state.selection_list_ssbo);
 
-    _state.volume_rendering.parameters.volume_dimensions = {
-        _state.volume_file.w, _state.volume_file.h, _state.volume_file.d
-    };
-    _state.volume_rendering.parameters.volume_dimensions_rcp =
-        glm::vec3(1.f) / glm::vec3(_state.volume_rendering.parameters.volume_dimensions);
+    glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
+    _state.volume_rendering.parameters.volume_dimensions = volume_dims;
+    _state.volume_rendering.parameters.volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(volume_dims);
 
     int maxDim = glm::compMax(_state.volume_rendering.parameters.volume_dimensions);
     float md = static_cast<float>(maxDim);
@@ -74,9 +72,8 @@ void Selection_Menu::initialize() {
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, _state.volume_file.w, _state.volume_file.h,
-        _state.volume_file.d, 0, GL_RED_INTEGER, GL_UNSIGNED_INT,
-        reinterpret_cast<char*>(_state.low_res_volume.index_data.data()));
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, volume_dims[0], volume_dims[1], volume_dims[2],
+            0, GL_RED_INTEGER, GL_UNSIGNED_INT, reinterpret_cast<char*>(_state.low_res_volume.index_data.data()));
     glBindTexture(GL_TEXTURE_3D, 0);
 
     _state.fishes.resize(1);
