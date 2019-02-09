@@ -342,7 +342,7 @@ public:
         /// along the first and second rows of this system.
         ///
         const Eigen::Matrix3d orientation_rotated() const {
-            Eigen::AngleAxisd R(_angle, _orientation.row(2));
+            Eigen::AngleAxisd R(-_angle, _orientation.row(2));
             return (R *_orientation.transpose()).transpose();
         }
 
