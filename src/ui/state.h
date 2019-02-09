@@ -41,12 +41,15 @@ struct State {
 
     struct LoadedVolume {
         DatFile metadata;
-        Eigen::VectorXi index_data;
-        VectorXui volume_data;
+        VectorXui index_data;
+        Eigen::VectorXd volume_data;
 
         GLuint volume_texture;
         GLuint index_texture;
     };
+
+    LoadedVolume low_res_volume;
+    LoadedVolume hi_res_volume;
 
     DatFile volume_file;
     int num_features = 10;
@@ -55,8 +58,8 @@ struct State {
     contourtree::TopologicalFeatures topological_features;
 
 
-    Eigen::VectorXd volume_data;
-    VectorXui index_volume_data;
+//    Eigen::VectorXd volume_data;
+//    VectorXui index_volume_data;
     volumerendering::Volume_Rendering volume_rendering;
 
 

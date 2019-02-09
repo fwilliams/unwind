@@ -86,7 +86,7 @@ bool Initial_File_Selection_Menu::post_draw() {
             _state.topological_features.loadData(volume_output_files_prefix);
             
             Eigen::RowVector3i volume_dims(_state.volume_file.w, _state.volume_file.h, _state.volume_file.d);
-            load_rawfile(volume_output_files_prefix+ ".raw", volume_dims, _state.volume_data, true);
+            load_rawfile(volume_output_files_prefix+ ".raw", volume_dims, _state.low_res_volume.volume_data, true);
 
             const int voxel = _state.volume_file.w * _state.volume_file.h * _state.volume_file.d;
             const int num_bytes = voxel * sizeof(uint32_t);
@@ -94,8 +94,9 @@ bool Initial_File_Selection_Menu::post_draw() {
             file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
             file.open(volume_output_files_prefix + ".part.raw", std::ifstream::binary);
 
-            _state.index_volume_data.resize(num_bytes / 4);
-            file.read(reinterpret_cast<char*>(_state.index_volume_data.data()), num_bytes);
+            typedef decltype(_state.low_res_volume.index_data) IndexType;
+            _state.low_res_volume.index_data.resize(num_bytes / sizeof(IndexType::Scalar));
+            file.read(reinterpret_cast<char*>(_state.low_res_volume.index_data.data()), num_bytes);
 
             done_loading = true;
             glfwPostEmptyEvent();

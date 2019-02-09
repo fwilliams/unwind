@@ -64,7 +64,7 @@ void Selection_Menu::initialize() {
 
     volumerendering::upload_volume_data(_state.volume_rendering.volume_texture,
         _state.volume_rendering.parameters.volume_dimensions,
-        _state.volume_data.data(), _state.volume_data.size());
+        _state.low_res_volume.volume_data.data(), _state.low_res_volume.volume_data.size());
 
     // Index volume
     glGenTextures(1, &_state.index_volume);
@@ -76,7 +76,7 @@ void Selection_Menu::initialize() {
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, _state.volume_file.w, _state.volume_file.h,
         _state.volume_file.d, 0, GL_RED_INTEGER, GL_UNSIGNED_INT,
-        reinterpret_cast<char*>(_state.index_volume_data.data()));
+        reinterpret_cast<char*>(_state.low_res_volume.index_data.data()));
     glBindTexture(GL_TEXTURE_3D, 0);
 
     _state.fishes.resize(1);
