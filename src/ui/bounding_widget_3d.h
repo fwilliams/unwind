@@ -16,7 +16,7 @@ public:
     bool pre_draw(float current_cut_index);
     bool post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);
 
-    vr::VolumeRenderer volume_renderer;
+    VolumeRenderer volume_renderer;
     Renderer2d renderer_2d;
 
 private:

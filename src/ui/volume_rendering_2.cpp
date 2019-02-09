@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <iostream>
 
-namespace vr {
 
 // Vertex shader that is used to trigger the volume rendering by rendering a static
 // screen-space filling quad.
@@ -201,6 +200,57 @@ constexpr const char* EntryBoxFragmentShader = R"(
     out_color = vec4(color, 1.0);
   }
 )";
+
+
+void VolumeRenderer::destroy() {
+
+    std::vector<GLuint> textures = {
+        _gl_state.ray_endpoints_pass.entry_texture,
+        _gl_state.ray_endpoints_pass.exit_texture,
+        _gl_state.volume_pass.transfer_function_texture,
+        _gl_state.volume_pass.volume_texture,
+        _gl_state.multipass.texture[0],
+        _gl_state.multipass.texture[1]
+    };
+
+    std::vector<GLuint> framebuffers = {
+        _gl_state.ray_endpoints_pass.entry_framebuffer,
+        _gl_state.ray_endpoints_pass.exit_framebuffer,
+        _gl_state.multipass.framebuffer[0],
+        _gl_state.multipass.framebuffer[1],
+    };
+
+    std::vector<GLuint> buffers = {
+        _gl_state.ray_endpoints_pass.vbo,
+        _gl_state.ray_endpoints_pass.ibo
+    };
+
+    std::vector<GLuint> vertex_arrays {
+        _gl_state.ray_endpoints_pass.vao,
+        _gl_state.volume_pass.vao
+    };
+
+    glDeleteTextures(textures.size(), textures.data());
+    glDeleteFramebuffers(framebuffers.size(), framebuffers.data());
+    glDeleteBuffers(buffers.size(), buffers.data());
+    glDeleteVertexArrays(vertex_arrays.size(), vertex_arrays.data());
+    glDeleteProgram(_gl_state.ray_endpoints_pass.program);
+    glDeleteProgram(_gl_state.volume_pass.program);
+}
+
+GLuint VolumeRenderer::set_volume_texture(GLuint volume_tex, bool delete_previous) {
+
+    GLuint old_tex = _gl_state.volume_pass.volume_texture;
+    if (delete_previous) {
+        glDeleteTextures(1, &old_tex);
+        old_tex = 0;
+    }
+
+    _gl_state.volume_pass.volume_texture = volume_tex;
+
+    return old_tex;
+}
+
 
 void VolumeRenderer::set_transfer_function(const std::vector<TfNode> &transfer_function) {
     /* The input transfer_function is a sequence of nodes on a graph as shown below.
@@ -696,5 +746,4 @@ void VolumeRenderer::render_multipass(
 
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
     glPopDebugGroup();
-}
 }

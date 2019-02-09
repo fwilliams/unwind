@@ -6,8 +6,6 @@
 #include <glm/glm.hpp>
 #include <vector>
 
-namespace vr {
-
 struct TfNode {
     float t;
     glm::vec4 rgba;
@@ -86,9 +84,13 @@ public:
               const char* fragment_shader = nullptr,
               const char* picking_shader = nullptr);
 
+    void destroy();
+
     void set_volume_data(const glm::ivec3& volume_dims, const double* texture_data);
     void set_transfer_function(const std::vector<TfNode>& transfer_function);
 
+    GLuint set_volume_texture(GLuint volume_tex, bool delete_previous=false);
+    GLint volume_texture() const { return _gl_state.volume_pass.volume_texture; }
 
     void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
     // TODO: Allow setting multiple geometric objects
@@ -109,5 +111,4 @@ public:
                           bool final);
 };
 
-}
 #endif // VOLUME_RENDERING_2_H
