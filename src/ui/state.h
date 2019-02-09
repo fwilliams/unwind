@@ -43,18 +43,9 @@ struct State {
     int num_features = 10;
 
     GLuint index_volume = 0;
-    struct {
-        GLuint index_volume = 0;
-        GLuint color_by_identifier = 0;
-        GLuint selection_emphasis_type = 0;
-        GLuint highlight_factor = 0;
-    } uniform_locations_rendering;
-
-    struct {
-        GLuint index_volume = 0;
-    } uniform_locations_picking;
 
     contourtree::TopologicalFeatures topological_features;
+
 
     Eigen::VectorXd volume_data;
     std::vector<unsigned int> index_volume_data;
