@@ -83,12 +83,12 @@ struct State {
     const int Delta_Frame_Count_Until_Resize = 10;
 
     // Output of the dilation and tetrahedralization
-    struct ExtractedVolume {
+    struct DilatedTetMesh {
         Eigen::MatrixXd TV;
         Eigen::MatrixXi TT;
         Eigen::MatrixXi TF;
         Eigen::VectorXi connected_components;
-    } extracted_volume;
+    } dilated_tet_mesh;
 
     // Selected pairs of endpoints
     std::vector<std::pair<int, int>> endpoint_pairs;

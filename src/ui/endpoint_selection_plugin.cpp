@@ -112,8 +112,8 @@ void EndPoint_Selection_Menu::initialize() {
     mesh_overlay_id = 0;
     viewer->selected_data_index = mesh_overlay_id;
 
-    const Eigen::MatrixXd& TV = state.extracted_volume.TV;
-    const Eigen::MatrixXi& TF = state.extracted_volume.TF;
+    const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
+    const Eigen::MatrixXi& TF = state.dilated_tet_mesh.TF;
     viewer->data().set_mesh(TV, TF);
     viewer->core.align_camera_center(TV, TF);
 
@@ -126,7 +126,7 @@ void EndPoint_Selection_Menu::initialize() {
 
 bool EndPoint_Selection_Menu::pre_draw() {
     bool ret = FishUIViewerPlugin::pre_draw();
-    const Eigen::MatrixXd& TV = state.extracted_volume.TV;
+    const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
 
     int push_mesh_id = static_cast<int>(viewer->selected_data_index);
     viewer->selected_data_index = points_overlay_id;
@@ -287,11 +287,11 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
     if (igl::unproject_onto_mesh(Eigen::Vector2f(x, y),
             viewer->core.view * viewer->core.model,
             viewer->core.proj, viewer->core.viewport,
-            state.extracted_volume.TV, state.extracted_volume.TF, fid, bc))
+            state.dilated_tet_mesh.TV, state.dilated_tet_mesh.TF, fid, bc))
     {
         int max;
         bc.maxCoeff(&max);
-        int vid = state.extracted_volume.TF(fid, max);
+        int vid = state.dilated_tet_mesh.TF(fid, max);
         current_endpoints[current_endpoint_idx] = vid;
 
         current_endpoint_idx += 1;
@@ -305,7 +305,7 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
                 bad_selection_error_message = "Invalid Endpoints: Selected endpoints are the same.";
                 state.endpoint_pairs.pop_back();
             }
-            else if (!validate_endpoint_pairs(state.endpoint_pairs, state.extracted_volume.connected_components)) {
+            else if (!validate_endpoint_pairs(state.endpoint_pairs, state.dilated_tet_mesh.connected_components)) {
                 bad_selection = true;
                 bad_selection_error_message = "Invalid Endpoints: You can only have one endpoint pair per connected component.";
                 state.endpoint_pairs.pop_back();
@@ -326,15 +326,15 @@ void EndPoint_Selection_Menu::extract_skeleton() {
         extracting_skeleton = true;
         glfwPostEmptyEvent();
 
-        const Eigen::MatrixXd& TV = state.extracted_volume.TV;
-        const Eigen::MatrixXi& TT = state.extracted_volume.TT;
+        const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
+        const Eigen::MatrixXi& TT = state.dilated_tet_mesh.TT;
 
         Eigen::MatrixXd skeleton_vertices;
 
         const bool normalized = true;
         geodesic_distances(TV, TT, state.endpoint_pairs, state.geodesic_dists, normalized);
         compute_skeleton(TV, TT, state.geodesic_dists,
-            state.endpoint_pairs, state.extracted_volume.connected_components,
+            state.endpoint_pairs, state.dilated_tet_mesh.connected_components,
             100, skeleton_vertices);
 
         const double rad = 7.5;

@@ -132,7 +132,7 @@ void Meshing_Menu::initialize() {
             abort();
         }
         tetrahedralize_surface_mesh();
-        igl::components(_state.extracted_volume.TT, _state.extracted_volume.connected_components);
+        igl::components(_state.dilated_tet_mesh.TT, _state.dilated_tet_mesh.connected_components);
 
         is_meshing = false;
         done_meshing = true;
@@ -266,18 +266,18 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
     const bool unsafe = false;
     make_tet_mesh(mesh, sdf, optimize, intermediate, unsafe);
 
-    _state.extracted_volume.TV.resize(mesh.verts().size(), 3);
+    _state.dilated_tet_mesh.TV.resize(mesh.verts().size(), 3);
     for (int i = 0; i < mesh.verts().size(); i++) {
-        _state.extracted_volume.TV.row(i) =
+        _state.dilated_tet_mesh.TV.row(i) =
             Eigen::Vector3d(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
     }
-    _state.extracted_volume.TT.resize(mesh.tets().size(), 4);
+    _state.dilated_tet_mesh.TT.resize(mesh.tets().size(), 4);
     for (int i = 0; i < mesh.tets().size(); i++) {
-        _state.extracted_volume.TT.row(i) =
+        _state.dilated_tet_mesh.TT.row(i) =
             Eigen::Vector4i(mesh.tets()[i][0], mesh.tets()[i][2], mesh.tets()[i][1], mesh.tets()[i][3]);
     }
 
-    igl::boundary_facets(_state.extracted_volume.TT, _state.extracted_volume.TF);
+    igl::boundary_facets(_state.dilated_tet_mesh.TT, _state.dilated_tet_mesh.TF);
 }
 
 
