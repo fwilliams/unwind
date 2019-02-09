@@ -220,7 +220,7 @@ void Selection_Menu::draw() {
 
     current_selected_feature = static_cast<int>(picking.x);
 
-    if (_state.should_select) {
+    if (should_select) {
         if (current_selected_feature != 0) {
             auto update = [f = current_selected_feature](std::vector<uint32_t>& indices) {
                 assert(std::is_sorted(indices.begin(), indices.end()));
@@ -248,13 +248,13 @@ void Selection_Menu::draw() {
             _state.selection_list_is_dirty = true;
         }
 
-        _state.should_select = false;
+        should_select = false;
     }
 }
 
 void Selection_Menu::key_down(unsigned int key, int modifiers) {
     if (key == 32) { // SPACE
-        _state.should_select = true;
+        should_select = true;
     }
 }
 

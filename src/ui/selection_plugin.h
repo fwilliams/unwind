@@ -66,6 +66,8 @@ private:
         } uniform_locations_rendering;
 
     } _gl_state;
+
+    bool should_select = false;
 };
 
 #endif // __FISH_DEFORMATION_SELECTION_MENU__

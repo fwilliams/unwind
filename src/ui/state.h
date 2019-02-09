@@ -52,8 +52,6 @@ struct State {
     volumerendering::Volume_Rendering volume_rendering;
 
 
-    bool should_select = false;
-
     struct Fish_Status {
         std::vector<uint32_t> feature_list;
     };
