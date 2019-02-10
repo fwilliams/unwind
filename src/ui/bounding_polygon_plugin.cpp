@@ -316,15 +316,25 @@ bool Bounding_Polygon_Menu::post_draw() {
             depth += (kf.centroid_3d() - last_centroid).norm();
             last_centroid = kf.centroid_3d();
         }
-        depth = 2*round(depth);
+        depth = round(depth) * widget_3d.export_rescale_factor;
 
         Eigen::RowVector4d cage_bbox = state.cage.keyframe_bounding_box();
-        width = 2*std::max(round(fabs(cage_bbox[1] - cage_bbox[0])), 1.0);
-        height = 2*std::max(round(fabs(cage_bbox[3] - cage_bbox[2])), 1.0);
+        width = std::max(round(fabs(cage_bbox[1] - cage_bbox[0])), 1.0) * widget_3d.export_rescale_factor;
+        height = std::max(round(fabs(cage_bbox[3] - cage_bbox[2])), 1.0) * widget_3d.export_rescale_factor;
 
-        std::cout << "updating straight volume to size " << width << ", " << height << ", " << depth << std::endl;
+        glBindTexture(GL_TEXTURE_3D, state.low_res_volume.volume_texture);
+        GLint old_min_filter, old_mag_filter;
+        glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_min_filter);
+        glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_mag_filter);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         exporter.set_export_dims(width, height, depth);
         exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
+
+        glBindTexture(GL_TEXTURE_3D, state.low_res_volume.volume_texture);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, old_min_filter);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, old_mag_filter);
+        glBindTexture(GL_TEXTURE_3D, 0);
         cage_dirty = false;
     }
 

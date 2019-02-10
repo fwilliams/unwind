@@ -22,6 +22,7 @@ public:
     VolumeRenderer volume_renderer;
     PointLineRenderer renderer_2d;
 
+    double export_rescale_factor = 2.0;
 private:
     void update_volume_geometry(const Eigen::RowVector3d& volume_size, const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
     void update_2d_geometry_curved(BoundingCage::KeyFrameIterator current_kf);

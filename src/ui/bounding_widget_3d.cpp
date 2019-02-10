@@ -321,11 +321,10 @@ bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingC
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
     GLuint straight_tex = _parent->exporter.export_texture();
 
-    glm::vec3 volume_dims = glm::vec3(_parent->exporter.export_dims())/glm::vec3(2.0);
-    glm::vec3 normalized_straight_tex_size =
-            glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
+    glm::vec3 volume_dims = glm::vec3(_parent->exporter.export_dims()) / glm::vec3(export_rescale_factor);
+    glm::vec3 normalized_volume_dims = glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
     glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
-    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dims);
     glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
     glm::mat4 view_matrix = GM4f(_viewer->core.view);
     glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
