@@ -23,7 +23,6 @@ public:
     bool key_up(int key, int modifiers) override;
 
     bool post_draw() override;
-    bool pre_draw() override;
 
     void initialize();
     void deinitialize();
@@ -44,6 +43,8 @@ public:
     bool show_display_options = false;
 
 private:
+
+    bool is_2d_widget_in_focus();
 
     void post_draw_transfer_function();
 

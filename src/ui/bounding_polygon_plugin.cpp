@@ -62,12 +62,16 @@ void Bounding_Polygon_Menu::deinitialize() {
     viewer->core.viewport = old_viewport;
 }
 
+bool Bounding_Polygon_Menu::is_2d_widget_in_focus()  {
+    ImVec2 current_mouse = ImGui::GetMousePos();
+    glm::vec2 p(current_mouse[0], current_mouse[1]);
+    return widget_2d.is_point_in_widget(p) && !this->mouse_in_popup;
+}
+
 bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
     bool ret = FishUIViewerPlugin::mouse_move(mouse_x, mouse_y);
 
-    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
-        ret = ret || widget_2d.mouse_move(mouse_x, mouse_y);
-    }
+    ret = ret || widget_2d.mouse_move(mouse_x, mouse_y, is_2d_widget_in_focus());
     return ret;
 }
 
@@ -75,64 +79,34 @@ bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
 bool Bounding_Polygon_Menu::mouse_down(int button, int modifier) {
     bool ret = FishUIViewerPlugin::mouse_down(button, modifier);
 
-    ImVec2 current_mouse = ImGui::GetMousePos();
-    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
-    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
-        ret = ret || widget_2d.mouse_down(button, modifier);
-    }
+    ret = ret || widget_2d.mouse_down(button, modifier, is_2d_widget_in_focus());
     return ret;
 }
 
 
 bool Bounding_Polygon_Menu::mouse_up(int button, int modifier) {
     bool ret = FishUIViewerPlugin::mouse_up(button, modifier);
-
-    ImVec2 current_mouse = ImGui::GetMousePos();
-    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
-    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
-        ret = ret || widget_2d.mouse_up(button, modifier);
-    }
+    ret = ret || widget_2d.mouse_up(button, modifier, is_2d_widget_in_focus());
     return ret;
 }
 
 bool Bounding_Polygon_Menu::mouse_scroll(float delta_y) {
     bool ret = FishUIViewerPlugin::mouse_scroll(delta_y);
 
-    ImVec2 current_mouse = ImGui::GetMousePos();
-    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
-    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
-        ret = ret || widget_2d.mouse_scroll(delta_y);
-    }
+    ret = ret || widget_2d.mouse_scroll(delta_y, is_2d_widget_in_focus());
     return ret;
 }
 
 
 bool Bounding_Polygon_Menu::key_down(int button, int modifier) {
     bool ret = FishUIViewerPlugin::key_down(button, modifier);
-
-    ImVec2 current_mouse = ImGui::GetMousePos();
-    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
-    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
-        ret = ret || widget_2d.key_down(button, modifier);
-    }
+    ret = ret || widget_2d.key_down(button, modifier, is_2d_widget_in_focus());
+    return ret;
 }
 
 bool Bounding_Polygon_Menu::key_up(int button, int modifier) {
     bool ret = FishUIViewerPlugin::key_up(button, modifier);
-
-    ImVec2 current_mouse = ImGui::GetMousePos();
-    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
-    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
-        ret = ret || widget_2d.key_up(button, modifier);
-    }
-}
-
-bool Bounding_Polygon_Menu::pre_draw() {
-    bool ret = FishUIViewerPlugin::pre_draw();
-
-    int window_width, window_height;
-    glfwGetWindowSize(viewer->window, &window_width, &window_height);
-
+    ret = ret || widget_2d.key_up(button, modifier, is_2d_widget_in_focus());
     return ret;
 }
 
@@ -362,7 +336,7 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     widget_2d.position = glm::vec2(0.f, view_vsplit*window_height);
     widget_2d.size = glm::vec2(window_width*view_hsplit, (1.0-view_vsplit)*window_height);
-    ret = widget_2d.post_draw(state.cage.keyframe_for_index(current_cut_index), static_cast<int>(current_cut_index));
+    ret = widget_2d.post_draw(state.cage.keyframe_for_index(current_cut_index), is_2d_widget_in_focus());
 
     Eigen::Vector4f widget_3d_viewport(view_hsplit*window_width, view_vsplit*window_height,
                                        (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);

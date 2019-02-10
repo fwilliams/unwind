@@ -17,15 +17,15 @@ public:
 
     void initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu* parent);
 
-    bool mouse_move(int mouse_x, int mouse_y);
-    bool mouse_down(int button, int modifier);
-    bool mouse_up(int button, int modifier);
-    bool mouse_scroll(float delta_y);
+    bool mouse_move(int mouse_x, int mouse_y, bool in_focus);
+    bool mouse_down(int button, int modifier, bool in_focus);
+    bool mouse_up(int button, int modifier, bool in_focus);
+    bool mouse_scroll(float delta_y, bool in_focus);
 
-    bool key_down(int key, int modifiers);
-    bool key_up(int key, int modifiers);
+    bool key_down(int key, int modifiers, bool in_focus);
+    bool key_up(int key, int modifiers, bool in_focus);
 
-    bool post_draw(BoundingCage::KeyFrameIterator it, int current_vertex_id);
+    bool post_draw(BoundingCage::KeyFrameIterator it, bool in_focus);
 
 
     glm::vec2 position = { 0.f, 0.f }; // window coordinates in pixels lower left of window
@@ -40,15 +40,17 @@ public:
     float center_point_size = 12.f;
     float selected_center_point_size = 14.f;
 
-    glm::vec4 polygon_line_color = glm::vec4(0.85f, 0.85f, 0.f, 1.f);
-    glm::vec4 selected_point_color = glm::vec4(0.8f, 0.2f, 0.2f, 1.f);
-    glm::vec4 available_point_color = glm::vec4(0.2f, 0.8f, 0.2f, 1.f);
+    glm::vec4 rotation_handle_reference_color = glm::vec4(0.5f, 0.5f, 0.2f, 1.0f);
+    glm::vec4 rotation_handle_color = glm::vec4(0.9f, 0.9f, 0.2f, 1.0f);
+    glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
+    glm::vec4 right_axis_color = glm::vec4(0.2f, 0.7f, 0.2f, 1.0f);
+    glm::vec4 up_axis_color = glm::vec4(0.7f, 0.2f, 0.2f, 1.0f);
     glm::vec4 center_point_color = glm::vec4(0.2f, 0.2f, 0.8f, 1.f);
     glm::vec4 selected_center_point_color = glm::vec4(0.2f, 0.5f, 0.8f, 1.f);
 
     Bounding_Polygon_Menu* parent;
 
-    bool point_in_widget(const glm::ivec2& p) const;
+    bool is_point_in_widget(glm::ivec2 p) const;
 private:
     glm::vec2 convert_position_mainwindow_to_keyframe(const glm::vec2& p) const;
     glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p) const;

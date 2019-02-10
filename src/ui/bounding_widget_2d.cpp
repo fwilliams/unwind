@@ -160,7 +160,8 @@ glm::vec2 Bounding_Polygon_Widget::convert_position_keyframe_to_ndc(const glm::v
     return ret / view.zoom;
 }
 
-bool Bounding_Polygon_Widget::point_in_widget(const glm::ivec2& p) const {
+bool Bounding_Polygon_Widget::is_point_in_widget(glm::ivec2 p) const {
+
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
 
@@ -169,6 +170,39 @@ bool Bounding_Polygon_Widget::point_in_widget(const glm::ivec2& p) const {
     const glm::ivec2 ur = position + size;
     return p_tx.x >= ll.x && p_tx.x <= ur.x && p_tx.y >= ll.y && p_tx.y <= ur.y;
 }
+
+void Bounding_Polygon_Widget::update_selection() {
+    // Helper function to find the closest vertex in vertices to p
+    auto closest_vertex = [](const glm::vec2& p, const Eigen::MatrixXd& vertices) -> std::pair<int, float> {
+        float min_dist = std::numeric_limits<float>::max();
+        int index = -1;
+
+        for (int i = 0; i < vertices.rows(); ++i) {
+            float d = glm::distance(G2f(vertices.row(i)), p);
+            if (d < min_dist) {
+                index = i;
+                min_dist = d;
+            }
+        }
+
+        return std::make_pair(index, min_dist);
+    };
+
+    glm::ivec2 window_size;
+    glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
+    glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y }; // In main window pixel space
+    glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);                    // In keyframe ndc
+
+    BoundingCage::KeyFrameIterator kf = selection.current_active_keyframe;
+    std::pair<int, float> cv = closest_vertex(kf_mouse, kf->bounding_box_vertices_rotated_2d());
+
+    selection.matched_vertex = std::get<1>(cv) < view.zoom * SelectionRadius;
+    float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
+
+    selection.matched_center = dist_to_center < view.zoom * SelectionRadius;
+    selection.closest_vertex_index = std::get<0>(cv);
+}
+
 
 void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu *parent) {
     this->viewer = viewer;
@@ -233,28 +267,12 @@ void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer, Boun
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool Bounding_Polygon_Widget::key_down(int key, int modifiers) {
-    if (!mouse_state.is_rotate_modifier_down && (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)) {
-        mouse_state.is_rotate_modifier_down = true;
-        mouse_state.which_modifier = key;
-    }
-    return false;
-}
-
-bool Bounding_Polygon_Widget::key_up(int key, int modifiers) {
-    if (mouse_state.is_rotate_modifier_down && key == mouse_state.which_modifier) {
-        mouse_state.is_rotate_modifier_down = false;
-        mouse_state.which_modifier = 0;
-    }
-    return false;
-}
-
-bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
+bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y, bool in_focus) {
     glm::ivec2 window_size;
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
-    if (!point_in_widget(mouse_state.current_position) || parent->mouse_in_popup) {
+    if (!is_point_in_widget(glm::ivec2(mouse_x, mouse_y)) || !in_focus) {
         return false;
     }
 
@@ -366,7 +384,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
     return false;
 }
 
-bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
+bool Bounding_Polygon_Widget::mouse_down(int button, int modifier, bool in_focus) {
     glm::ivec2 window_size;
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
@@ -395,20 +413,20 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
         }
     }
 
-    return point_in_widget(mouse_state.current_position) || parent->mouse_in_popup;
+    return in_focus;
 }
 
-bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
+bool Bounding_Polygon_Widget::mouse_up(int button, int modifier, bool in_focus) {
     selection.current_edit_element = NoElement;
     mouse_state.is_left_button_down = false;
     mouse_state.is_right_button_down = false;
     return false;
 }
 
-bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
+bool Bounding_Polygon_Widget::mouse_scroll(float delta_y, bool in_focus) {
     mouse_state.scroll = delta_y;
 
-    if (!point_in_widget(mouse_state.current_position) || parent->mouse_in_popup) {
+    if (!in_focus) {
         return false;
     }
 
@@ -424,40 +442,23 @@ bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
     return true;
 }
 
-
-void Bounding_Polygon_Widget::update_selection() {
-    // Helper function to find the closest vertex in vertices to p
-    auto closest_vertex = [](const glm::vec2& p, const Eigen::MatrixXd& vertices) -> std::pair<int, float> {
-        float min_dist = std::numeric_limits<float>::max();
-        int index = -1;
-
-        for (int i = 0; i < vertices.rows(); ++i) {
-            float d = glm::distance(G2f(vertices.row(i)), p);
-            if (d < min_dist) {
-                index = i;
-                min_dist = d;
-            }
-        }
-
-        return std::make_pair(index, min_dist);
-    };
-
-    glm::ivec2 window_size;
-    glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
-    glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y }; // In main window pixel space
-    glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);                    // In keyframe ndc
-
-    BoundingCage::KeyFrameIterator kf = selection.current_active_keyframe;
-    std::pair<int, float> cv = closest_vertex(kf_mouse, kf->bounding_box_vertices_rotated_2d());
-
-    selection.matched_vertex = std::get<1>(cv) < view.zoom * SelectionRadius;
-    float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
-
-    selection.matched_center = dist_to_center < view.zoom * SelectionRadius;
-    selection.closest_vertex_index = std::get<0>(cv);
+bool Bounding_Polygon_Widget::key_down(int key, int modifiers, bool in_focus) {
+    if (!mouse_state.is_rotate_modifier_down && (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)) {
+        mouse_state.is_rotate_modifier_down = true;
+        mouse_state.which_modifier = key;
+    }
+    return false;
 }
 
-bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int current_vertex_id) {
+bool Bounding_Polygon_Widget::key_up(int key, int modifiers, bool in_focus) {
+    if (mouse_state.is_rotate_modifier_down && key == mouse_state.which_modifier) {
+        mouse_state.is_rotate_modifier_down = false;
+        mouse_state.which_modifier = 0;
+    }
+    return false;
+}
+
+bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool in_focus) {
 
     // Helper function to render a closed polygon in one of 3 ways:
     // 1) Just render the vertices
@@ -469,15 +470,14 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         PointsAndLines
     };
     auto draw_polygon = [&](const std::vector<glm::vec2>& pixel_space_points, glm::vec4 color,
-                            float point_size, float line_width, PolygonDrawMode mode, bool keyframe_space) {
+                            float point_size, float line_width, PolygonDrawMode mode) {
         glUseProgram(polygon.program);
         glBindVertexArray(polygon.vao);
 
         std::vector<glm::vec2> vertex_data;
 
         for (int i = 0; i < pixel_space_points.size(); i++) {
-            glm::vec2 p = keyframe_space ? convert_position_keyframe_to_ndc(pixel_space_points[i]) : pixel_space_points[i];
-            vertex_data.push_back(p);
+            vertex_data.push_back(convert_position_keyframe_to_ndc(pixel_space_points[i]));
         }
 
         std::vector<float> vertex_data_data;
@@ -586,20 +586,19 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
         glm::vec4 ctr_color = selection.matched_center ? selected_center_point_color : center_point_color;
         std::vector<glm::vec2> selected_vertices_2d;
         selected_vertices_2d.push_back(centroid_2d);
-        draw_polygon(selected_vertices_2d, ctr_color, ctr_point_size, 1.f, PolygonDrawMode::Points, true /* keyframe_space */);
+        draw_polygon(selected_vertices_2d, ctr_color, ctr_point_size, 1.f, PolygonDrawMode::Points);
 
         // Render the rotated bounding box
         Eigen::MatrixXd bbox_v = kf->bounding_box_vertices_rotated_2d();
         std::vector<glm::vec2> bbox_vertices;
         for (int i = 0; i < bbox_v.rows(); i++) { bbox_vertices.push_back(G2f(bbox_v.row(i))); }
-        glm::vec4 bbox_color = glm::vec4(0.5f, 0.5f, 0.9f, 1.f);
-        draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines, true /* keyframe_space */);
+        draw_polygon(bbox_vertices, bbox_color, 5.f, 2.f, PolygonDrawMode::PointsAndLines);
 
         // Render the up and right axes
         std::vector<glm::vec2> vertical_line =   { centroid_2d - 100000.f*u_axis, centroid_2d + 100000.f*u_axis };
         std::vector<glm::vec2> horizontal_line = { centroid_2d - 100000.f*r_axis, centroid_2d + 100000.f*r_axis };
-        draw_polygon(vertical_line, glm::vec4(0.7f, 0.2f, 0.2f, 1.0f), 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
-        draw_polygon(horizontal_line, glm::vec4(0.2f, 0.7f, 0.2f, 1.0f), 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
+        draw_polygon(vertical_line, up_axis_color, 1.f, 1.f, PolygonDrawMode::Lines);
+        draw_polygon(horizontal_line, right_axis_color, 1.f, 1.f, PolygonDrawMode::Lines);
 
         // Render rotation handle
         if (mouse_state.is_rotate_modifier_down) {
@@ -608,15 +607,14 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, int c
             glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
             glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
 
-            std::vector<glm::vec2> handle_line = { centroid_2d, kf_mouse };
-            glm::vec4 handle_color = glm::vec4(0.7f, 0.7f, 0.2f, 1.0f);
-            draw_polygon(handle_line, handle_color, 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
-
+            if (in_focus) {
+                std::vector<glm::vec2> handle_line = { centroid_2d, kf_mouse };
+                draw_polygon(handle_line, rotation_handle_color, 1.f, 1.f, PolygonDrawMode::Lines);
+            }
             if (mouse_state.is_left_button_down) {
                 glm::vec2 kf_mouse_o = convert_position_mainwindow_to_keyframe(mouse_state.down_position);
                 std::vector<glm::vec2> handle_line_o = { centroid_2d, kf_mouse_o };
-                glm::vec4 handle_color_o = glm::vec4(0.2f, 0.7f, 0.7f, 1.0f);
-                draw_polygon(handle_line_o, handle_color_o, 1.f, 1.f, PolygonDrawMode::Lines, true /* keyframe_space */);
+                draw_polygon(handle_line_o, rotation_handle_reference_color, 1.f, 1.f, PolygonDrawMode::Lines);
             }
         }
     }
