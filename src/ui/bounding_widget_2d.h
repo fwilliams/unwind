@@ -48,8 +48,8 @@ public:
 
     Bounding_Polygon_Menu* parent;
 
-private:
     bool point_in_widget(const glm::ivec2& p) const;
+private:
     glm::vec2 convert_position_mainwindow_to_keyframe(const glm::vec2& p) const;
     glm::vec2 convert_position_keyframe_to_ndc(const glm::vec2& p) const;
 

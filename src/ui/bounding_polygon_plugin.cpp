@@ -63,30 +63,68 @@ void Bounding_Polygon_Menu::deinitialize() {
 }
 
 bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
-    return widget_2d.mouse_move(mouse_x, mouse_y) || FishUIViewerPlugin::mouse_move(mouse_x, mouse_y);;
+    bool ret = FishUIViewerPlugin::mouse_move(mouse_x, mouse_y);
+
+    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
+        ret = ret || widget_2d.mouse_move(mouse_x, mouse_y);
+    }
+    return ret;
 }
 
 
 bool Bounding_Polygon_Menu::mouse_down(int button, int modifier) {
-    return widget_2d.mouse_down(button, modifier) || FishUIViewerPlugin::mouse_down(button, modifier);
+    bool ret = FishUIViewerPlugin::mouse_down(button, modifier);
+
+    ImVec2 current_mouse = ImGui::GetMousePos();
+    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
+    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
+        ret = ret || widget_2d.mouse_down(button, modifier);
+    }
+    return ret;
 }
 
 
 bool Bounding_Polygon_Menu::mouse_up(int button, int modifier) {
-    return widget_2d.mouse_up(button, modifier) || FishUIViewerPlugin::mouse_up(button, modifier);
+    bool ret = FishUIViewerPlugin::mouse_up(button, modifier);
+
+    ImVec2 current_mouse = ImGui::GetMousePos();
+    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
+    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
+        ret = ret || widget_2d.mouse_up(button, modifier);
+    }
+    return ret;
 }
 
 bool Bounding_Polygon_Menu::mouse_scroll(float delta_y) {
-    return widget_2d.mouse_scroll(delta_y) || FishUIViewerPlugin::mouse_scroll(delta_y);
+    bool ret = FishUIViewerPlugin::mouse_scroll(delta_y);
+
+    ImVec2 current_mouse = ImGui::GetMousePos();
+    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
+    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
+        ret = ret || widget_2d.mouse_scroll(delta_y);
+    }
+    return ret;
 }
 
 
 bool Bounding_Polygon_Menu::key_down(int button, int modifier) {
-    return widget_2d.key_down(button, modifier) || FishUIViewerPlugin::key_down(button, modifier);
+    bool ret = FishUIViewerPlugin::key_down(button, modifier);
+
+    ImVec2 current_mouse = ImGui::GetMousePos();
+    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
+    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
+        ret = ret || widget_2d.key_down(button, modifier);
+    }
 }
 
 bool Bounding_Polygon_Menu::key_up(int button, int modifier) {
-    return widget_2d.key_up(button, modifier) || FishUIViewerPlugin::key_up(button, modifier);
+    bool ret = FishUIViewerPlugin::key_up(button, modifier);
+
+    ImVec2 current_mouse = ImGui::GetMousePos();
+    int mouse_x = current_mouse[0], mouse_y = current_mouse[1];
+    if (widget_2d.point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !this->mouse_in_popup) {
+        ret = ret || widget_2d.key_up(button, modifier);
+    }
 }
 
 bool Bounding_Polygon_Menu::pre_draw() {

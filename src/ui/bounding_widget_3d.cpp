@@ -125,7 +125,6 @@ void Bounding_Widget_3d::update_2d_geometry_curved(BoundingCage::KeyFrameIterato
 
 void Bounding_Widget_3d::update_2d_geometry_straight(BoundingCage::KeyFrameIterator current_kf) {
     typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
-    const Eigen::RowVector3f volume_size = _state.low_res_volume.dims().cast<float>();
 
     std::vector<GLfloat> cageV;
     int num_vertices = 0;
