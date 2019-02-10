@@ -133,6 +133,18 @@ void Bounding_Widget_3d::update_2d_geometry_straight(BoundingCage::KeyFrameItera
     std::vector<double> kf_lengths;
     _state.cage.keyframe_depths(kf_lengths);
 
+    BoundingCage::KeyFrameIterator prev_kf = current_kf;
+    if (prev_kf != _state.cage.keyframes.begin()) { prev_kf--; }
+    int prev_kf_id = 0;
+    for (BoundingCage::KeyFrameIterator kf = _state.cage.keyframes.begin(); kf != _state.cage.keyframes.end(); kf++) {
+        if (kf == prev_kf) {
+            break;
+        }
+        prev_kf_id += 1;
+    }
+    double current_kf_length = kf_lengths[prev_kf_id] + (prev_kf->centroid_3d() - current_kf->centroid_3d()).norm();
+    double current_kf_length_normalized = current_kf_length / kf_lengths.back();
+
     for (int count = 0; count < _state.cage.num_cells(); count++) {
         double max_length = kf_lengths.back();
         double z_left = kf_lengths[count] / max_length, z_right = kf_lengths[count+1] / max_length;
@@ -170,7 +182,11 @@ void Bounding_Widget_3d::update_2d_geometry_straight(BoundingCage::KeyFrameItera
     renderer_2d.update_polyline_3d(cage_polyline_id, cageV.data(),cage_color, num_vertices, cage_style);
 
 
-    MatrixXfRm kfV(0, 3);
+    MatrixXfRm kfV(4, 3);
+    kfV << 0.0, 0.0, current_kf_length_normalized,
+           1.0, 0.0, current_kf_length_normalized,
+           1.0, 1.0, current_kf_length_normalized,
+           0.0, 1.0, current_kf_length_normalized;
     glm::vec4 kf_color(0.2, 0.8, 0.2, 0.3);
     PointLineRenderer::PolylineStyle kf_style;
     kf_style.primitive = PointLineRenderer::LINE_LOOP;
