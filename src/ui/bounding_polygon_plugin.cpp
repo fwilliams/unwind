@@ -63,15 +63,20 @@ void Bounding_Polygon_Menu::deinitialize() {
 }
 
 bool Bounding_Polygon_Menu::is_2d_widget_in_focus()  {
-    ImVec2 current_mouse = ImGui::GetMousePos();
-    glm::vec2 p(current_mouse[0], current_mouse[1]);
-    return widget_2d.is_point_in_widget(p) && !this->mouse_in_popup;
+    double mouse_x, mouse_y;
+    glfwGetCursorPos(viewer->window, &mouse_x, &mouse_y);
+    glm::vec2 p(mouse_x, mouse_y);
+    return widget_2d.is_point_in_widget(p) && !mouse_in_popup;
 }
 
 bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
     bool ret = FishUIViewerPlugin::mouse_move(mouse_x, mouse_y);
 
-    ret = ret || widget_2d.mouse_move(mouse_x, mouse_y, is_2d_widget_in_focus());
+    // The mouse position given by ImGui is one frame behind so the in focus event will be delayed here.
+    // Because of this we compute focus based on the latest mouse position
+    bool in_focus = widget_2d.is_point_in_widget(glm::ivec2(mouse_x, mouse_y)) && !mouse_in_popup;
+
+    ret = ret || widget_2d.mouse_move(mouse_x, mouse_y, in_focus);
     return ret;
 }
 
@@ -505,12 +510,13 @@ bool Bounding_Polygon_Menu::post_draw() {
         if (ImGui::Begin("Display Options", NULL)) {
             ImVec2 popup_pos = ImGui::GetWindowPos();
             ImVec2 popup_size = ImGui::GetWindowSize();
-            ImVec2 cursor_pos = ImGui::GetMousePos();
+            double mouse_x, mouse_y;
+            glfwGetCursorPos(viewer->window, &mouse_x, &mouse_y);
 
             post_draw_transfer_function();
 
-            bool in_window_x = (cursor_pos[0] >= popup_pos[0]) && (cursor_pos[0] <= (popup_pos[0] + popup_size[0]));
-            bool in_window_y = (cursor_pos[1] >= popup_pos[1]) && (cursor_pos[1] <= (popup_pos[1] + popup_size[1]));
+            bool in_window_x = (mouse_x >= popup_pos[0]) && (mouse_x <= (popup_pos[0] + popup_size[0]));
+            bool in_window_y = (mouse_y >= popup_pos[1]) && (mouse_y <= (popup_pos[1] + popup_size[1]));
             mouse_in_popup = (in_window_x && in_window_y);
 
             ImGui::Separator();

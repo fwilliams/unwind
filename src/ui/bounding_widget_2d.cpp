@@ -272,7 +272,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y, bool in_focus
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
-    if (!is_point_in_widget(glm::ivec2(mouse_x, mouse_y)) || !in_focus) {
+    if (!in_focus) { //!is_point_in_widget(glm::ivec2(mouse_x, mouse_y)) ||
         return false;
     }
 
