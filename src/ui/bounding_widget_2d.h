@@ -9,11 +9,13 @@
 
 namespace igl { namespace opengl { namespace glfw { class Viewer; }}}
 
+class Bounding_Polygon_Menu;
+
 class Bounding_Polygon_Widget {
 public:
     Bounding_Polygon_Widget(State& state);
 
-    void initialize(igl::opengl::glfw::Viewer* viewer);
+    void initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu* parent);
 
     bool mouse_move(int mouse_x, int mouse_y);
     bool mouse_down(int button, int modifier);
@@ -43,6 +45,8 @@ public:
     glm::vec4 available_point_color = glm::vec4(0.2f, 0.8f, 0.2f, 1.f);
     glm::vec4 center_point_color = glm::vec4(0.2f, 0.2f, 0.8f, 1.f);
     glm::vec4 selected_center_point_color = glm::vec4(0.2f, 0.5f, 0.8f, 1.f);
+
+    Bounding_Polygon_Menu* parent;
 
 private:
     bool point_in_widget(const glm::ivec2& p) const;

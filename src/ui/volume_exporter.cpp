@@ -68,7 +68,7 @@ void main() {
     }
     else {
         float v = texture(tex, uv).r;
-        out_color = vec4(vec3(v * 1.5), 1.0);
+        out_color = vec4(v);
     }
 }
 )";
@@ -141,7 +141,7 @@ void VolumeExporter::update(BoundingCage& cage, GLuint volume_texture, glm::ivec
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
 
-    glm::vec4 bounds = keyframe_bounds(cage);
+    glm::vec4 bounds = G4f(cage.keyframe_bounding_box());
     float min_u = bounds[0], max_u = bounds[1], min_v = bounds[2], max_v = bounds[3];
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Export Slice");

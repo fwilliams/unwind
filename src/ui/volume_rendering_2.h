@@ -90,7 +90,7 @@ public:
 
     void set_transfer_function(const std::vector<TfNode>& transfer_function);
 
-    void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_indices);
+    void set_bounding_geometry(GLfloat* vertices, GLsizei num_vertices, GLint* indices, GLsizei num_faces);
     // TODO: Allow setting multiple geometric objects
     //    void set_bounding_geometry(const std::vector<GLfloat*>& vertices,
     //                               const std::vector<GLsizei>& num_vertices,

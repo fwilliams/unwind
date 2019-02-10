@@ -28,6 +28,10 @@ public:
     void initialize();
     void deinitialize();
 
+    // We set this when the bounding cage changes to regenerate the straightened texture
+    bool cage_dirty = true;
+
+    VolumeExporter exporter;
 private:
 
     float view_hsplit = 0.5; // Horizontal split for the two menus (normalized distance
@@ -35,7 +39,7 @@ private:
     Bounding_Polygon_Widget widget_2d;
     Bounding_Widget_3d widget_3d;
 
-    VolumeExporter exporter;
+
 
     State& state;
 
@@ -50,6 +54,8 @@ private:
     Eigen::Vector4f viewer_viewport;
 
     float keyframe_nudge_amount = 0.1;
+
+    bool draw_straight = false;
 
     // GUI variables for setting width height and depth to export
     int exp_w = 128, exp_h = 128, exp_d = 1024;

@@ -42,10 +42,10 @@ void Bounding_Polygon_Menu::initialize() {
     viewer->selected_data_index = 0;
 
     // Initialize the 2d cross section widget
-    widget_2d.initialize(viewer);
+    widget_2d.initialize(viewer, this);
 
     // Initialize the 3d volume viewer
-    widget_3d.initialize(viewer);
+    widget_3d.initialize(viewer, this);
 
     exporter.init(128, 128, 1024);
 
@@ -94,6 +94,25 @@ bool Bounding_Polygon_Menu::pre_draw() {
 
 
 bool Bounding_Polygon_Menu::post_draw() {
+    if (cage_dirty) {
+        double depth = 0, width, height;
+        Eigen::RowVector3d last_centroid = state.cage.keyframes.begin()->centroid_3d();
+        for (const BoundingCage::KeyFrame& kf : state.cage.keyframes) {
+            depth += (kf.centroid_3d() - last_centroid).norm();
+            last_centroid = kf.centroid_3d();
+        }
+        depth = round(depth);
+
+        Eigen::RowVector4d cage_bbox = state.cage.keyframe_bounding_box();
+        width = std::max(round(fabs(cage_bbox[1] - cage_bbox[0])), 1.0);
+        height = std::max(round(fabs(cage_bbox[3] - cage_bbox[2])), 1.0);
+
+        std::cout << "updating straight volume to size " << width << ", " << height << ", " << depth << std::endl;
+        exporter.set_export_dims(width, height, depth);
+        exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
+        cage_dirty = false;
+    }
+
     bool ret = FishUIViewerPlugin::post_draw();
 
     int window_width, window_height;
@@ -107,7 +126,7 @@ bool Bounding_Polygon_Menu::post_draw() {
     Eigen::Vector4f widget_3d_viewport(view_hsplit*window_width, view_vsplit*window_height,
                                        (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
     viewer->core.viewport = widget_3d_viewport;
-    ret = widget_3d.post_draw(G4f(widget_3d_viewport), state.cage.keyframe_for_index(current_cut_index));
+    ret = widget_3d.post_draw(G4f(widget_3d_viewport), state.cage.keyframe_for_index(current_cut_index), draw_straight);
 
     ImGui::SetNextWindowBgAlpha(0.0f);
     float window_height_float = static_cast<float>(window_height);
@@ -164,12 +183,19 @@ bool Bounding_Polygon_Menu::post_draw() {
     if (ImGui::Button("Insert KF")) {
         state.cage.insert_keyframe(current_cut_index);
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("Remove KF")) {
         BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
+
         state.cage.delete_keyframe(it);
+        BoundingCage::KeyFrameIterator next = it++;
+        if (next != state.cage.keyframes.end()) {
+            current_cut_index = next->index();
+        }
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
 
     ImGui::Separator();
@@ -204,6 +230,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         }
         kf->rotate_torsion_frame(-angle_3deg);
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("+3deg")) {
@@ -212,6 +239,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         }
         kf->rotate_torsion_frame(angle_3deg);
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
 
     if (ImGui::Button("-10deg")) {
@@ -220,6 +248,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         }
         kf->rotate_torsion_frame(-angle_10deg);
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("+10deg")) {
@@ -228,13 +257,18 @@ bool Bounding_Polygon_Menu::post_draw() {
         }
         kf->rotate_torsion_frame(angle_10deg);
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
     if (ImGui::Button("Reset Rotation")) {
         if (kf->in_bounding_cage()) {
             kf->set_angle(0.0);
         }
         glfwPostEmptyEvent();
+        cage_dirty = true;
     }
+
+    ImGui::Checkbox("Show straight view", &draw_straight);
+
     ImGui::End();
     ImGui::Render();
 

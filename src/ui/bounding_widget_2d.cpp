@@ -1,5 +1,6 @@
 #include "bounding_widget_2d.h"
 #include "volume_exporter.h"
+#include "bounding_polygon_plugin.h"
 
 #include <igl/opengl/create_shader_program.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -169,8 +170,9 @@ bool Bounding_Polygon_Widget::point_in_widget(const glm::ivec2& p) const {
     return p_tx.x >= ll.x && p_tx.x <= ur.x && p_tx.y >= ll.y && p_tx.y <= ur.y;
 }
 
-void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer) {
+void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu *parent) {
     this->viewer = viewer;
+    this->parent = parent;
 
     igl::opengl::create_shader_program(PlaneVertexShader,
                                        PlaneFragmentShader, {}, plane.program);
@@ -300,6 +302,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
             state.cage.insert_keyframe(kf);
         }
         kf->set_angle(mouse_state.down_angle + theta);
+        parent->cage_dirty = true;
 
         return true;
     }
@@ -340,6 +343,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
             exit(EXIT_FAILURE);
         }
         state.cage.set_keyframe_bounding_box(bbox);
+        parent->cage_dirty = true;
     }
 
     if (mouse_state.is_left_button_down && selection.current_edit_element == CenterElement) {
@@ -357,6 +361,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
         if (!success) {
             // TODO: Handle this case if ever we decide to force the centroid to be inside the polygon
         }
+        parent->cage_dirty = true;
     }
     return false;
 }

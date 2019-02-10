@@ -15,14 +15,13 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "volume_fragment_shader.h"
-#include "picking_fragment_shader.h"
-
+#include "bounding_polygon_plugin.h"
 
 Bounding_Widget_3d::Bounding_Widget_3d(State& state) : _state(state) {}
 
-void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer) {
+void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu* parent) {
     _viewer = viewer;
+    _parent = parent;
     glm::ivec2 viewport_size = glm::ivec2(_viewer->core.viewport[2], _viewer->core.viewport[3]);
 
     volume_renderer.init(viewport_size);
@@ -151,6 +150,51 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
     glm::mat4 view_matrix = GM4f(_viewer->core.view);
     glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
     glm::vec3 light_position = G3f(_viewer->core.light_position);
+
+    if (draw_straight) {
+        glm::ivec3 straight_tex_size = _parent->exporter.export_dims();
+        glm::vec3 normalized_straight_tex_size =
+                glm::vec3(straight_tex_size) / static_cast<float>(glm::compMax(straight_tex_size));
+        glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+        glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
+        glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
+
+        glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
+        GLuint straight_tex = _parent->exporter.export_texture();
+
+        constexpr GLsizei NUM_VERTICES = 8;
+        constexpr GLsizei NUM_FACES = 12;
+        std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
+            0.f, 0.f, 0.f,
+            0.f, 0.f, 1.f,
+            0.f, 1.f, 0.f,
+            0.f, 1.f, 1.f,
+            1.f, 0.f, 0.f,
+            1.f, 0.f, 1.f,
+            1.f, 1.f, 0.f,
+            1.f, 1.f, 1.f
+        };
+        std::array<GLint, NUM_FACES*3> index_data = {
+            0, 6, 4,
+            0, 2, 6,
+            0, 3, 2,
+            0, 1, 3,
+            2, 7, 6,
+            2, 3, 7,
+            4, 6, 7,
+            4, 7, 5,
+            0, 4, 5,
+            0, 5, 1,
+            1, 5, 7,
+            1, 7, 3
+        };
+
+        volume_renderer.begin(straight_tex_size, straight_tex);
+        volume_renderer.set_bounding_geometry(vertex_data.data(), NUM_VERTICES, index_data.data(), NUM_FACES);
+        volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, true /* final */);
+        glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
+        return false;
+    }
 
     // Sort the cells of the bounding cage front to back
     std::vector<BoundingCage::CellIterator> sorted_cells;
