@@ -102,14 +102,14 @@ constexpr const char* ContourTreeFragmentShader = R"(
 
   vec3 centralDifferenceGradient(vec3 pos) {
     vec3 f;
-    f.x = texture(volume_texture, pos + vec3(volume_dimensions_rcp.x, 0.0, 0.0)).a;
-    f.y = texture(volume_texture, pos + vec3(0.0, volume_dimensions_rcp.y, 0.0)).a;
-    f.z = texture(volume_texture, pos + vec3(0.0, 0.0, volume_dimensions_rcp.z)).a;
+    f.x = texture(volume_texture, pos + vec3(volume_dimensions_rcp.x, 0.0, 0.0)).r;
+    f.y = texture(volume_texture, pos + vec3(0.0, volume_dimensions_rcp.y, 0.0)).r;
+    f.z = texture(volume_texture, pos + vec3(0.0, 0.0, volume_dimensions_rcp.z)).r;
 
     vec3 b;
-    b.x = texture(volume_texture, pos - vec3(volume_dimensions_rcp.x, 0.0, 0.0)).a;
-    b.y = texture(volume_texture, pos - vec3(0.0, volume_dimensions_rcp.y, 0.0)).a;
-    b.z = texture(volume_texture, pos - vec3(0.0, 0.0, volume_dimensions_rcp.z)).a;
+    b.x = texture(volume_texture, pos - vec3(volume_dimensions_rcp.x, 0.0, 0.0)).r;
+    b.y = texture(volume_texture, pos - vec3(0.0, volume_dimensions_rcp.y, 0.0)).r;
+    b.z = texture(volume_texture, pos - vec3(0.0, 0.0, volume_dimensions_rcp.z)).r;
 
     return (f - b) / 2.0;
   }
@@ -181,11 +181,7 @@ constexpr const char* ContourTreeFragmentShader = R"(
     vec3 ray_direction = exit - entry;
 
     float t_end = length(ray_direction);
-    float t_incr = min(
-      t_end,
-      t_end / (sampling_rate * length(ray_direction * volume_dimensions))
-    );
-    t_incr = 0.01;
+    float t_incr = sampling_rate;
 
     vec3 normalized_ray_direction = normalize(ray_direction);
 
@@ -203,18 +199,17 @@ constexpr const char* ContourTreeFragmentShader = R"(
             const float normFeature = float(feature) / float(contour.nFeatures);
             color.rgb = colormap(normFeature).rgb;
             color.a = selection_factor(is_feature_selected(feature));
-        }
-        else {
+        } else {
           color = texture(transfer_function, value);
           color.a *= selection_factor(is_feature_selected(feature));
         }
         if (color.a > 0) {
           // Gradient
           vec3 gradient = centralDifferenceGradient(sample_pos);
-
+          vec3 normal = gradient / max(length(gradient), 0.001);
           // Lighting
-          //color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
-                                  //sample_pos, gradient, -normalized_ray_direction);
+          color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
+                                  sample_pos, normal, -normalized_ray_direction);
 
           // Front-to-back Compositing
           color.a = 1.0 - pow(1.0 - color.a, t_incr * REF_SAMPLING_INTERVAL);

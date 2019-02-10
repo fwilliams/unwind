@@ -48,6 +48,11 @@ struct Parameters {
     glm::vec3 normalized_volume_dimensions = { 0.f, 0.f, 0.f };
 
     GLfloat sampling_rate = 10.0;
+
+    glm::vec3 ambient = glm::vec3(0.5, 0.5, 0.5);
+    glm::vec3 diffuse = glm::vec3(0.8, 0.8, 0.8);
+    glm::vec3 specular = glm::vec3(0.0, 0.0, 0.0);
+    float specular_exponent = 10.0;
 };
 
 struct Volume_Rendering {

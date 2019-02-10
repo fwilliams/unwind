@@ -47,7 +47,7 @@ private:
     };
     Emphasis emphasize_by_selection = Emphasis::OnSelection;
 
-    float highlight_factor = 0.05f;
+    float highlight_factor = 0.125f;
 
     bool show_error_popup = false;
     std::string error_title;

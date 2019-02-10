@@ -151,11 +151,13 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
     vec3 ray_direction = exit - entry;
 
     float t_end = length(ray_direction);
-    float t_incr = min(
+    float t_incr = sampling_rate;
+    /*
+    min(
       t_end,
       t_end / (sampling_rate * length(ray_direction * volume_dimensions))
     );
-    t_incr = 0.01;
+    */
 
     vec3 normalized_ray_direction = normalize(ray_direction);
 
@@ -624,8 +626,7 @@ void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_pos
     glBindTexture(GL_TEXTURE_1D, volume_rendering.transfer_function.texture);
     glUniform1i(volume_rendering.program.uniform_location.transfer_function, 3);
 
-    glUniform1f(volume_rendering.program.uniform_location.sampling_rate,
-        volume_rendering.parameters.sampling_rate);
+    glUniform1f(volume_rendering.program.uniform_location.sampling_rate, volume_rendering.parameters.sampling_rate);
 
 
     // Rendering parameters
@@ -635,18 +636,26 @@ void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_pos
         glm::value_ptr(volume_rendering.parameters.volume_dimensions_rcp));
     glUniform3fv(volume_rendering.program.uniform_location.light_position, 1,
         glm::value_ptr(light_position));
-    glUniform3f(
-        volume_rendering.program.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f
-    );
-    glUniform3f(
-        volume_rendering.program.uniform_location.light_color_diffuse, 0.8f, 0.8f, 0.8f
-    );
-    glUniform3f(
-        volume_rendering.program.uniform_location.light_color_specular, 1.f, 1.f, 1.f
-    );
-    glUniform1f(
-        volume_rendering.program.uniform_location.light_exponent_specular, 10.f
-    );
+    glUniform3fv(volume_rendering.program.uniform_location.light_color_ambient, 1,
+                 glm::value_ptr(volume_rendering.parameters.ambient));
+    glUniform3fv(volume_rendering.program.uniform_location.light_color_diffuse, 1,
+                 glm::value_ptr(volume_rendering.parameters.diffuse));
+    glUniform3fv(volume_rendering.program.uniform_location.light_color_specular, 1,
+                 glm::value_ptr(volume_rendering.parameters.specular));
+    glUniform1f(volume_rendering.program.uniform_location.light_exponent_specular,
+                volume_rendering.parameters.specular_exponent);
+//    glUniform3f(
+//        volume_rendering.program.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f
+//    );
+//    glUniform3f(
+//        volume_rendering.program.uniform_location.light_color_diffuse, 0.8f, 0.8f, 0.8f
+//    );
+//    glUniform3f(
+//        volume_rendering.program.uniform_location.light_color_specular, 0.8f, 0.8f, 0.8f
+//    );
+//    glUniform1f(
+//        volume_rendering.program.uniform_location.light_exponent_specular, 100.f
+//    );
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glPopDebugGroup();

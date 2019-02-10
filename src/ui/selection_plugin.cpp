@@ -99,6 +99,8 @@ void Selection_Menu::initialize() {
         1, 7, 3;
 
     viewer->core.align_camera_center(volume_bbox_v, volume_bbox_i);
+
+    volume_rendering.parameters.sampling_rate = 1.0 / glm::length(glm::vec3(volume_rendering.parameters.volume_dimensions));
 }
 
 void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
