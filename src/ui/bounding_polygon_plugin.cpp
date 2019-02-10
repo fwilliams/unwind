@@ -478,19 +478,40 @@ bool Bounding_Polygon_Menu::post_draw() {
     ImGui::Checkbox("Show straight view", &draw_straight);
 
 
-    ImGui::SetNextWindowSize(ImVec2(480, 720), ImGuiSetCond_FirstUseEver);
-    ImGui::Begin("Display Options", NULL);
-    ImVec2 popup_pos = ImGui::GetWindowPos();
-    ImVec2 popup_size = ImGui::GetWindowSize();
-    ImVec2 cursor_pos = ImGui::GetMousePos();
+    if (show_display_options) {
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+        ImGui::Button("Display Options");
+        ImGui::PopItemFlag();
+        ImGui::PopStyleVar();
+    } else if (ImGui::Button("Display Options")) {
+        show_display_options = true;
+    }
 
-    post_draw_transfer_function();
+    if (show_display_options) {
+        ImGui::SetNextWindowSize(ImVec2(480, 720), ImGuiSetCond_FirstUseEver);
+        if (ImGui::Begin("Display Options", NULL)) {
+            ImVec2 popup_pos = ImGui::GetWindowPos();
+            ImVec2 popup_size = ImGui::GetWindowSize();
+            ImVec2 cursor_pos = ImGui::GetMousePos();
 
-    bool in_window_x = (cursor_pos[0] >= popup_pos[0]) && (cursor_pos[0] <= (popup_pos[0] + popup_size[0]));
-    bool in_window_y = (cursor_pos[1] >= popup_pos[1]) && (cursor_pos[1] <= (popup_pos[1] + popup_size[1]));
-    mouse_in_popup = (in_window_x && in_window_y);
+            post_draw_transfer_function();
 
-    ImGui::End();
+            bool in_window_x = (cursor_pos[0] >= popup_pos[0]) && (cursor_pos[0] <= (popup_pos[0] + popup_size[0]));
+            bool in_window_y = (cursor_pos[1] >= popup_pos[1]) && (cursor_pos[1] <= (popup_pos[1] + popup_size[1]));
+            mouse_in_popup = (in_window_x && in_window_y);
+
+            ImGui::Separator();
+            if (ImGui::Button("Close")) {
+                show_display_options = false;
+            }
+        } else {
+            mouse_in_popup = false;
+        }
+        ImGui::End();
+    } else {
+        mouse_in_popup = false;
+    }
 
     ImGui::End();
     ImGui::Render();

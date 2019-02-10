@@ -41,6 +41,7 @@ public:
     int current_interaction_index = -1;
 
     bool mouse_in_popup = false;
+    bool show_display_options = false;
 
 private:
 
