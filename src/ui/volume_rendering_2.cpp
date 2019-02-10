@@ -91,14 +91,14 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
 
   vec3 centralDifferenceGradient(vec3 pos) {
     vec3 f;
-    f.x = texture(volume_texture, pos + vec3(volume_dimensions_rcp.x, 0.0, 0.0)).a;
-    f.y = texture(volume_texture, pos + vec3(0.0, volume_dimensions_rcp.y, 0.0)).a;
-    f.z = texture(volume_texture, pos + vec3(0.0, 0.0, volume_dimensions_rcp.z)).a;
+    f.x = texture(volume_texture, pos + vec3(volume_dimensions_rcp.x, 0.0, 0.0)).r;
+    f.y = texture(volume_texture, pos + vec3(0.0, volume_dimensions_rcp.y, 0.0)).r;
+    f.z = texture(volume_texture, pos + vec3(0.0, 0.0, volume_dimensions_rcp.z)).r;
 
     vec3 b;
-    b.x = texture(volume_texture, pos - vec3(volume_dimensions_rcp.x, 0.0, 0.0)).a;
-    b.y = texture(volume_texture, pos - vec3(0.0, volume_dimensions_rcp.y, 0.0)).a;
-    b.z = texture(volume_texture, pos - vec3(0.0, 0.0, volume_dimensions_rcp.z)).a;
+    b.x = texture(volume_texture, pos - vec3(volume_dimensions_rcp.x, 0.0, 0.0)).r;
+    b.y = texture(volume_texture, pos - vec3(0.0, volume_dimensions_rcp.y, 0.0)).r;
+    b.z = texture(volume_texture, pos - vec3(0.0, 0.0, volume_dimensions_rcp.z)).r;
 
     return (f - b) / 2.0;
   }
@@ -155,9 +155,10 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
       if (color.a > 0) {
         // Gradient
         vec3 gradient = centralDifferenceGradient(sample_pos);
+        gradient = gradient / max(length(gradient), 0.0001);
 
         // Lighting
-        //color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
+        //color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(value),
         //                        sample_pos, gradient, -normalized_ray_direction);
 
         // Front-to-back Compositing
@@ -194,7 +195,7 @@ constexpr const char* RAY_ENDPOINT_PASS_VERTEX_SHADER = R"(
   }
 )";
 
-// Using Krueger-Westermann rendering encodes the position of the vertex as its color
+// Encode the position of the vertex as its color
 constexpr const char* RAY_ENDPOINT_PASS_FRAGMENT_SHADER = R"(
   #version 150
   in vec3 color;
@@ -631,10 +632,10 @@ void VolumeRenderer::volume_pass(const glm::vec3& light_position, const glm::ive
     glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1, glm::value_ptr(_volume_dimensions));
     glUniform3fv(_gl_state.volume_pass.uniform_location.volume_dimensions_rcp, 1, glm::value_ptr(volume_dims_rcp));
     glUniform3fv(_gl_state.volume_pass.uniform_location.light_position, 1, glm::value_ptr(light_position));
-    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_ambient, 0.5f, 0.5f, 0.5f);
+    glUniform3f(_gl_state.volume_pass.uniform_location.light_color_ambient, 0.8f, 0.8f, 0.8f);
     glUniform3f(_gl_state.volume_pass.uniform_location.light_color_diffuse, 0.8f, 0.8f, 0.8f);
     glUniform3f(_gl_state.volume_pass.uniform_location.light_color_specular, 1.f, 1.f, 1.f);
-    glUniform1f(_gl_state.volume_pass.uniform_location.light_exponent_specular, 10.f);
+    glUniform1f(_gl_state.volume_pass.uniform_location.light_exponent_specular, 20.f);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
 

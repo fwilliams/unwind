@@ -32,7 +32,19 @@ public:
     bool cage_dirty = true;
 
     VolumeExporter exporter;
+
+    std::vector<TfNode> transfer_function;
+    bool transfer_function_dirty = true;
+    bool is_currently_interacting = false;
+    bool has_added_node_since_initial_click = false;
+    glm::vec2 clicked_mouse_position = { 0.f, 0.f };
+    int current_interaction_index = -1;
+
+    bool mouse_in_popup = false;
+
 private:
+
+    void post_draw_transfer_function();
 
     float view_hsplit = 0.5; // Horizontal split for the two menus (normalized distance
     float view_vsplit = 0.2; // Vertical split for the bottom menu (normalized distance from the bottom)

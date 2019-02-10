@@ -574,6 +574,18 @@ public:
         return _num_keyframes - 1;
     }
 
+    const void keyframe_depths(std::vector<double>& out_depths) {
+        out_depths.reserve(num_keyframes());
+        out_depths.clear();
+        Eigen::RowVector3d last_centroid = keyframes.begin()->centroid_3d();
+        double total_dist = 0.0;
+        for (const BoundingCage::KeyFrame& kf : keyframes) {
+            total_dist += (kf.centroid_3d() - last_centroid).norm();
+            last_centroid = kf.centroid_3d();
+            out_depths.push_back(total_dist);
+        }
+    }
+
     /// Set the skeleton vertices to whatever the user provides.
     /// There must be at least two vertices, if not the method returns false.
     /// Upon setting the vertices, The

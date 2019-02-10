@@ -24,7 +24,8 @@ public:
 
 private:
     void update_volume_geometry(const Eigen::RowVector3d& volume_size, const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
-    void update_2d_geometry(BoundingCage::KeyFrameIterator current_kf);
+    void update_2d_geometry_curved(BoundingCage::KeyFrameIterator current_kf);
+    void update_2d_geometry_straight(BoundingCage::KeyFrameIterator current_kf);
 
     int cage_polyline_id;
     int current_kf_polyline_id;

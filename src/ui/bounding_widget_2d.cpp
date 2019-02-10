@@ -254,7 +254,7 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y) {
     glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
 
     mouse_state.current_position = glm::ivec2(mouse_x, mouse_y);
-    if (!point_in_widget(mouse_state.current_position)) {
+    if (!point_in_widget(mouse_state.current_position) || parent->mouse_in_popup) {
         return false;
     }
 
@@ -395,7 +395,7 @@ bool Bounding_Polygon_Widget::mouse_down(int button, int modifier) {
         }
     }
 
-    return point_in_widget(mouse_state.current_position);
+    return point_in_widget(mouse_state.current_position) || parent->mouse_in_popup;
 }
 
 bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
@@ -408,7 +408,7 @@ bool Bounding_Polygon_Widget::mouse_up(int button, int modifier) {
 bool Bounding_Polygon_Widget::mouse_scroll(float delta_y) {
     mouse_state.scroll = delta_y;
 
-    if (!point_in_widget(mouse_state.current_position)) {
+    if (!point_in_widget(mouse_state.current_position) || parent->mouse_in_popup) {
         return false;
     }
 

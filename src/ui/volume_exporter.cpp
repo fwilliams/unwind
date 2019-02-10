@@ -63,13 +63,15 @@ uniform sampler1D tf;
 
 void main() {
     // All areas outside the actual texture area should be black
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        out_color = vec4(0.0, 0.0, 0.0, 1.0);
-    }
-    else {
-        float v = texture(tex, uv).r;
-        out_color = vec4(v);
-    }
+    // if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    //     out_color = vec4(0.0);
+    // }
+    // else {
+    //     float v = texture(tex, uv).r;
+    //     out_color = vec4(v);
+    // }
+
+    out_color = texture(tex, uv).rrrr;
 }
 )";
 
@@ -107,7 +109,7 @@ void VolumeExporter::set_export_dims(GLsizei w, GLsizei h, GLsizei d) {
     this->h = h;
     this->d = d;
     glBindTexture(GL_TEXTURE_3D, render_texture);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, w, h, d, 0, GL_RED, GL_FLOAT, 0);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA, w, h, d, 0, GL_RGBA, GL_FLOAT, 0);
     glBindTexture(GL_TEXTURE_3D, 0);
 }
 

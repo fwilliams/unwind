@@ -69,7 +69,7 @@ void Bounding_Widget_3d::update_volume_geometry(const Eigen::RowVector3d& volume
     volume_renderer.set_bounding_geometry((GLfloat*)V.data(), num_vertices, (GLint*)F.data(), num_faces);
 }
 
-void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator current_kf) {
+void Bounding_Widget_3d::update_2d_geometry_curved(BoundingCage::KeyFrameIterator current_kf) {
     typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
     const Eigen::RowVector3f volume_size = _state.low_res_volume.dims().cast<float>();
 
@@ -123,10 +123,84 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     renderer_2d.update_polyline_3d(skeleton_polyline_id, skV.data(), sk_color, skV.rows(), sk_style);
 }
 
+void Bounding_Widget_3d::update_2d_geometry_straight(BoundingCage::KeyFrameIterator current_kf) {
+    typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
+    const Eigen::RowVector3f volume_size = _state.low_res_volume.dims().cast<float>();
+
+    std::vector<GLfloat> cageV;
+    int num_vertices = 0;
+
+    std::vector<double> kf_lengths;
+    _state.cage.keyframe_depths(kf_lengths);
+
+    for (int count = 0; count < _state.cage.num_cells(); count++) {
+        double max_length = kf_lengths.back();
+        double z_left = kf_lengths[count] / max_length, z_right = kf_lengths[count+1] / max_length;
+
+
+        Eigen::MatrixXd lkfV(4, 3); // = lkf->bounding_box_vertices_3d();
+        lkfV << 0.0, 0.0, z_left,
+                1.0, 0.0, z_left,
+                1.0, 1.0, z_left,
+                0.0, 1.0, z_left;
+        Eigen::MatrixXd rkfV(4, 3); // = rkf->bounding_box_vertices_3d();
+        rkfV << 0.0, 0.0, z_right,
+                1.0, 0.0, z_right,
+                1.0, 1.0, z_right,
+                0.0, 1.0, z_right;
+
+        for (int i = 0; i < lkfV.rows(); i++) {
+            int next_i = (i + 1) % lkfV.rows();
+            for (int j = 0; j < 3; j++) { cageV.push_back(lkfV(i, j)); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(lkfV(next_i, j)); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(rkfV(i, j)); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(rkfV(next_i, j)); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(lkfV(i, j)); }
+            for (int j = 0; j < 3; j++) { cageV.push_back(rkfV(i, j)); }
+
+            num_vertices += 6;
+        }
+    }
+    glm::vec4 cage_color(0.2, 0.2, 0.8, 0.5);
+    PointLineRenderer::PolylineStyle cage_style;
+    cage_style.primitive = PointLineRenderer::LINES;
+    cage_style.render_points = true;
+    cage_style.line_width = 1.0f;
+    cage_style.point_size = 4.0f;
+    renderer_2d.update_polyline_3d(cage_polyline_id, cageV.data(),cage_color, num_vertices, cage_style);
+
+
+    MatrixXfRm kfV(0, 3);
+    glm::vec4 kf_color(0.2, 0.8, 0.2, 0.3);
+    PointLineRenderer::PolylineStyle kf_style;
+    kf_style.primitive = PointLineRenderer::LINE_LOOP;
+    kf_style.render_points = false;
+    kf_style.line_width = 1.0f;
+    kf_style.point_size = 4.0f;
+    renderer_2d.update_polyline_3d(current_kf_polyline_id, kfV.data(), kf_color, kfV.rows(), kf_style);
+
+    MatrixXfRm skV(2, 3);
+    Eigen::RowVector4d bbox = _state.cage.keyframe_bounding_box();
+    double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+    double bbox_w = max_u - min_u, bbox_h = max_v - min_v;
+    double x = fabs(min_u) / bbox_w;
+    double y = fabs(min_v) / bbox_h;
+    skV << x, y, 0.0,
+           x, y, 1.0;
+    PointLineRenderer::PolylineStyle sk_style;
+    sk_style.primitive = PointLineRenderer::LINE_STRIP;
+    sk_style.render_points = false;
+    glm::vec4 sk_color(0.8, 0.2, 0.2, 0.5);
+    sk_style.line_width = 1.0f;
+    renderer_2d.update_polyline_3d(skeleton_polyline_id, skV.data(), sk_color, skV.rows(), sk_style);
+}
+
 bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingCage::KeyFrameIterator current_kf) {
     // Back up the old viewport so we can restore it
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+    update_2d_geometry_straight(current_kf);
 
     glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
     glm::ivec2 viewport_pos = glm::ivec2(viewport[0], viewport[1]);
@@ -138,6 +212,7 @@ bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingC
         _state.logger->debug("Widget 3d resizing framebuffer textures");
     }
 
+    /*
     glm::ivec3 volume_dims = _parent->exporter.export_dims();
     glm::vec3 normalized_straight_tex_size =
             glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
@@ -152,14 +227,7 @@ bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingC
     GLuint straight_tex = _parent->exporter.export_texture();
 
     std::vector<double> kf_lengths;
-    kf_lengths.reserve(_state.cage.num_keyframes());
-    Eigen::RowVector3d last_centroid = _state.cage.keyframes.begin()->centroid_3d();
-    double total_dist = 0.0;
-    for (const BoundingCage::KeyFrame& kf : _state.cage.keyframes) {
-        total_dist += (kf.centroid_3d() - last_centroid).norm();
-        last_centroid = kf.centroid_3d();
-        kf_lengths.push_back(total_dist);
-    }
+    _state.cage.keyframe_depths(kf_lengths);
 
     std::vector<int> sorted_cell_indexes;
     for (int i = 0; i < _state.cage.num_cells(); i++) { sorted_cell_indexes.push_back(i); }
@@ -195,14 +263,23 @@ bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingC
         double bbox_h = max_v - min_v;
 
         Eigen::MatrixXd cV(8, 3);
-        cV << 0.0,    0.0,    z_left,
-              bbox_w, 0.0,    z_left,
-              bbox_w, bbox_h, z_left,
-              0.0,    bbox_h, z_left,
-              0.0,    0.0,    z_right,
-              bbox_w, 0.0,    z_right,
-              bbox_w, bbox_h, z_right,
-              0.0,    bbox_h, z_right;
+//        cV << 0.0,    0.0,    z_left,
+//              bbox_w, 0.0,    z_left,
+//              bbox_w, bbox_h, z_left,
+//              0.0,    bbox_h, z_left,
+//              0.0,    0.0,    z_right,
+//              bbox_w, 0.0,    z_right,
+//              bbox_w, bbox_h, z_right,
+//              0.0,    bbox_h, z_right;
+        cV << min_u, min_v, z_left,
+              max_u, min_v, z_left,
+              max_u, max_v, z_left,
+              min_u, max_v, z_left,
+              min_u, min_v, z_right,
+              max_u, min_v, z_right,
+              max_u, max_v, z_right,
+              min_u, max_v, z_right;
+
 
         Eigen::MatrixXi cF(12, 3);
         cF << 3, 0, 1,
@@ -223,48 +300,56 @@ bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingC
         std::cout << "final ? " << final << std::endl;
         volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, final);
     }
+    */
 
 
-//    glm::ivec3 volume_dims = _parent->exporter.export_dims();
-//    glm::vec3 normalized_straight_tex_size =
-//            glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
-//    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
-//    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
-//    glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
-//    glm::mat4 view_matrix = GM4f(_viewer->core.view);
-//    glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
-//    glm::vec3 light_position = G3f(_viewer->core.light_position);
-//
-//    constexpr GLsizei NUM_VERTICES = 8;
-//    constexpr GLsizei NUM_FACES = 12;
-//    std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
-//        0.f, 0.f, 0.f,
-//        0.f, 0.f, 1.f,
-//        0.f, 1.f, 0.f,
-//        0.f, 1.f, 1.f,
-//        1.f, 0.f, 0.f,
-//        1.f, 0.f, 1.f,
-//        1.f, 1.f, 0.f,
-//        1.f, 1.f, 1.f
-//    };
-//    std::array<GLint, NUM_FACES*3> index_data = {
-//        0, 6, 4,
-//        0, 2, 6,
-//        0, 3, 2,
-//        0, 1, 3,
-//        2, 7, 6,
-//        2, 3, 7,
-//        4, 6, 7,
-//        4, 7, 5,
-//        0, 4, 5,
-//        0, 5, 1,
-//        1, 5, 7,
-//        1, 7, 3
-//    };
-//
-//    volume_renderer.begin(volume_dims, straight_tex);
-//    volume_renderer.set_bounding_geometry(vertex_data.data(), NUM_VERTICES, index_data.data(), NUM_FACES);
-//    volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, true /* final */);
+    glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
+    GLuint straight_tex = _parent->exporter.export_texture();
+
+    glm::vec3 volume_dims = glm::vec3(_parent->exporter.export_dims())/glm::vec3(2.0);
+    glm::vec3 normalized_straight_tex_size =
+            glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
+    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
+    glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
+    glm::mat4 view_matrix = GM4f(_viewer->core.view);
+    glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
+    glm::vec3 light_position = G3f(_viewer->core.light_position);
+
+    constexpr GLsizei NUM_VERTICES = 8;
+    constexpr GLsizei NUM_FACES = 12;
+    std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
+        0.f, 0.f, 0.f,
+        0.f, 0.f, 1.f,
+        0.f, 1.f, 0.f,
+        0.f, 1.f, 1.f,
+        1.f, 0.f, 0.f,
+        1.f, 0.f, 1.f,
+        1.f, 1.f, 0.f,
+        1.f, 1.f, 1.f
+    };
+    std::array<GLint, NUM_FACES*3> index_data = {
+        0, 6, 4,
+        0, 2, 6,
+        0, 3, 2,
+        0, 1, 3,
+        2, 7, 6,
+        2, 3, 7,
+        4, 6, 7,
+        4, 7, 5,
+        0, 4, 5,
+        0, 5, 1,
+        1, 5, 7,
+        1, 7, 3
+    };
+
+//    volume_renderer.set_step_size(1.0 / glm::length(G3f(_state.low_res_volume.dims())));
+    volume_renderer.set_step_size(1.0 / glm::length(glm::vec3(volume_dims)));
+    volume_renderer.begin(volume_dims, straight_tex);
+    volume_renderer.set_bounding_geometry(vertex_data.data(), NUM_VERTICES, index_data.data(), NUM_FACES);
+    volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, true /* final */);
+
+    renderer_2d.draw(model_matrix, view_matrix, proj_matrix);
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
     return false;
 }
@@ -274,7 +359,7 @@ bool Bounding_Widget_3d::post_draw_curved(const glm::vec4& viewport, BoundingCag
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
 
-    update_2d_geometry(current_kf);
+    update_2d_geometry_curved(current_kf);
 
     glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
     glm::ivec2 viewport_pos = glm::ivec2(viewport[0], viewport[1]);
