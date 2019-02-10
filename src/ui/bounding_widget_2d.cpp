@@ -601,16 +601,15 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
         draw_polygon(horizontal_line, right_axis_color, 1.f, 1.f, PolygonDrawMode::Lines);
 
         // Render rotation handle
-        if (mouse_state.is_rotate_modifier_down) {
+        if (mouse_state.is_rotate_modifier_down && in_focus) {
             glm::ivec2 window_size;
             glfwGetWindowSize(viewer->window, &window_size.x, &window_size.y);
             glm::vec2 current_mouse = { viewer->current_mouse_x, window_size.y - viewer->current_mouse_y };
             glm::vec2 kf_mouse = convert_position_mainwindow_to_keyframe(current_mouse);
 
-            if (in_focus) {
-                std::vector<glm::vec2> handle_line = { centroid_2d, kf_mouse };
-                draw_polygon(handle_line, rotation_handle_color, 1.f, 1.f, PolygonDrawMode::Lines);
-            }
+            std::vector<glm::vec2> handle_line = { centroid_2d, kf_mouse };
+            draw_polygon(handle_line, rotation_handle_color, 1.f, 1.f, PolygonDrawMode::Lines);
+
             if (mouse_state.is_left_button_down) {
                 glm::vec2 kf_mouse_o = convert_position_mainwindow_to_keyframe(mouse_state.down_position);
                 std::vector<glm::vec2> handle_line_o = { centroid_2d, kf_mouse_o };
