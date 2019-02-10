@@ -624,9 +624,10 @@ void VolumeRenderer::volume_pass(const glm::vec3& light_position, const glm::ive
     // Bind rendering parameters
     glm::vec3 volume_dims_rcp = glm::vec3(1.0) / glm::vec3(volume_dims);
 
-    GLfloat t_incr = 1.0 / glm::length(glm::vec3(volume_dims));
+//    GLfloat t_incr = 1.0 / glm::length(glm::vec3(volume_dims));
 //    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, _sampling_rate);
-    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, t_incr);
+//    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, t_incr);
+    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, _step_size);
     glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1, glm::value_ptr(_volume_dimensions));
     glUniform3fv(_gl_state.volume_pass.uniform_location.volume_dimensions_rcp, 1, glm::value_ptr(volume_dims_rcp));
     glUniform3fv(_gl_state.volume_pass.uniform_location.light_position, 1, glm::value_ptr(light_position));

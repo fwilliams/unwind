@@ -126,7 +126,12 @@ bool Bounding_Polygon_Menu::post_draw() {
     Eigen::Vector4f widget_3d_viewport(view_hsplit*window_width, view_vsplit*window_height,
                                        (1.0-view_hsplit)*window_width, (1.0-view_vsplit)*window_height);
     viewer->core.viewport = widget_3d_viewport;
-    ret = widget_3d.post_draw(G4f(widget_3d_viewport), state.cage.keyframe_for_index(current_cut_index), draw_straight);
+    if (draw_straight) {
+        ret = widget_3d.post_draw_straight(G4f(widget_3d_viewport), state.cage.keyframe_for_index(current_cut_index));
+    } else {
+        ret = widget_3d.post_draw_curved(G4f(widget_3d_viewport), state.cage.keyframe_for_index(current_cut_index));
+    }
+
 
     ImGui::SetNextWindowBgAlpha(0.0f);
     float window_height_float = static_cast<float>(window_height);

@@ -22,6 +22,8 @@ class VolumeRenderer {
     GLuint _current_volume_tex = 0;
     glm::ivec3 _current_volume_dims;
 
+    GLfloat _step_size = 0.0;
+
     struct GLState {
         struct RayEndpointsPass {
             GLuint vao = 0;
@@ -79,6 +81,10 @@ class VolumeRenderer {
 
 public:
     const GLState& gl_state() const { return _gl_state; }
+
+    void set_step_size(float step_size) {
+        _step_size = step_size;
+    }
 
     void resize_framebuffer(const glm::ivec2& viewport_size);
 

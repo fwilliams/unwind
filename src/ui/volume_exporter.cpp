@@ -108,6 +108,7 @@ void VolumeExporter::set_export_dims(GLsizei w, GLsizei h, GLsizei d) {
     this->d = d;
     glBindTexture(GL_TEXTURE_3D, render_texture);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, w, h, d, 0, GL_RED, GL_FLOAT, 0);
+    glBindTexture(GL_TEXTURE_3D, 0);
 }
 
 
@@ -125,10 +126,16 @@ void VolumeExporter::init(GLsizei w, GLsizei h, GLsizei d) {
     glGenVertexArrays(1, &empty_vao);
 
     glGenTextures(1, &render_texture);
-    set_export_dims(w, h, d);
-
+    glBindTexture(GL_TEXTURE_3D, render_texture);
+    GLfloat transparent_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, transparent_color);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    set_export_dims(w, h, d);
 
     glGenFramebuffers(1, &framebuffer);
     glPopDebugGroup();

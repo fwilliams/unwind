@@ -50,8 +50,8 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_
     }
 }
 
-void Bounding_Widget_3d::update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
-    Eigen::RowVector3d volume_size = _state.low_res_volume.dims().cast<double>();
+void Bounding_Widget_3d::update_volume_geometry(const Eigen::RowVector3d& volume_size, const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
+//    Eigen::RowVector3d volume_size = _state.low_res_volume.dims().cast<double>();
     std::size_t num_vertices = cage_V.rows();
     std::size_t num_faces = cage_F.rows();
     std::vector<glm::vec3> V(num_vertices);
@@ -123,7 +123,153 @@ void Bounding_Widget_3d::update_2d_geometry(BoundingCage::KeyFrameIterator curre
     renderer_2d.update_polyline_3d(skeleton_polyline_id, skV.data(), sk_color, skV.rows(), sk_style);
 }
 
-bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf, bool draw_straight) {
+bool Bounding_Widget_3d::post_draw_straight(const glm::vec4 &viewport, BoundingCage::KeyFrameIterator current_kf) {
+    // Back up the old viewport so we can restore it
+    GLint old_viewport[4];
+    glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+    glm::ivec2 viewport_size = glm::ivec2(viewport[2], viewport[3]);
+    glm::ivec2 viewport_pos = glm::ivec2(viewport[0], viewport[1]);
+
+    // Resize framebuffer textures to match the viewport size if it has changed since the last draw call
+    if (glm::length(viewport - _last_viewport) > 1e-8) {
+        _last_viewport = viewport;
+        volume_renderer.resize_framebuffer(viewport_size);
+        _state.logger->debug("Widget 3d resizing framebuffer textures");
+    }
+
+    glm::ivec3 volume_dims = _parent->exporter.export_dims();
+    glm::vec3 normalized_straight_tex_size =
+            glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
+    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
+    glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
+    glm::mat4 view_matrix = GM4f(_viewer->core.view);
+    glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
+    glm::vec3 light_position = G3f(_viewer->core.light_position);
+
+    glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
+    GLuint straight_tex = _parent->exporter.export_texture();
+
+    std::vector<double> kf_lengths;
+    kf_lengths.reserve(_state.cage.num_keyframes());
+    Eigen::RowVector3d last_centroid = _state.cage.keyframes.begin()->centroid_3d();
+    double total_dist = 0.0;
+    for (const BoundingCage::KeyFrame& kf : _state.cage.keyframes) {
+        total_dist += (kf.centroid_3d() - last_centroid).norm();
+        last_centroid = kf.centroid_3d();
+        kf_lengths.push_back(total_dist);
+    }
+
+    std::vector<int> sorted_cell_indexes;
+    for (int i = 0; i < _state.cage.num_cells(); i++) { sorted_cell_indexes.push_back(i); }
+    auto comp_cells = [&](int c1, int c2) -> bool {
+        glm::vec4 voldims = glm::vec4(volume_dims, 1.0);
+        glm::vec4 c1l = glm::vec4(0.0, 0.0, kf_lengths[c1], 1.0) / voldims;
+        glm::vec4 c1r = glm::vec4(0.0, 0.0, kf_lengths[c1+1], 1.0) / voldims;
+        glm::vec4 c2l = glm::vec4(0.0, 0.0, kf_lengths[c2], 1.0) / voldims;
+        glm::vec4 c2r = glm::vec4(0.0, 0.0, kf_lengths[c2+1], 1.0) / voldims;
+
+        glm::vec4 cam_ctr = glm::vec4(G3f(_viewer->core.camera_center), 1.0);
+
+        c1l = model_matrix*c1l;
+        c1r = model_matrix*c1r;
+        c2l = model_matrix*c2l;
+        c2r = model_matrix*c2r;
+
+        float d1 = glm::max(glm::distance(c1l, cam_ctr), glm::distance(c1r, cam_ctr));
+        float d2 = glm::max(glm::distance(c2l, cam_ctr), glm::distance(c2r, cam_ctr));
+
+        return d1 < d2;
+    };
+    std::sort(sorted_cell_indexes.begin(), sorted_cell_indexes.end(), comp_cells);
+
+    volume_renderer.set_step_size(1.0 / glm::length(G3f(_state.low_res_volume.dims())));
+    volume_renderer.begin(volume_dims, straight_tex);
+    for (int i = 0; i < _state.cage.num_cells(); i++) {
+        double z_left = kf_lengths[sorted_cell_indexes[i]];
+        double z_right = kf_lengths[sorted_cell_indexes[i]+1];
+        Eigen::RowVector4d bbox = _state.cage.keyframe_bounding_box();
+        double min_u = bbox[0], max_u = bbox[1], min_v = bbox[2], max_v = bbox[3];
+        double bbox_w = max_u - min_u;
+        double bbox_h = max_v - min_v;
+
+        Eigen::MatrixXd cV(8, 3);
+        cV << 0.0,    0.0,    z_left,
+              bbox_w, 0.0,    z_left,
+              bbox_w, bbox_h, z_left,
+              0.0,    bbox_h, z_left,
+              0.0,    0.0,    z_right,
+              bbox_w, 0.0,    z_right,
+              bbox_w, bbox_h, z_right,
+              0.0,    bbox_h, z_right;
+
+        Eigen::MatrixXi cF(12, 3);
+        cF << 3, 0, 1,
+              3, 1, 2,
+              5, 4, 7,
+              5, 7, 6,
+              0, 3, 7,
+              0, 7, 4,
+              3, 6, 7,
+              6, 3, 2,
+              2, 5, 6,
+              5, 2, 1,
+              1, 0, 5,
+              5, 0, 4;
+
+        update_volume_geometry(E3d(volume_dims), cV, cF);
+        bool final = (i == _state.cage.num_cells()-1);
+        std::cout << "final ? " << final << std::endl;
+        volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, final);
+    }
+
+
+//    glm::ivec3 volume_dims = _parent->exporter.export_dims();
+//    glm::vec3 normalized_straight_tex_size =
+//            glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
+//    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+//    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
+//    glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
+//    glm::mat4 view_matrix = GM4f(_viewer->core.view);
+//    glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
+//    glm::vec3 light_position = G3f(_viewer->core.light_position);
+//
+//    constexpr GLsizei NUM_VERTICES = 8;
+//    constexpr GLsizei NUM_FACES = 12;
+//    std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
+//        0.f, 0.f, 0.f,
+//        0.f, 0.f, 1.f,
+//        0.f, 1.f, 0.f,
+//        0.f, 1.f, 1.f,
+//        1.f, 0.f, 0.f,
+//        1.f, 0.f, 1.f,
+//        1.f, 1.f, 0.f,
+//        1.f, 1.f, 1.f
+//    };
+//    std::array<GLint, NUM_FACES*3> index_data = {
+//        0, 6, 4,
+//        0, 2, 6,
+//        0, 3, 2,
+//        0, 1, 3,
+//        2, 7, 6,
+//        2, 3, 7,
+//        4, 6, 7,
+//        4, 7, 5,
+//        0, 4, 5,
+//        0, 5, 1,
+//        1, 5, 7,
+//        1, 7, 3
+//    };
+//
+//    volume_renderer.begin(volume_dims, straight_tex);
+//    volume_renderer.set_bounding_geometry(vertex_data.data(), NUM_VERTICES, index_data.data(), NUM_FACES);
+//    volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, true /* final */);
+    glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
+    return false;
+}
+
+bool Bounding_Widget_3d::post_draw_curved(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf) {
     // Back up the old viewport so we can restore it
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
@@ -151,50 +297,6 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
     glm::mat4 proj_matrix = GM4f(_viewer->core.proj);
     glm::vec3 light_position = G3f(_viewer->core.light_position);
 
-    if (draw_straight) {
-        glm::ivec3 straight_tex_size = _parent->exporter.export_dims();
-        glm::vec3 normalized_straight_tex_size =
-                glm::vec3(straight_tex_size) / static_cast<float>(glm::compMax(straight_tex_size));
-        glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
-        glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_straight_tex_size);
-        glm::mat4 model_matrix = GM4f(_viewer->core.model) * scaling * translate;
-
-        glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
-        GLuint straight_tex = _parent->exporter.export_texture();
-
-        constexpr GLsizei NUM_VERTICES = 8;
-        constexpr GLsizei NUM_FACES = 12;
-        std::array<GLfloat, NUM_VERTICES*3> vertex_data = {
-            0.f, 0.f, 0.f,
-            0.f, 0.f, 1.f,
-            0.f, 1.f, 0.f,
-            0.f, 1.f, 1.f,
-            1.f, 0.f, 0.f,
-            1.f, 0.f, 1.f,
-            1.f, 1.f, 0.f,
-            1.f, 1.f, 1.f
-        };
-        std::array<GLint, NUM_FACES*3> index_data = {
-            0, 6, 4,
-            0, 2, 6,
-            0, 3, 2,
-            0, 1, 3,
-            2, 7, 6,
-            2, 3, 7,
-            4, 6, 7,
-            4, 7, 5,
-            0, 4, 5,
-            0, 5, 1,
-            1, 5, 7,
-            1, 7, 3
-        };
-
-        volume_renderer.begin(straight_tex_size, straight_tex);
-        volume_renderer.set_bounding_geometry(vertex_data.data(), NUM_VERTICES, index_data.data(), NUM_FACES);
-        volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, true /* final */);
-        glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
-        return false;
-    }
 
     // Sort the cells of the bounding cage front to back
     std::vector<BoundingCage::CellIterator> sorted_cells;
@@ -225,12 +327,13 @@ bool Bounding_Widget_3d::post_draw(const glm::vec4& viewport, BoundingCage::KeyF
 
     glViewport(viewport_pos.x, viewport_pos.y, viewport_size.x, viewport_size.y);
 
+    volume_renderer.set_step_size(1.0 / glm::length(glm::vec3(volume_dims)));
     volume_renderer.begin(volume_dims, _state.low_res_volume.volume_texture);
     for (int i = 0; i < sorted_cells.size(); i++) {
         auto cell = sorted_cells[i];
         Eigen::MatrixXd cV = cell->mesh_vertices();
         Eigen::MatrixXi cF = cell->mesh_faces();
-        update_volume_geometry(cV, cF);
+        update_volume_geometry(_state.low_res_volume.dims().cast<double>(), cV, cF);
 
         bool final = (i == sorted_cells.size()-1);
         volume_renderer.render_pass(model_matrix, view_matrix, proj_matrix, light_position, final);

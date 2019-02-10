@@ -16,13 +16,14 @@ public:
 
     void initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu* parent);
     bool pre_draw(float current_cut_index);
-    bool post_draw(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf, bool draw_straight=false);
+    bool post_draw_curved(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);
+    bool post_draw_straight(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);
 
     VolumeRenderer volume_renderer;
     PointLineRenderer renderer_2d;
 
 private:
-    void update_volume_geometry(const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
+    void update_volume_geometry(const Eigen::RowVector3d& volume_size, const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
     void update_2d_geometry(BoundingCage::KeyFrameIterator current_kf);
 
     int cage_polyline_id;
