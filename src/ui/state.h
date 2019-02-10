@@ -47,6 +47,9 @@ struct State {
         GLuint volume_texture;
         GLuint index_texture;
 
+        double min_value;
+        double max_value;
+
         const Eigen::RowVector3i dims() const {
             return Eigen::RowVector3i(metadata.w, metadata.h, metadata.d);
         }

@@ -77,11 +77,11 @@ uniform sampler1D tf;
 void main() {
     // All areas outside the actual texture area should be black
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+        out_color = vec4(0.0, 0.0, 0.0, 0.0);
     }
     else {
         float v = texture(tex, uv).r;
-        out_color = vec4(vec3(v * 1.5), 1.0);
+        out_color = vec4(vec3(v), 1.0);
     }
 }
 )";

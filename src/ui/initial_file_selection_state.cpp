@@ -75,12 +75,14 @@ bool Initial_File_Selection_Menu::post_draw() {
             float* texture_data = _state.low_res_volume.volume_data.data();
             size_t size = _state.low_res_volume.num_voxels();
             std::vector<uint8_t> volume_data(size);
+            double value_range = _state.low_res_volume.max_value - _state.low_res_volume.min_value;
+            double min_value = _state.low_res_volume.min_value;
             std::transform(
                 texture_data,
                 texture_data + size,
                 volume_data.begin(),
-                [](float d) {
-                    return static_cast<uint8_t>(d * std::numeric_limits<uint8_t>::max());
+                [min_value, value_range](double d) {
+                    return static_cast<uint8_t>(((d - min_value)/value_range) * std::numeric_limits<uint8_t>::max());
                 }
             );
             glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volume_dims[0], volume_dims[1], volume_dims[2], 0,
@@ -97,6 +99,9 @@ bool Initial_File_Selection_Menu::post_draw() {
             glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, volume_dims[0], volume_dims[1], volume_dims[2],
                     0, GL_RED_INTEGER, GL_UNSIGNED_INT, reinterpret_cast<char*>(_state.low_res_volume.index_data.data()));
             glBindTexture(GL_TEXTURE_3D, 0);
+
+            _state.logger->debug("Done loading volume. Values range between {} and {}",
+                                 _state.low_res_volume.min_value, _state.low_res_volume.max_value);
         }
     }
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
@@ -127,6 +132,9 @@ bool Initial_File_Selection_Menu::post_draw() {
             _state.topological_features.loadData(volume_output_files_prefix);
             
             load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, true);
+
+            _state.low_res_volume.max_value = _state.low_res_volume.volume_data.maxCoeff();
+            _state.low_res_volume.min_value = _state.low_res_volume.volume_data.minCoeff();
 
             const size_t num_bytes = _state.low_res_volume.num_voxels() * sizeof(uint32_t);
             std::ifstream file;
