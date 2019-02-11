@@ -5,7 +5,10 @@
 #include <algorithm>
 
 TransferFunctionEditWidget::TransferFunctionEditWidget() {
-
+    TfNode n1 = {0.0, glm::vec4(0.0)};
+    TfNode n2 = {1.0, glm::vec4(1.0)};
+    transfer_function.push_back(n1);
+    transfer_function.push_back(n2);
 }
 
 bool TransferFunctionEditWidget::post_draw() {

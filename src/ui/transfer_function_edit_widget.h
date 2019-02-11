@@ -19,9 +19,11 @@ class TransferFunctionEditWidget
     bool color_popup_open = false;
 
 public:
-    const std::vector<TfNode>& tfunc() { return transfer_function; }
+    const std::vector<TfNode>& tfunc() const { return transfer_function; }
     TransferFunctionEditWidget();
 
+    bool tfdirty() const { return transfer_function_dirty; }
+    void clear_dirty_bit() { transfer_function_dirty = false; }
     bool post_draw();
 };
 
