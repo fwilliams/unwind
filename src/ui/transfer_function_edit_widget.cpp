@@ -12,6 +12,8 @@ TransferFunctionEditWidget::TransferFunctionEditWidget() {
 }
 
 bool TransferFunctionEditWidget::post_draw() {
+    constexpr float click_scale = 2.5f;
+
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -22,16 +24,23 @@ bool TransferFunctionEditWidget::post_draw() {
     float centering_offset = 0.5 * (ImGui::GetContentRegionAvailWidth() - canvas_width);
     float canvas_height = aspect_ratio * canvas_width;
     ImVec2 canvas_size = { canvas_width, canvas_height };
-    ImVec2 canvas_pos = { ImGui::GetCursorScreenPos()[0] + centering_offset, ImGui::GetCursorScreenPos()[1] };
+    ImVec2 canvas_pos = { ImGui::GetCursorScreenPos()[0] + centering_offset, ImGui::GetCursorScreenPos()[1] + click_scale*_node_radius};
 
-    draw_list->AddRectFilledMultiColor(canvas_pos,
+    ImVec2 canvas_capture_size = {canvas_size[0] + 2.f*click_scale*_node_radius, canvas_size[1] + 2.f*click_scale*_node_radius}; //ImGui::GetCursorScreenPos(); // { canvas_width + 2.f*click_scale*_node_radius, canvas_height + 2.f*click_scale*_node_radius};
+    ImVec2 canvas_scale_pos = { canvas_pos[0] - click_scale*_node_radius, ImGui::GetCursorScreenPos()[1] };
+
+    draw_list->AddRectFilledMultiColor(
+        ImVec2(canvas_pos.x, canvas_pos.y),
         ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
         IM_COL32(50, 50, 50, 255), IM_COL32(50, 50, 60, 255),
         IM_COL32(60, 60, 70, 255), IM_COL32(50, 50, 60, 255));
-    draw_list->AddRect(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x,
-        canvas_pos.y + canvas_size.y), IM_COL32(255, 255, 255, 255));
-    ImGui::InvisibleButton("canvas", canvas_size);
+    draw_list->AddRect(
+                ImVec2(canvas_pos.x, canvas_pos.y),
+                ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
+        IM_COL32(255, 255, 255, 255));
 
+    ImGui::SetCursorScreenPos(canvas_scale_pos);
+    ImGui::InvisibleButton("canvas", canvas_capture_size);
     // First render the lines
     for (size_t i = 0; i < _transfer_function.size(); ++i) {
         TfNode& node = _transfer_function[i];
@@ -70,13 +79,13 @@ bool TransferFunctionEditWidget::post_draw() {
 
     // If the mouse button is pressed, we either have to add a new node or move an
     // existing one
-    const bool mouse_in_tf_editor = ImGui::GetIO().MousePos.x >= canvas_pos.x &&
-        ImGui::GetIO().MousePos.x <= (canvas_pos.x + canvas_size.x) &&
-        ImGui::GetIO().MousePos.y >= canvas_pos.y &&
-        ImGui::GetIO().MousePos.y <= (canvas_pos.y + canvas_size.y);
-
+    const bool mouse_in_tf_editor = ImGui::GetIO().MousePos.x >= (canvas_scale_pos.x) &&
+        ImGui::GetIO().MousePos.x <= (canvas_scale_pos.x + canvas_capture_size.x) &&
+        ImGui::GetIO().MousePos.y >= (canvas_scale_pos.y) &&
+        ImGui::GetIO().MousePos.y <= (canvas_scale_pos.y + canvas_capture_size.y);
     if (mouse_in_tf_editor) {
         if (ImGui::IsMouseDown(0)) {
+            ImGui::GetIO().WantCaptureMouse = true;
             for (size_t i = 0; i < _transfer_function.size(); ++i) {
                 TfNode& node = _transfer_function[i];
                 const float x = canvas_pos.x + canvas_size.x * node.t;
@@ -87,7 +96,7 @@ bool TransferFunctionEditWidget::post_draw() {
 
                 const float r = sqrt(dx * dx + dy * dy);
 
-                if (r <= _node_radius * 2.5) {
+                if (r <= _node_radius * click_scale) {
                     _clicked_mouse_position[0] = ImGui::GetIO().MousePos.x;
                     _clicked_mouse_position[1] = ImGui::GetIO().MousePos.y;
                     _is_currently_interacting = true;
@@ -95,7 +104,6 @@ bool TransferFunctionEditWidget::post_draw() {
                     break;
                 }
             }
-
             if (_is_currently_interacting) {
                 const float dx = ImGui::GetIO().MousePos.x - _clicked_mouse_position[0];
                 const float dy = ImGui::GetIO().MousePos.y - _clicked_mouse_position[1];
@@ -176,10 +184,11 @@ bool TransferFunctionEditWidget::post_draw() {
     }
 
 
-    ImVec2 rm_button_pos = {centering_offset, ImGui::GetCursorPosY() + 0.4f*ImGui::GetTextLineHeight()};
-    ImGui::SetCursorPos(rm_button_pos);
+    ImVec2 rm_button_pos = {ImGui::GetCursorScreenPos()[0] + centering_offset, ImGui::GetCursorScreenPos()[1]};
+    ImGui::SetCursorScreenPos(rm_button_pos);
 
-    ImVec2 button_size = _color_edit_as_popup ? ImVec2{canvas_width*0.48f, 0.0f} : ImVec2{canvas_width, 0.0f};
+//    ImVec2 button_size = _color_edit_as_popup ? ImVec2{canvas_width*0.48f, 0.0f} : ImVec2{canvas_width, 0.0f};
+    ImVec2 button_size = ImVec2{canvas_width, 0.0f};
     const bool is_first = _current_interaction_index == 0;
     const bool is_last = _current_interaction_index == _transfer_function.size() - 1;
     bool pushed_disabled_style = false;
@@ -226,8 +235,7 @@ bool TransferFunctionEditWidget::post_draw() {
     };
 
     if (_color_edit_as_popup) {
-        ImVec2 clr_button_pos = {rm_button_pos[0] + 0.52f*canvas_width, rm_button_pos[1]};
-        ImGui::SetCursorPos(clr_button_pos);
+        ImGui::SetCursorScreenPos(ImVec2{rm_button_pos.x, ImGui::GetCursorScreenPos()[1]});
         pushed_disabled_style = false;
         if (_current_interaction_index < 0 || _color_popup_open) {
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -261,13 +269,18 @@ bool TransferFunctionEditWidget::post_draw() {
         } else {
             _color_popup_open = false;
         }
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY()+_node_radius*click_scale);
     } else {
-        ImGui::SetCursorPos(ImVec2{0.0, ImGui::GetCursorPosY() + 0.3f*ImGui::GetTextLineHeight()});
+        ImGui::SetCursorPos(ImVec2{0.0, ImGui::GetCursorPosY() + _node_radius*click_scale});
         ImGui::Separator();
-        ImGui::SetCursorPos(ImVec2{centering_offset, ImGui::GetCursorPosY() + 0.3f*ImGui::GetTextLineHeight()});
+//        ImGui::SetCursorPos(ImVec2{centering_offset, ImGui::GetCursorPosY() + _node_radius*click_scale});
+
+        ImGui::SetCursorScreenPos(ImVec2{rm_button_pos.x, ImGui::GetCursorScreenPos()[1] + _node_radius*click_scale});
+//        ImGui::SetCursorPos(ImVec2{centering_offset, ImGui::GetCursorPosY() + 0.0f*ImGui::GetTextLineHeight()});
         ImGui::PushItemWidth(canvas_width);
         draw_color_picker();
         ImGui::PopItemWidth();
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY()+_node_radius*click_scale);
     }
 
 }
