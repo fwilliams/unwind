@@ -136,8 +136,8 @@ bool Bounding_Polygon_Menu::post_draw() {
         cage_dirty = false;
     }
 
-    if (tf_widget.tfdirty()) {
-        widget_3d.volume_renderer.set_transfer_function(tf_widget.tfunc());
+    if (tf_widget.transfer_function_dirty()) {
+        widget_3d.volume_renderer.set_transfer_function(tf_widget.transfer_function());
         tf_widget.clear_dirty_bit();
     }
 
@@ -238,30 +238,6 @@ bool Bounding_Polygon_Menu::post_draw() {
         cage_dirty = true;
     }
 
-    /*
-    ImGui::Separator();
-    ImGui::Text("Num Keyframes: %d", state.cage.num_keyframes());
-    ImGui::Separator();
-    if (ImGui::InputInt("W", &exp_w)) {
-        exporter.set_export_dims(exp_w, exp_h, exp_d);
-    }
-    ImGui::SameLine();
-    if (ImGui::InputInt("H", &exp_h)) {
-        exporter.set_export_dims(exp_w, exp_h, exp_d);
-    }
-    ImGui::SameLine();
-    if (ImGui::InputInt("D", &exp_d)) {
-        exporter.set_export_dims(exp_w, exp_h, exp_d);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Export Volume")) {
-        exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
-        state.logger->debug("EXPORT");
-        exporter.write_texture_data_to_file("out_volume.raw");
-        state.logger->debug("DONE");
-    }
-    */
-
     ImGui::Separator();
     ImGui::Text("Display Options");
     ImGui::Checkbox("Show straight view", &draw_straight);
@@ -282,8 +258,7 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     if (show_display_options) {
         ImGui::SetNextWindowSize(ImVec2(window_height_float*view_vsplit, 0), ImGuiSetCond_FirstUseEver);
-
-        ImGui::Begin("Display Options");
+        ImGui::Begin("Edit Transfer Function", &show_display_options, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
 //        ImGui::SetNextWindowSize(ImVec2(480, 720), ImGuiSetCond_FirstUseEver);
 //        if (ImGui::Begin("Display Options", NULL)) {
         ImVec2 popup_pos = ImGui::GetWindowPos();
