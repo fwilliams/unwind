@@ -147,7 +147,7 @@ bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims
 
     out.resize(num_bytes);
     for (int i = 0; i < num_bytes; i++) {
-        out[i] = static_cast<double>(data[i]);
+        out[i] = static_cast<double>(reinterpret_cast<std::uint8_t*>(data)[i]);
         if (normalize) {
             static_assert(sizeof(char) == sizeof(std::uint8_t), "Your system is fucked"); // This is dumb but why not
             out[i] /= 255.0;
