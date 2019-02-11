@@ -259,17 +259,12 @@ bool Bounding_Polygon_Menu::post_draw() {
     if (show_display_options) {
         ImGui::SetNextWindowSize(ImVec2(window_height_float*view_vsplit, 0), ImGuiSetCond_FirstUseEver);
         ImGui::Begin("Edit Transfer Function", &show_display_options, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-//        ImGui::SetNextWindowSize(ImVec2(480, 720), ImGuiSetCond_FirstUseEver);
-//        if (ImGui::Begin("Display Options", NULL)) {
         ImVec2 popup_pos = ImGui::GetWindowPos();
         ImVec2 popup_size = ImGui::GetWindowSize();
-        double mouse_x, mouse_y;
-        glfwGetCursorPos(viewer->window, &mouse_x, &mouse_y);
-
-        ImGui::Text("%s", "Edit Transfer Function");
-        ImGui::Separator();
         tf_widget.post_draw();
 
+        double mouse_x, mouse_y;
+        glfwGetCursorPos(viewer->window, &mouse_x, &mouse_y);
         bool in_window_x = (mouse_x >= popup_pos[0]) && (mouse_x <= (popup_pos[0] + popup_size[0]));
         bool in_window_y = (mouse_y >= popup_pos[1]) && (mouse_y <= (popup_pos[1] + popup_size[1]));
         mouse_in_popup = (in_window_x && in_window_y);

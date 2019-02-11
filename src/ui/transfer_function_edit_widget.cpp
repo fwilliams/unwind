@@ -187,7 +187,6 @@ bool TransferFunctionEditWidget::post_draw() {
     ImVec2 rm_button_pos = {ImGui::GetCursorScreenPos()[0] + centering_offset, ImGui::GetCursorScreenPos()[1]};
     ImGui::SetCursorScreenPos(rm_button_pos);
 
-//    ImVec2 button_size = _color_edit_as_popup ? ImVec2{canvas_width*0.48f, 0.0f} : ImVec2{canvas_width, 0.0f};
     ImVec2 button_size = ImVec2{canvas_width, 0.0f};
     const bool is_first = _current_interaction_index == 0;
     const bool is_last = _current_interaction_index == _transfer_function.size() - 1;
@@ -237,7 +236,7 @@ bool TransferFunctionEditWidget::post_draw() {
     if (_color_edit_as_popup) {
         ImGui::SetCursorScreenPos(ImVec2{rm_button_pos.x, ImGui::GetCursorScreenPos()[1]});
         pushed_disabled_style = false;
-        if (_current_interaction_index < 0 || _color_popup_open) {
+        if (_current_interaction_index <= 0 || _color_popup_open) {
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
             pushed_disabled_style = true;
@@ -253,8 +252,7 @@ bool TransferFunctionEditWidget::post_draw() {
 
         if (ImGui::BeginPopup("Change Color")) {
             _color_popup_open = true;
-            if (_current_interaction_index >= 1 &&
-                    _current_interaction_index <= _transfer_function.size() - 1)
+            if (_current_interaction_index >= 1 && _current_interaction_index <= _transfer_function.size() - 1)
             {
                 float* rgba = glm::value_ptr(_transfer_function[_current_interaction_index].rgba);
                 if (ImGui::ColorPicker4("Change Color", rgba, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel)) {
