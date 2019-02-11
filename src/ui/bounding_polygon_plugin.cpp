@@ -248,7 +248,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
         pushed_disabled_style = true;
     }
-    if (ImGui::Button("Display Options")) {
+    if (ImGui::Button("Edit Transfer Function")) {
         show_display_options = true;
     }
     if (pushed_disabled_style) {
@@ -280,7 +280,26 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
     ImGui::End();
-    ImGui::Render();
+
+    // Draw a line separating the two half views
+    {
+        ImGui::SetNextWindowPos(ImVec2(0.f,0.f), ImGuiSetCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(window_width_float, window_height_float), ImGuiSetCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.0f);
+        ImGui::Begin("Full screen derp", NULL,
+                     ImGuiWindowFlags_NoCollapse |
+                     ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoScrollbar |
+                     ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoInputs |
+                     ImGuiWindowFlags_NoTitleBar);
+        ImVec2 line_start = {window_width*view_hsplit, 0.0f};
+        ImVec2 line_end = {window_width*view_hsplit, (1.0f-view_vsplit)*window_height};
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddLine(line_start, line_end, ImGui::GetColorU32(ImGuiCol_Separator));
+        ImGui::End();
+        ImGui::Render();
+    }
 
     return ret;
 }
