@@ -80,14 +80,12 @@ bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
     return ret;
 }
 
-
 bool Bounding_Polygon_Menu::mouse_down(int button, int modifier) {
     bool ret = FishUIViewerPlugin::mouse_down(button, modifier);
 
     ret = ret || widget_2d.mouse_down(button, modifier, is_2d_widget_in_focus());
     return ret;
 }
-
 
 bool Bounding_Polygon_Menu::mouse_up(int button, int modifier) {
     bool ret = FishUIViewerPlugin::mouse_up(button, modifier);
@@ -102,7 +100,6 @@ bool Bounding_Polygon_Menu::mouse_scroll(float delta_y) {
     return ret;
 }
 
-
 bool Bounding_Polygon_Menu::key_down(int button, int modifier) {
     bool ret = FishUIViewerPlugin::key_down(button, modifier);
     ret = ret || widget_2d.key_down(button, modifier, is_2d_widget_in_focus());
@@ -116,20 +113,22 @@ bool Bounding_Polygon_Menu::key_up(int button, int modifier) {
 }
 
 void Bounding_Polygon_Menu::post_draw_transfer_function() {
-    ImGui::Text("%s", "Transfer Function");
+    ImGui::Text("%s", "Edit Transfer Function");
+    ImGui::Separator();
 
     constexpr const float Radius = 10.f;
 
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     //ImVec2 canvas_size = { 640.f, 150.f };
 
     float aspect_ratio = 150.f / 200.f; // height / width
     float canvas_width = 0.9f * ImGui::GetContentRegionAvailWidth();
+    float centering_offset = 0.5 * (ImGui::GetContentRegionAvailWidth() - canvas_width);
     float canvas_height = aspect_ratio * canvas_width;
     ImVec2 canvas_size = { canvas_width, canvas_height };
+    ImVec2 canvas_pos = { ImGui::GetCursorScreenPos()[0] + centering_offset, ImGui::GetCursorScreenPos()[1] };
 
     draw_list->AddRectFilledMultiColor(canvas_pos,
         ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
@@ -234,8 +233,7 @@ void Bounding_Polygon_Menu::post_draw_transfer_function() {
 
                 std::sort(transfer_function.begin(), transfer_function.end(), [](const TfNode& lhs, const TfNode& rhs) { return lhs.t < rhs.t; });
                 transfer_function_dirty = true;
-            }
-            else {
+            } else {
                 current_interaction_index = -1;
                 // We want to only add one node per mouse click
                 if (!has_added_node_since_initial_click) {
@@ -283,29 +281,89 @@ void Bounding_Polygon_Menu::post_draw_transfer_function() {
         }
     }
 
-    if (ImGui::Button("Remove node")) {
-        const bool is_first = current_interaction_index == 0;
-        const bool is_last = current_interaction_index == transfer_function.size() - 1;
-        if (!is_first && !is_last) {
-            transfer_function.erase(transfer_function.begin() + current_interaction_index);
-            current_interaction_index = -1;
-            transfer_function_dirty = true;
-        }
+
+    ImVec2 rm_button_pos = {centering_offset, ImGui::GetCursorPosY() + 0.4f*ImGui::GetTextLineHeight()};
+    ImGui::SetCursorPos(rm_button_pos);
+    ImVec2 button_size {canvas_width*0.48f, 0.0f};
+    const bool is_first = current_interaction_index == 0;
+    const bool is_last = current_interaction_index == transfer_function.size() - 1;
+    bool pushed_disabled_style = false;
+    if (current_interaction_index < 0 || is_first || is_last) {
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+        pushed_disabled_style = true;
+    }
+    if (ImGui::Button("Remove Node", button_size)) {
+        transfer_function.erase(transfer_function.begin() + current_interaction_index);
+        current_interaction_index = -1;
+        transfer_function_dirty = true;
+    }
+    if (pushed_disabled_style) {
+        ImGui::PopItemFlag();
+        ImGui::PopStyleVar();
+        pushed_disabled_style = false;
     }
 
+    ImGui::SetCursorPos(ImVec2{0.0, ImGui::GetCursorPosY() + 0.3f*ImGui::GetTextLineHeight()});
+    ImGui::Separator();
+    ImGui::SetCursorPos(ImVec2{centering_offset, ImGui::GetCursorPosY() + 0.3f*ImGui::GetTextLineHeight()});
     ImGui::PushItemWidth(canvas_width);
     if (current_interaction_index >= 1 &&
         current_interaction_index <= transfer_function.size() - 1)
     {
         float* rgba = glm::value_ptr(transfer_function[current_interaction_index].rgba);
-        if (ImGui::ColorPicker4("Change Color", rgba)) {
+        if (ImGui::ColorPicker4("Change Color", rgba, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel)) {
             transfer_function_dirty = true;
         }
     }
     else {
         float rgba[4];
-        ImGui::ColorPicker4("Change Color", rgba);
+        ImGui::ColorPicker4("Change Color", rgba, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel);
     }
+    ImGui::PopItemWidth();
+
+//    if (false) {
+//        ImVec2 clr_button_pos = {rm_button_pos[0] + 0.52f*canvas_width, rm_button_pos[1]};
+//        ImGui::SetCursorPos(clr_button_pos);
+//        pushed_disabled_style = false;
+//        if (current_interaction_index < 0 || color_popup_open) {
+//            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+//            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+//            pushed_disabled_style = true;
+//        }
+//        if (ImGui::Button("Change Color", button_size)) {
+//            ImGui::OpenPopup("Change Color");
+//        }
+//        if (pushed_disabled_style) {
+//            ImGui::PopItemFlag();
+//            ImGui::PopStyleVar();
+//            pushed_disabled_style = false;
+//        }
+
+//        if (ImGui::BeginPopup("Change Color")) {
+//            color_popup_open = true;
+//    //        ImGui::SetCursorPos(ImVec2{0.0, ImGui::GetCursorPosY() + 0.3f*ImGui::GetTextLineHeight()});
+//    //        ImGui::Separator();
+//    //        ImGui::SetCursorPos(ImVec2{centering_offset, ImGui::GetCursorPosY() + 0.3f*ImGui::GetTextLineHeight()});
+//    //        ImGui::PushItemWidth(canvas_width);
+//            if (current_interaction_index >= 1 &&
+//                current_interaction_index <= transfer_function.size() - 1)
+//            {
+//                float* rgba = glm::value_ptr(transfer_function[current_interaction_index].rgba);
+//                if (ImGui::ColorPicker4("Change Color", rgba, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel)) {
+//                    transfer_function_dirty = true;
+//                }
+//            }
+//            else {
+//                float rgba[4];
+//                ImGui::ColorPicker4("Change Color", rgba, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoLabel);
+//            }
+//            ImGui::EndPopup();
+//        } else {
+//            color_popup_open = false;
+//        }
+//    }
+
 }
 
 bool Bounding_Polygon_Menu::post_draw() {
@@ -326,8 +384,8 @@ bool Bounding_Polygon_Menu::post_draw() {
         GLint old_min_filter, old_mag_filter;
         glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_min_filter);
         glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_mag_filter);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         exporter.set_export_dims(width, height, depth);
         exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
 
@@ -410,11 +468,10 @@ bool Bounding_Polygon_Menu::post_draw() {
         current_cut_index = static_cast<float>(it->index());
     }
 
-    if (ImGui::InputFloat("Nudge Amount", &keyframe_nudge_amount, 0.01, 0.1, 5)) {
-
-    }
+    if (ImGui::InputFloat("Nudge Amount", &keyframe_nudge_amount, 0.01, 0.1, 5)) {}
 
 
+    BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
     if (ImGui::Button("Insert KF")) {
         state.cage.insert_keyframe(current_cut_index);
         glfwPostEmptyEvent();
@@ -432,7 +489,16 @@ bool Bounding_Polygon_Menu::post_draw() {
         glfwPostEmptyEvent();
         cage_dirty = true;
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Rotation")) {
+        if (kf->in_bounding_cage()) {
+            kf->set_angle(0.0);
+        }
+        glfwPostEmptyEvent();
+        cage_dirty = true;
+    }
 
+    /*
     ImGui::Separator();
     ImGui::Text("Num Keyframes: %d", state.cage.num_keyframes());
     ImGui::Separator();
@@ -454,90 +520,50 @@ bool Bounding_Polygon_Menu::post_draw() {
         exporter.write_texture_data_to_file("out_volume.raw");
         state.logger->debug("DONE");
     }
+    */
 
-    BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
-
-    const double angle_3deg = M_2_PI / 120.0;
-    const double angle_10deg = M_2_PI / 36.0;
-    if (ImGui::Button("-3deg")) {
-        if (!kf->in_bounding_cage()) {
-            kf = state.cage.insert_keyframe(current_cut_index);
-        }
-        kf->rotate_torsion_frame(-angle_3deg);
-        glfwPostEmptyEvent();
-        cage_dirty = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("+3deg")) {
-        if (!kf->in_bounding_cage()) {
-            kf = state.cage.insert_keyframe(current_cut_index);
-        }
-        kf->rotate_torsion_frame(angle_3deg);
-        glfwPostEmptyEvent();
-        cage_dirty = true;
-    }
-
-    if (ImGui::Button("-10deg")) {
-        if (!kf->in_bounding_cage()) {
-            kf = state.cage.insert_keyframe(current_cut_index);
-        }
-        kf->rotate_torsion_frame(-angle_10deg);
-        glfwPostEmptyEvent();
-        cage_dirty = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("+10deg")) {
-        if (!kf->in_bounding_cage()) {
-            kf = state.cage.insert_keyframe(current_cut_index);
-        }
-        kf->rotate_torsion_frame(angle_10deg);
-        glfwPostEmptyEvent();
-        cage_dirty = true;
-    }
-    if (ImGui::Button("Reset Rotation")) {
-        if (kf->in_bounding_cage()) {
-            kf->set_angle(0.0);
-        }
-        glfwPostEmptyEvent();
-        cage_dirty = true;
-    }
-
+    ImGui::Separator();
+    ImGui::Text("Display Options");
     ImGui::Checkbox("Show straight view", &draw_straight);
 
-
+    bool pushed_disabled_style = false;
     if (show_display_options) {
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-        ImGui::Button("Display Options");
+        pushed_disabled_style = true;
+    }
+    if (ImGui::Button("Display Options")) {
+        show_display_options = true;
+    }
+    if (pushed_disabled_style) {
         ImGui::PopItemFlag();
         ImGui::PopStyleVar();
-    } else if (ImGui::Button("Display Options")) {
-        show_display_options = true;
     }
 
     if (show_display_options) {
-        ImGui::SetNextWindowSize(ImVec2(480, 720), ImGuiSetCond_FirstUseEver);
-        if (ImGui::Begin("Display Options", NULL)) {
-            ImVec2 popup_pos = ImGui::GetWindowPos();
-            ImVec2 popup_size = ImGui::GetWindowSize();
-            double mouse_x, mouse_y;
-            glfwGetCursorPos(viewer->window, &mouse_x, &mouse_y);
+        ImGui::SetNextWindowSize(ImVec2(window_height_float*view_vsplit, 0), ImGuiSetCond_FirstUseEver);
 
-            post_draw_transfer_function();
+        ImGui::Begin("Display Options");
+//        ImGui::SetNextWindowSize(ImVec2(480, 720), ImGuiSetCond_FirstUseEver);
+//        if (ImGui::Begin("Display Options", NULL)) {
+        ImVec2 popup_pos = ImGui::GetWindowPos();
+        ImVec2 popup_size = ImGui::GetWindowSize();
+        double mouse_x, mouse_y;
+        glfwGetCursorPos(viewer->window, &mouse_x, &mouse_y);
 
-            bool in_window_x = (mouse_x >= popup_pos[0]) && (mouse_x <= (popup_pos[0] + popup_size[0]));
-            bool in_window_y = (mouse_y >= popup_pos[1]) && (mouse_y <= (popup_pos[1] + popup_size[1]));
-            mouse_in_popup = (in_window_x && in_window_y);
+        post_draw_transfer_function();
 
-            ImGui::Separator();
-            if (ImGui::Button("Close")) {
-                show_display_options = false;
-            }
-        } else {
-            mouse_in_popup = false;
+        bool in_window_x = (mouse_x >= popup_pos[0]) && (mouse_x <= (popup_pos[0] + popup_size[0]));
+        bool in_window_y = (mouse_y >= popup_pos[1]) && (mouse_y <= (popup_pos[1] + popup_size[1]));
+        mouse_in_popup = (in_window_x && in_window_y);
+
+        ImGui::Separator();
+        if (ImGui::Button("Close")) {
+            show_display_options = false;
         }
         ImGui::End();
     } else {
+        show_display_options = false;
         mouse_in_popup = false;
     }
 

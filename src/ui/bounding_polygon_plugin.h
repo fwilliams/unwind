@@ -38,6 +38,7 @@ public:
     bool has_added_node_since_initial_click = false;
     glm::vec2 clicked_mouse_position = { 0.f, 0.f };
     int current_interaction_index = -1;
+    bool color_popup_open = false;
 
     bool mouse_in_popup = false;
     bool show_display_options = false;
