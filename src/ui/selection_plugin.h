@@ -25,7 +25,8 @@ private:
 
     State& _state;
 
-    volumerendering::SelectionRenderer volume_rendering;
+    volumerendering::Parameters rendering_params;
+    volumerendering::SelectionRenderer selection_renderer;
 
     glm::vec2 clicked_mouse_position = { 0.f, 0.f };
     bool is_currently_interacting = false;

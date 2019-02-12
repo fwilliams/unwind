@@ -19,26 +19,26 @@
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::deinitialize() {
-    volume_rendering.destroy();
+    selection_renderer.destroy();
 }
 
 void Selection_Menu::initialize() {
-    volume_rendering.initialize(glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
+    selection_renderer.initialize(glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
 
     const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
-    volume_rendering.parameters.volume_dimensions = volume_dims;
+    rendering_params.volume_dimensions = volume_dims;
 
     _state.selected_features.clear();
     number_features_is_dirty = true;
     selection_list_is_dirty = false;
     target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
 
-    const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
+    const int maxDim = glm::compMax(rendering_params.volume_dimensions);
     const float md = static_cast<float>(maxDim);
     const glm::vec3 normalized_volume_dims = {
-      volume_rendering.parameters.volume_dimensions[0] / md,
-      volume_rendering.parameters.volume_dimensions[1] / md,
-      volume_rendering.parameters.volume_dimensions[2] / md
+      rendering_params.volume_dimensions[0] / md,
+      rendering_params.volume_dimensions[1] / md,
+      rendering_params.volume_dimensions[2] / md
     };
     double w = normalized_volume_dims[0]/2.0, h = normalized_volume_dims[1]/2.0, d = normalized_volume_dims[2]/2.0;
     Eigen::MatrixXd volume_bbox_v(8, 3);
@@ -87,7 +87,7 @@ bool Selection_Menu::pre_draw() {
 
 void Selection_Menu::draw_selection_volume() {
     if (viewer->core.viewport != target_viewport_size) {
-        volume_rendering.resize_framebuffer(
+        selection_renderer.resize_framebuffer(
                     glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
         target_viewport_size = G4f(viewer->core.viewport);
     }
@@ -112,47 +112,49 @@ void Selection_Menu::draw_selection_volume() {
                 buffer_data[j + 1] = static_cast<uint32_t>(i);
             }
         }
-        volume_rendering.set_contour_data(buffer_data.data(), buffer_data.size());
+        selection_renderer.set_contour_data(buffer_data.data(), buffer_data.size());
         number_features_is_dirty = false;
     }
 
     if (selection_list_is_dirty) {
         std::vector<uint32_t> selected = _state.selected_features;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
-        volume_rendering.set_selection_data(selected.data(), selected.size());
+        selection_renderer.set_selection_data(selected.data(), selected.size());
         selection_list_is_dirty = false;
     }
 
     if (transfer_function_dirty) {
-        volume_rendering.set_transfer_function(transfer_function);
+        selection_renderer.set_transfer_function(transfer_function);
         transfer_function_dirty = false;
     }
 
-    volume_rendering.parameters.sampling_rate = 1.0 / glm::length(glm::vec3(volume_rendering.parameters.volume_dimensions));
-    volume_rendering.parameters.light_position = G3f(viewer->core.light_position);
-    volume_rendering.parameters.highlight_factor = highlight_factor;
-    volume_rendering.parameters.emphasize_by_selection = static_cast<int>(emphasize_by_selection);
-    volume_rendering.parameters.color_by_id = color_by_id;
+    rendering_params.sampling_rate = 1.0 / glm::length(glm::vec3(rendering_params.volume_dimensions));
+    rendering_params.light_position = G3f(viewer->core.light_position);
+    rendering_params.highlight_factor = highlight_factor;
+    rendering_params.emphasize_by_selection = static_cast<int>(emphasize_by_selection);
+    rendering_params.color_by_id = color_by_id;
 
-    const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
+    const int maxDim = glm::compMax(rendering_params.volume_dimensions);
     const float md = static_cast<float>(maxDim);
     const glm::vec3 normalized_volume_dims = {
-      volume_rendering.parameters.volume_dimensions[0] / md,
-      volume_rendering.parameters.volume_dimensions[1] / md,
-      volume_rendering.parameters.volume_dimensions[2] / md
+      rendering_params.volume_dimensions[0] / md,
+      rendering_params.volume_dimensions[1] / md,
+      rendering_params.volume_dimensions[2] / md
     };
     glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dims);
     glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
     glm::mat4 model = GM4f(viewer->core.model) * scaling * translate;
     glm::mat4 view = GM4f(viewer->core.view);
     glm::mat4 proj = GM4f(viewer->core.proj);
-    volume_rendering.render_bounding_box(model, view, proj);
-    volume_rendering.render_volume(
+    selection_renderer.geometry_pass(model, view, proj);
+    selection_renderer.volume_pass(
+                rendering_params,
                 _state.low_res_volume.index_texture,
                 _state.low_res_volume.volume_texture);
 
     glm::ivec2 inv_mouse_coords { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y };
-    glm::vec3 picking = volume_rendering.pick_volume_location(
+    glm::vec3 picking = selection_renderer.picking_pass(
+                rendering_params,
                 inv_mouse_coords,
                 _state.low_res_volume.index_texture,
                 _state.low_res_volume.volume_texture);

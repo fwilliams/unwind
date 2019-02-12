@@ -16,24 +16,6 @@ struct TfNode {
     glm::vec4 rgba;
 };
 
-struct Bounding_Box {
-    GLuint vao = 0;
-    GLuint vbo = 0;
-    GLuint ibo = 0;
-
-    GLuint entry_framebuffer = 0;
-    GLuint entry_texture = 0;
-
-    GLuint exit_framebuffer = 0;
-    GLuint exit_texture = 0;
-
-    GLuint program = 0;
-    struct {
-        GLint model_matrix = 0;
-        GLint view_matrix = 0;
-        GLint projection_matrix = 0;
-    } uniform_location;
-};
 
 struct Parameters {
     glm::ivec3 volume_dimensions = { 0, 0, 0 };
@@ -58,8 +40,25 @@ struct Parameters {
 };
 
 struct SelectionRenderer {
-    Bounding_Box bounding_box;
-    Parameters parameters;
+    struct GeometryPass {
+        GLuint vao = 0;
+        GLuint vbo = 0;
+        GLuint ibo = 0;
+
+        GLuint entry_framebuffer = 0;
+        GLuint entry_texture = 0;
+
+        GLuint exit_framebuffer = 0;
+        GLuint exit_texture = 0;
+
+        GLuint program = 0;
+        struct {
+            GLint model_matrix = 0;
+            GLint view_matrix = 0;
+            GLint projection_matrix = 0;
+        } uniform_location;
+    } bounding_box;
+    //Parameters parameters;
 
     struct VolumePass {
         GLuint program_object = 0;
@@ -97,16 +96,13 @@ struct SelectionRenderer {
             GLint volume_dimensions = 0;
             GLint volume_dimensions_rcp = 0;
             GLint sampling_rate = 0;
+            GLuint index_volume = 0;
         } uniform_location;
     } picking_program;
 
     struct GLState {
         GLuint selection_list_ssbo;
         GLuint contour_information_ssbo;
-
-        struct {
-            GLuint index_volume = 0;
-        } uniform_locations_picking;
 
         struct {
             GLuint index_volume = 0;
@@ -127,9 +123,10 @@ struct SelectionRenderer {
 
     void initialize(const glm::ivec2& viewport_size);
     void destroy();
-    void render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
-    void render_volume(GLuint index_texture, GLuint volume_texture);
-    glm::vec3 pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture);
+
+    void geometry_pass(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
+    void volume_pass(Parameters parameters, GLuint index_texture, GLuint volume_texture);
+    glm::vec3 picking_pass(Parameters parameters, glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture);
 
 };
 

@@ -578,7 +578,7 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
     _gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
         program.program_object, "highlight_factor"
     );
-    _gl_state.uniform_locations_picking.index_volume = glGetUniformLocation(
+    picking_program.uniform_location.index_volume = glGetUniformLocation(
         picking_program.program_object, "index_volume"
     );
 
@@ -614,8 +614,8 @@ void SelectionRenderer::destroy() {
     glDeleteProgram(picking_program.program_object);
     glDeleteProgram(bounding_box.program);
 
-    bounding_box = Bounding_Box();
-    parameters = Parameters();
+    bounding_box = GeometryPass();
+    //parameters = Parameters();
     program = VolumePass();
     picking_program = PickingPass();
     _gl_state = GLState();
@@ -699,7 +699,7 @@ void SelectionRenderer::set_transfer_function(const std::vector<TfNode> &tf) {
     glPopDebugGroup();
 }
 
-void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix)
+void SelectionRenderer::geometry_pass(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix)
 {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
 
@@ -764,7 +764,7 @@ void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 vi
     glPopDebugGroup();
 }
 
-void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_texture) {
+void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture, GLuint volume_texture) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
 
     //
@@ -854,11 +854,11 @@ void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_textur
     glPopDebugGroup();
 }
 
-glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture) {
+glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture) {
     glUseProgram(picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, index_texture);
-    glUniform1i(_gl_state.uniform_locations_picking.index_volume, 4);
+    glUniform1i(picking_program.uniform_location.index_volume, 4);
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
     glBindFramebuffer(GL_FRAMEBUFFER, picking_program.picking_framebuffer);
