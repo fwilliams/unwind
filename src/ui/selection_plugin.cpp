@@ -99,18 +99,15 @@ void Selection_Menu::initialize() {
     viewer->core.align_camera_center(volume_bbox_v, volume_bbox_i);
 
     volume_rendering.parameters.sampling_rate = 1.0 / glm::length(glm::vec3(volume_rendering.parameters.volume_dimensions));
-}
 
-void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
-    // Entry point texture and frame buffer
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.entry_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
-        GL_RGBA, GL_FLOAT, nullptr);
-
-    // Exit point texture and frame buffer
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.exit_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
-        GL_RGBA, GL_FLOAT, nullptr);
+    if (transfer_function.empty()) {
+        // Create the initial nodes
+        volumerendering::TfNode first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
+        volumerendering::TfNode last = { 1.f, { 1.f, 1.f, 1.f, 1.f } };
+        transfer_function.push_back(std::move(first));
+        transfer_function.push_back(std::move(last));
+        transfer_function_dirty = true;
+    }
 }
 
 bool Selection_Menu::pre_draw() {
@@ -121,8 +118,8 @@ bool Selection_Menu::pre_draw() {
 
 void Selection_Menu::draw_selection_volume() {
     if (viewer->core.viewport != target_viewport_size) {
-        resize_framebuffer_textures(
-            glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
+        volume_rendering.resize_framebuffer(
+                    glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
         target_viewport_size = G4f(viewer->core.viewport);
     }
 
@@ -157,11 +154,9 @@ void Selection_Menu::draw_selection_volume() {
         selection_list_is_dirty = false;
     }
 
-    if (volume_rendering.transfer_function.is_dirty) {
-        glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
-        update_transfer_function(volume_rendering.transfer_function);
-        volume_rendering.transfer_function.is_dirty = false;
-        glPopDebugGroup();
+    if (transfer_function_dirty) {
+        volume_rendering.set_transfer_function(transfer_function);
+        transfer_function_dirty = false;
     }
 
     volume_rendering.parameters.light_position = G3f(viewer->core.light_position);
@@ -368,8 +363,6 @@ bool Selection_Menu::post_draw() {
 
         constexpr const float Radius = 10.f;
 
-        volumerendering::Transfer_Function& tf = volume_rendering.transfer_function;
-
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
 
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -390,14 +383,14 @@ bool Selection_Menu::post_draw() {
         ImGui::InvisibleButton("canvas", canvas_size);
 
         // First render the lines
-        for (size_t i = 0; i < tf.nodes.size(); ++i) {
-            volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+        for (size_t i = 0; i < transfer_function.size(); ++i) {
+            volumerendering::TfNode& node = transfer_function[i];
 
             const float x = canvas_pos.x + canvas_size.x * node.t;
             const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
             if (i > 0) {
-                volumerendering::Transfer_Function::Node& prev_node = tf.nodes[i - 1];
+                volumerendering::TfNode& prev_node = transfer_function[i - 1];
 
                 const float prev_x = canvas_pos.x + canvas_size.x * prev_node.t;
                 const float prev_y = canvas_pos.y + canvas_size.y * (1.f - prev_node.rgba[3]);
@@ -406,8 +399,8 @@ bool Selection_Menu::post_draw() {
             }
         }
 
-        for (size_t i = 0; i < tf.nodes.size(); ++i) {
-            volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+        for (size_t i = 0; i < transfer_function.size(); ++i) {
+            volumerendering::TfNode& node = transfer_function[i];
 
             const float x = canvas_pos.x + canvas_size.x * node.t;
             const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
@@ -434,8 +427,8 @@ bool Selection_Menu::post_draw() {
 
         if (mouse_in_tf_editor) {
             if (ImGui::IsMouseDown(0)) {
-                for (size_t i = 0; i < tf.nodes.size(); ++i) {
-                    volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+                for (size_t i = 0; i < transfer_function.size(); ++i) {
+                    volumerendering::TfNode& node = transfer_function[i];
                     const float x = canvas_pos.x + canvas_size.x * node.t;
                     const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
@@ -476,16 +469,16 @@ bool Selection_Menu::post_draw() {
                     }
                     // We don't want to move the first or last value
                     const bool is_first = current_interaction_index == 0;
-                    const bool is_last = (current_interaction_index == tf.nodes.size() - 1);
+                    const bool is_last = (current_interaction_index == transfer_function.size() - 1);
                     if (!is_first && !is_last) {
-                        tf.nodes[current_interaction_index].t = new_t;
+                        transfer_function[current_interaction_index].t = new_t;
                     }
-                    tf.nodes[current_interaction_index].rgba[3] = new_a;
+                    transfer_function[current_interaction_index].rgba[3] = new_a;
 
-                    using N = volumerendering::Transfer_Function::Node;
-                    std::sort(tf.nodes.begin(), tf.nodes.end(),
+                    using N = volumerendering::TfNode;
+                    std::sort(transfer_function.begin(), transfer_function.end(),
                         [](const N& lhs, const N& rhs) { return lhs.t < rhs.t; });
-                    tf.is_dirty = true;
+                    transfer_function_dirty = true;
                 }
                 else {
                     current_interaction_index = -1;
@@ -497,11 +490,11 @@ bool Selection_Menu::post_draw() {
                         const float a = 1.f - ((ImGui::GetIO().MousePos.y - canvas_pos.y) /
                             canvas_size.y);
 
-                        for (size_t i = 0; i < tf.nodes.size(); ++i) {
-                            volumerendering::Transfer_Function::Node& node = tf.nodes[i];
+                        for (size_t i = 0; i < transfer_function.size(); ++i) {
+                            volumerendering::TfNode& node = transfer_function[i];
 
                             if (node.t > t) {
-                                volumerendering::Transfer_Function::Node& prev = tf.nodes[i - 1];
+                                volumerendering::TfNode& prev = transfer_function[i - 1];
 
                                 const float t_prime = (t - prev.t) / (node.t - prev.t);
 
@@ -514,12 +507,12 @@ bool Selection_Menu::post_draw() {
                                 const float a = prev.rgba[3] * (1.f - t_prime) +
                                     node.rgba[3] * t_prime;
 
-                                tf.nodes.insert(
-                                    tf.nodes.begin() + i,
+                                transfer_function.insert(
+                                    transfer_function.begin() + i,
                                     { t, { r, g, b, a } }
                                 );
                                 has_added_node_since_initial_click = true;
-                                tf.is_dirty = true;
+                                transfer_function_dirty = true;
                                 break;
                             }
                         }
@@ -537,21 +530,21 @@ bool Selection_Menu::post_draw() {
 
         if (ImGui::Button("Remove node")) {
             const bool is_first = current_interaction_index == 0;
-            const bool is_last = current_interaction_index == tf.nodes.size() - 1;
+            const bool is_last = current_interaction_index == transfer_function.size() - 1;
             if (!is_first && !is_last) {
-                tf.nodes.erase(tf.nodes.begin() + current_interaction_index);
+                transfer_function.erase(transfer_function.begin() + current_interaction_index);
                 current_interaction_index = -1;
-                tf.is_dirty = true;
+                transfer_function_dirty = true;
             }
         }
 
         ImGui::PushItemWidth(-1);
         if (current_interaction_index >= 1 &&
-            current_interaction_index <= tf.nodes.size() - 1)
+            current_interaction_index <= transfer_function.size() - 1)
         {
-            float* rgba = glm::value_ptr(tf.nodes[current_interaction_index].rgba);
+            float* rgba = glm::value_ptr(transfer_function[current_interaction_index].rgba);
             if (ImGui::ColorPicker4("Change Color", rgba)) {
-                tf.is_dirty = true;
+                transfer_function_dirty = true;
             }
         }
         else {

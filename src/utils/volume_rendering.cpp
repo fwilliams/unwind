@@ -441,13 +441,6 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
-    // Create the initial nodes
-    Transfer_Function::Node first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
-    Transfer_Function::Node last = { 1.f, { 1.f, 1.f, 1.f, 1.f } };
-    transfer_function.nodes.push_back(std::move(first));
-    transfer_function.nodes.push_back(std::move(last));
-    transfer_function.is_dirty = true;
 }
 
 
@@ -483,26 +476,27 @@ void SelectionRenderer::destroy() {
     _gl_state = GLState();
 }
 
-void update_transfer_function(Transfer_Function& transfer_function) {
-    constexpr const int TransferFunctionWidth = 512;
+void SelectionRenderer::set_transfer_function(const std::vector<TfNode> &tf) {
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
+
+    constexpr const int TRANSFER_FUNCTION_WIDTH = 512;
 
     assert(
         std::is_sorted(
-            transfer_function.nodes.begin(),
-            transfer_function.nodes.end(),
-            [](const Transfer_Function::Node& a, const Transfer_Function::Node& b) {
+            tf.begin(),
+            tf.end(),
+            [](const TfNode& a, const TfNode& b) {
                 return a.t < b.t;
             }
         )
     );
-    assert(transfer_function.nodes.size() >= 2);
-    assert(transfer_function.nodes.front().t == 0.f);
-    assert(transfer_function.nodes.back().t == 1.f);
+    assert(tf.size() >= 2);
+    assert(tf.front().t == 0.f);
+    assert(tf.back().t == 1.f);
 
 
-    std::vector<Transfer_Function::Node>::const_iterator current =
-        transfer_function.nodes.begin();
-    std::vector<Transfer_Function::Node>::const_iterator next = current + 1;
+    std::vector<TfNode>::const_iterator current = tf.begin();
+    std::vector<TfNode>::const_iterator next = current + 1;
 
     //    a
     //    l  ^
@@ -526,9 +520,9 @@ void update_transfer_function(Transfer_Function& transfer_function) {
     //
 
 
-    std::vector<std::array<uint8_t, 4>> transfer_function_data(TransferFunctionWidth);
-    for (int i = 0; i < TransferFunctionWidth; ++i) {
-        const float t = static_cast<float>(i) / (TransferFunctionWidth - 1);
+    std::vector<std::array<uint8_t, 4>> transfer_function_data(TRANSFER_FUNCTION_WIDTH);
+    for (int i = 0; i < TRANSFER_FUNCTION_WIDTH; ++i) {
+        const float t = static_cast<float>(i) / (TRANSFER_FUNCTION_WIDTH - 1);
 
         if (t > next->t) {
             current = next;
@@ -553,9 +547,11 @@ void update_transfer_function(Transfer_Function& transfer_function) {
     }
 
     glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
-    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, TransferFunctionWidth, 0, GL_RGBA,
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, TRANSFER_FUNCTION_WIDTH, 0, GL_RGBA,
         GL_UNSIGNED_BYTE, transfer_function_data.data());
     glBindTexture(GL_TEXTURE_1D, 0);
+
+    glPopDebugGroup();
 }
 
 void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix)
@@ -790,5 +786,19 @@ void SelectionRenderer::set_selection_data(uint32_t* selection_list, size_t num_
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, selection_list, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void SelectionRenderer::resize_framebuffer(glm::ivec2 framebuffer_size) {
+    // Entry point texture and frame buffer
+    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
+        GL_RGBA, GL_FLOAT, nullptr);
+
+    // Exit point texture and frame buffer
+    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
+        GL_RGBA, GL_FLOAT, nullptr);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 } // namespace volumerendering

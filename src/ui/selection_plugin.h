@@ -21,7 +21,6 @@ public:
     bool post_draw() override;
 
 private:
-    void resize_framebuffer_textures(glm::ivec2 framebuffer_size);
     void draw_selection_volume();
 
     State& _state;
@@ -34,6 +33,9 @@ private:
     bool has_added_node_since_initial_click = false;
 
     bool number_features_is_dirty = true;
+    bool transfer_function_dirty = true;
+
+    std::vector<volumerendering::TfNode> transfer_function;
 
     int current_selected_feature = -1;
 
