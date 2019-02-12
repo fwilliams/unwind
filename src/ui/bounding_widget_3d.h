@@ -23,7 +23,12 @@ public:
     PointLineRenderer renderer_2d;
 
     double export_rescale_factor = 2.0;
+
+    void center_bounding_cage_mesh();
+    void center_straight_mesh();
+
 private:
+
     void update_volume_geometry(const Eigen::RowVector3d& volume_size, const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F);
     void update_2d_geometry_curved(BoundingCage::KeyFrameIterator current_kf);
     void update_2d_geometry_straight(BoundingCage::KeyFrameIterator current_kf);

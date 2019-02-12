@@ -259,7 +259,13 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     ImGui::Separator();
     ImGui::Text("Display Options");
-    ImGui::Checkbox("Show straight view", &draw_straight);
+    if (ImGui::Checkbox("Show straight view", &draw_straight)) {
+        if (draw_straight) {
+            widget_3d.center_straight_mesh();
+        } else {
+            widget_3d.center_bounding_cage_mesh();
+        }
+    }
 
     bool pushed_disabled_style = false;
     if (show_display_options) {

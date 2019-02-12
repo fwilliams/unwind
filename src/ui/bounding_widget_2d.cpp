@@ -381,7 +381,8 @@ bool Bounding_Polygon_Widget::mouse_move(int mouse_x, int mouse_y, bool in_focus
         }
         parent->cage_dirty = true;
     }
-    return false;
+
+    return true;
 }
 
 bool Bounding_Polygon_Widget::mouse_down(int button, int modifier, bool in_focus) {

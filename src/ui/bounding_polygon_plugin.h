@@ -32,10 +32,10 @@ public:
 
     VolumeExporter exporter;
 
-
-
-
 private:
+
+    void center_bounding_cage_mesh();
+    void center_straight_mesh();
 
     bool is_2d_widget_in_focus();
 
