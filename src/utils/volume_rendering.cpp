@@ -574,8 +574,8 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
 
     // SSBO
-    glGenBuffers(1, &_gl_state.contour_information_ssbo);
-    glGenBuffers(1, &_gl_state.selection_list_ssbo);
+    glGenBuffers(1, &program.contour_information_ssbo);
+    glGenBuffers(1, &program.selection_list_ssbo);
 
 }
 
@@ -584,8 +584,8 @@ void SelectionRenderer::destroy() {
     std::vector<GLuint> buffers = {
         bounding_box.vbo,
         bounding_box.ibo,
-        _gl_state.contour_information_ssbo,
-        _gl_state.selection_list_ssbo };
+        program.contour_information_ssbo,
+        program.selection_list_ssbo };
     std::vector<GLuint> textures = {
         bounding_box.entry_texture,
         bounding_box.exit_texture,
@@ -774,12 +774,12 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
 
 
     // Contour Buffer
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _gl_state.contour_information_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.contour_information_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, program.contour_information_ssbo);
 
     // Selection Buffer
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.selection_list_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.selection_list_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, program.selection_list_ssbo);
 
     glUniform1i(program.uniform_location.color_by_identifier, parameters.color_by_id ? 1 : 0);
 
@@ -911,13 +911,13 @@ glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mous
 }
 
 void SelectionRenderer::set_contour_data(uint32_t* contour_features, size_t num_features) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.contour_information_ssbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, contour_features, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void SelectionRenderer::set_selection_data(uint32_t* selection_list, size_t num_features) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.selection_list_ssbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, selection_list, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
