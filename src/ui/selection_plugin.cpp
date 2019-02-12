@@ -255,54 +255,12 @@ bool Selection_Menu::post_draw() {
         _state.selected_features.clear();
         selection_list_is_dirty = true;
     }
-//    ImGui::NewLine();
-
-//    ImGui::Separator();
-//    ImGui::PushItemWidth(-1);
-//    ImGui::Text("Current fish: %ld / %ld", _state.current_fish + 1,
-//        _state.fishes.size());
-//    bool pressed_prev = ImGui::Button("< Prev Fish");
-//    ImGui::SameLine();
-//    bool pressed_next = ImGui::Button("Next Fish >");
-//    ImGui::SameLine();
-//    bool pressed_delete = ImGui::Button("Delete Fish");
-
-//    if (pressed_prev) {
-//        bool is_fish_empty = _state.selected_features.empty();
-//        bool is_in_last_fish = _state.current_fish == _state.fishes.size() - 1;
-//        if (is_fish_empty && is_in_last_fish) {
-//            pressed_delete = true;
-//        }
-//        else {
-//            _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
-//        }
-//        selection_list_is_dirty = true;
-//    }
-//    if (pressed_next) {
-//        _state.current_fish++;
-//        // We reached the end
-//        if (_state.current_fish == _state.fishes.size()) {
-//            _state.fishes.push_back({});
-//        }
-
-//        selection_list_is_dirty = true;
-//    }
-
-//    // We don't want to delete the last fish
-//    if (pressed_delete && _state.fishes.size() > 1) {
-//        _state.fishes.erase(_state.fishes.begin() + _state.current_fish);
-//        _state.current_fish = std::max(size_t(0), _state.current_fish - 1);
-
-//        selection_list_is_dirty = true;
-//    }
-
-//    ImGui::NewLine();
 
     ImGui::Separator();
 
     ImGui::NewLine();
     if (ImGui::Button("Back")) {
-        // TODO: Back button
+        _state.set_application_state(Application_State::Initial_File_Selection);
     }
     ImGui::SameLine();
     if (list.empty()) {
