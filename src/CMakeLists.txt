@@ -7,7 +7,7 @@ add_executable(fish_deformation main.cpp ${UI_SRCS} ${UI_HEADER} ".editorconfig"
 set_property(TARGET fish_deformation PROPERTY CXX_STANDARD 14)
 set_property(TARGET fish_deformation PROPERTY CXX_STANDARD_REQUIRED ON)
 target_link_libraries(fish_deformation quartet contourtree utils vor3d spdlog
-  igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal igl::triangle)
+  igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui igl::cgal igl::triangle FreeImage_static)
 
 # Binary to extract a surface mesh from a volume datfile (Deprecated, remove soon)
 add_executable(extract_surface_bin extract_surface.cpp)

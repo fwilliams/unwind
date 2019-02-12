@@ -68,6 +68,9 @@ find_package(Qt5Widgets REQUIRED)
 add_library(spdlog INTERFACE)
 target_include_directories(spdlog INTERFACE external/spdlog/include)
 
+# FreeImage static library
+include(external/FreeImage/CMakeLists.txt)
+
 # Quartet static library
 set(QUARTET_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src")
 file(GLOB QUARTET_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src/*.cpp")
