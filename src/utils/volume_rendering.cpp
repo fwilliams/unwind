@@ -624,16 +624,9 @@ void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_textur
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.selection_list_ssbo);
 
-    bool color_by_id = true;
-    glUniform1i(_gl_state.uniform_locations_rendering.color_by_identifier, color_by_id ? 1 : 0);
+    glUniform1i(_gl_state.uniform_locations_rendering.color_by_identifier, parameters.color_by_id ? 1 : 0);
 
-    //    enum class Emphasis {
-    //        None = 0,
-    //        OnSelection = 1,
-    //        OnNonSelection = 2
-    //    };
-    int emphasize_by_selection = 1;
-    glUniform1i(_gl_state.uniform_locations_rendering.selection_emphasis_type, emphasize_by_selection);
+    glUniform1i(_gl_state.uniform_locations_rendering.selection_emphasis_type, parameters.emphasize_by_selection);
 
     glUniform1f(_gl_state.uniform_locations_rendering.highlight_factor, parameters.highlight_factor);
 

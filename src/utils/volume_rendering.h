@@ -54,6 +54,15 @@ struct Parameters {
     glm::vec3 diffuse = glm::vec3(0.8, 0.8, 0.8);
     glm::vec3 specular = glm::vec3(0.0, 0.0, 0.0);
     float specular_exponent = 10.0;
+
+    // When to emphasize selected components:
+    // 0 = None
+    // 1 = OnSelection
+    // 2 = OnNonSelection
+    int emphasize_by_selection = 1;
+
+    // Color components based on their identifier
+    bool color_by_id = true;
 };
 
 struct SelectionRenderer {

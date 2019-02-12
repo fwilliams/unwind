@@ -183,29 +183,10 @@ void Selection_Menu::draw_selection_volume() {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-//    glUseProgram(volume_rendering.program.program_object);
-
-//    // The default volume renderer already uses GL_TEXTURE0 through GL_TEXTURE3
-//    glActiveTexture(GL_TEXTURE4);
-//    glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
-//    glUniform1i(volume_rendering._gl_state.uniform_locations_rendering.index_volume, 4);
-
-//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.contour_information_ssbo);
-//    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, volume_rendering._gl_state.contour_information_ssbo);
-
-//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.selection_list_ssbo);
-//    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, volume_rendering._gl_state.selection_list_ssbo);
-
-//    glUniform1i(volume_rendering._gl_state.uniform_locations_rendering.color_by_identifier,
-//        color_by_id ? 1 : 0);
-
-//    glUniform1i(volume_rendering._gl_state.uniform_locations_rendering.selection_emphasis_type,
-//        static_cast<int>(emphasize_by_selection));
-
-//    glUniform1f(volume_rendering._gl_state.uniform_locations_rendering.highlight_factor, highlight_factor);
-
     volume_rendering.parameters.light_position = G3f(viewer->core.light_position);
     volume_rendering.parameters.highlight_factor = highlight_factor;
+    volume_rendering.parameters.emphasize_by_selection = static_cast<int>(emphasize_by_selection);
+    volume_rendering.parameters.color_by_id = color_by_id;
     volume_rendering.render_volume(
                 _state.low_res_volume.index_texture,
                 _state.low_res_volume.volume_texture);
