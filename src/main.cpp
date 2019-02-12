@@ -10,17 +10,13 @@
 #include "ui/state.h"
 
 State _state;
+
 Application_State previous_state;
-
-
 Initial_File_Selection_Menu initial_file_selection(_state);
 Selection_Menu selection_menu(_state);
 Meshing_Menu meshing_menu(_state);
 EndPoint_Selection_Menu endpoint_selection_menu(_state);
 Bounding_Polygon_Menu bounding_polygon_menu(_state);
-
-
-
 
 
 void log_opengl_debug(GLenum source, GLenum type, GLuint id, GLenum severity,
@@ -51,7 +47,7 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
 
     viewer.plugins.push_back(&initial_file_selection);
 
-    _state.logger = spdlog::stdout_color_mt(FishLoggerName);
+    _state.logger = spdlog::stdout_color_mt(FISH_LOGGER_NAME);
     _state.logger->set_level(spdlog::level::trace);
     _state.cage.set_logger(_state.logger);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -105,42 +101,11 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
     return false;
 }
 
-
-bool mouse_move(igl::opengl::glfw::Viewer& viewer, int mouse_x, int mouse_y) {
-    switch (_state.application_state) {
-        case Application_State::BoundingPolygon:
-            return bounding_polygon_menu.mouse_move(mouse_x, mouse_y);
-        default:
-            return false;
-    }
-}
-
-bool mouse_down(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
-    switch (_state.application_state) {
-        case Application_State::BoundingPolygon:
-            return bounding_polygon_menu.mouse_down(button, modifier);
-        default:
-            return false;
-    }
-}
-
-bool mouse_up(igl::opengl::glfw::Viewer& viewer, int button, int modifier) {
-    switch (_state.application_state) {
-        case Application_State::BoundingPolygon:
-            return bounding_polygon_menu.mouse_up(button, modifier);
-        default:
-            return false;
-    }
-}
-
 int main(int argc, char** argv) {
     igl::opengl::glfw::Viewer viewer;
     viewer.core.background_color = Eigen::Vector4f(0.1f, 0.1f, 0.1f, 1.f);
     viewer.callback_init = init;
     viewer.callback_pre_draw = pre_draw;
-    viewer.callback_mouse_move = mouse_move;
-    viewer.callback_mouse_down = mouse_down;
-    viewer.callback_mouse_up = mouse_up;
     viewer.launch();
 
     return EXIT_SUCCESS;

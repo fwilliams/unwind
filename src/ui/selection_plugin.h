@@ -17,10 +17,12 @@ public:
     void deinitialize();
 
     bool key_down(int key, int modifiers) override;
-    bool pre_draw() override;
     bool post_draw() override;
 
 private:
+    Eigen::RowVector4f old_viewport;
+    float view_hsplit = 0.2f;
+
     void draw_selection_volume();
 
     State& _state;
@@ -37,9 +39,7 @@ private:
     bool transfer_function_dirty = true;
 
     std::vector<TfNode> transfer_function;
-
     int current_selected_feature = -1;
-
     bool color_by_id = true;
 
     // Keep in sync with volume_fragment_shader.h and Combobox code generation
@@ -49,7 +49,6 @@ private:
         OnNonSelection = 2
     };
     Emphasis emphasize_by_selection = Emphasis::OnSelection;
-
     float highlight_factor = 0.125f;
 
     bool show_error_popup = false;

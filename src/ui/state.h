@@ -1,10 +1,10 @@
 #ifndef __FISH_DEFORMATION_STATE__
 #define __FISH_DEFORMATION_STATE__
 
-#include "bounding_cage.h"
-#include "preprocessing.hpp"
-#include "utils/utils.h"
-#include "utils/datfile.h"
+#include <preprocessing.hpp>
+#include <utils/bounding_cage.h>
+#include <utils/utils.h>
+#include <utils/datfile.h>
 
 #include <array>
 #include <GLFW/glfw3.h>
@@ -14,7 +14,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-constexpr const char* FishLoggerName = "fish_deformation_logger";
+constexpr const char* FISH_LOGGER_NAME = "fish_deformation_logger";
 
 enum class Application_State {
     Initial_File_Selection = 0,
@@ -22,8 +22,6 @@ enum class Application_State {
     Meshing,
     EndPointSelection,
     BoundingPolygon,
-    Straightening,
-    Rasterization
 };
 
 struct State {

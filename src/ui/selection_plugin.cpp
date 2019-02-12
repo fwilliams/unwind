@@ -18,6 +18,7 @@ Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::deinitialize() {
     selection_renderer.destroy();
+    viewer->core.viewport = old_viewport;
 }
 
 void Selection_Menu::initialize() {
@@ -30,6 +31,11 @@ void Selection_Menu::initialize() {
     number_features_is_dirty = true;
     selection_list_is_dirty = false;
     target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
+
+    int window_width, window_height;
+    glfwGetWindowSize(viewer->window, &window_width, &window_height);
+    Eigen::RowVector4f viewport(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
+    viewer->core.viewport = viewport;
 
     const int maxDim = glm::compMax(rendering_params.volume_dimensions);
     const float md = static_cast<float>(maxDim);
@@ -65,8 +71,6 @@ void Selection_Menu::initialize() {
         1, 7, 3;
     viewer->core.align_camera_center(volume_bbox_v, volume_bbox_i);
 
-
-
     if (transfer_function.empty()) {
         // Create the initial nodes
         TfNode first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
@@ -75,15 +79,17 @@ void Selection_Menu::initialize() {
         transfer_function.push_back(std::move(last));
         transfer_function_dirty = true;
     }
-}
 
-bool Selection_Menu::pre_draw() {
-    bool ret = FishUIViewerPlugin::pre_draw();
-
-    return ret;
+    old_viewport = viewer->core.viewport;
 }
 
 void Selection_Menu::draw_selection_volume() {
+    int window_width, window_height;
+    glfwGetWindowSize(viewer->window, &window_width, &window_height);
+    Eigen::RowVector4f viewport(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    viewer->core.viewport = viewport;
+
     if (viewer->core.viewport != target_viewport_size) {
         selection_renderer.resize_framebuffer(
                     glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
@@ -187,6 +193,8 @@ void Selection_Menu::draw_selection_volume() {
 
         should_select = false;
     }
+
+    glViewport(0, 0, window_width, window_height);
 }
 
 bool Selection_Menu::key_down(int key, int modifiers) {
@@ -207,7 +215,7 @@ bool Selection_Menu::post_draw() {
     float h = static_cast<float>(height);
     ImGui::SetNextWindowBgAlpha(0.5f);
     ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiSetCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(w * 0.2f, h), ImGuiSetCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(w * view_hsplit, h), ImGuiSetCond_Always);
     ImGui::Begin("Select Segments", nullptr,
         //ImGuiWindowFlags_NoSavedSettings |
         //ImGuiWindowFlags_AlwaysAutoResize);
