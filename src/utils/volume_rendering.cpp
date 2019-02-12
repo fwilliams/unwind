@@ -599,7 +599,7 @@ void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 vi
     glPopDebugGroup();
 }
 
-void SelectionRenderer::render_volume(glm::vec3 light_position, GLuint volume_texture) {
+void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_texture) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
     //
     //  Setup
@@ -614,6 +614,30 @@ void SelectionRenderer::render_volume(glm::vec3 light_position, GLuint volume_te
     //  Volume rendering
     //
     glUseProgram(program.program_object);
+
+
+    // Contour Buffer
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _gl_state.contour_information_ssbo);
+
+    // Selection Buffer
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.selection_list_ssbo);
+
+    bool color_by_id = true;
+    glUniform1i(_gl_state.uniform_locations_rendering.color_by_identifier, color_by_id ? 1 : 0);
+
+    //    enum class Emphasis {
+    //        None = 0,
+    //        OnSelection = 1,
+    //        OnNonSelection = 2
+    //    };
+    int emphasize_by_selection = 1;
+    glUniform1i(_gl_state.uniform_locations_rendering.selection_emphasis_type, emphasize_by_selection);
+
+    glUniform1f(_gl_state.uniform_locations_rendering.highlight_factor, parameters.highlight_factor);
+
+
 
     // Entry points texture
     glActiveTexture(GL_TEXTURE0);
@@ -635,6 +659,11 @@ void SelectionRenderer::render_volume(glm::vec3 light_position, GLuint volume_te
     glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
     glUniform1i(program.uniform_location.transfer_function, 3);
 
+    // Index Texture
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_3D, index_texture);
+    glUniform1i(_gl_state.uniform_locations_rendering.index_volume, 4);
+
     glUniform1f(program.uniform_location.sampling_rate, parameters.sampling_rate);
 
 
@@ -644,7 +673,7 @@ void SelectionRenderer::render_volume(glm::vec3 light_position, GLuint volume_te
     glUniform3fv(program.uniform_location.volume_dimensions_rcp, 1,
         glm::value_ptr(parameters.volume_dimensions_rcp));
     glUniform3fv(program.uniform_location.light_position, 1,
-        glm::value_ptr(light_position));
+        glm::value_ptr(parameters.light_position));
     glUniform3fv(program.uniform_location.light_color_ambient, 1,
                  glm::value_ptr(parameters.ambient));
     glUniform3fv(program.uniform_location.light_color_diffuse, 1,
@@ -709,8 +738,6 @@ glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLu
     glReadPixels(mouse_position.x, mouse_position.y, 1, 1, GL_RGB, GL_FLOAT, colors);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glUseProgram(0);
 
     glPopDebugGroup();
 

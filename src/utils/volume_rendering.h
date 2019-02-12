@@ -44,9 +44,10 @@ struct Transfer_Function {
 struct Parameters {
     glm::ivec3 volume_dimensions = { 0, 0, 0 };
     glm::vec3 volume_dimensions_rcp = { 0.f, 0.f, 0.f };
-
     glm::vec3 normalized_volume_dimensions = { 0.f, 0.f, 0.f };
 
+    glm::vec3 light_position;
+    float highlight_factor;
     GLfloat sampling_rate = 10.0;
 
     glm::vec3 ambient = glm::vec3(0.5, 0.5, 0.5);
@@ -117,7 +118,7 @@ struct SelectionRenderer {
     void initialize(const glm::ivec2& viewport_size, const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
     void destroy();
     void render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
-    void render_volume(glm::vec3 light_position, GLuint volume_texture);
+    void render_volume(GLuint index_texture, GLuint volume_texture);
 
     glm::vec3 pick_volume_location(glm::ivec2 mouse_position, GLuint picking_texture, GLuint volume_texture);
 };
