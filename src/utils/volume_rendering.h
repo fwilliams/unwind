@@ -1,13 +1,10 @@
 #ifndef __VOLUME_RENDERING_H__
 #define __VOLUME_RENDERING_H__
 
-#include <igl/opengl/load_shader.h>
-#include <igl/opengl/create_shader_program.h>
-#include <Eigen/Core>
-#include <array>
+#include <glad/glad.h>
 #include <vector>
 #include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
+
 
 namespace volumerendering {
 
@@ -88,28 +85,40 @@ struct SelectionRenderer {
             GLuint selection_emphasis_type = 0;
             GLuint highlight_factor = 0;
         } uniform_location;
-    } program;
-
-    struct PickingPass {
-        GLuint program_object = 0;
-
-        GLuint picking_framebuffer = 0;
-        GLuint picking_texture = 0;
-
-        struct {
-            GLint entry_texture = 0;
-            GLint exit_texture = 0;
-            GLint volume_texture = 0;
-            GLint transfer_function = 0;
-
-            GLint volume_dimensions = 0;
-            GLint volume_dimensions_rcp = 0;
-            GLint sampling_rate = 0;
-            GLuint index_volume = 0;
-        } uniform_location;
-    } ___picking_pass;
+    } ___volume_pass;
 
     struct GLState {
+
+        struct VolumePass {
+            GLuint program_object = 0;
+            GLuint transfer_function_texture;
+
+            GLuint selection_list_ssbo;
+            GLuint contour_information_ssbo;
+
+            struct {
+                GLint entry_texture = 0;
+                GLint exit_texture = 0;
+                GLint volume_texture = 0;
+                GLint transfer_function = 0;
+
+                GLint volume_dimensions = 0;
+                GLint volume_dimensions_rcp = 0;
+                GLint sampling_rate = 0;
+
+                GLint light_position = 0;
+                GLint light_color_ambient = 0;
+                GLint light_color_diffuse = 0;
+                GLint light_color_specular = 0;
+                GLint light_exponent_specular = 0;
+
+                GLuint index_volume = 0;
+                GLuint color_by_identifier = 0;
+                GLuint selection_emphasis_type = 0;
+                GLuint highlight_factor = 0;
+            } uniform_location;
+        } volume_pass;
+
         struct PickingPass {
             GLuint program_object = 0;
 

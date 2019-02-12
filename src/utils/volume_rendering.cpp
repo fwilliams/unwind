@@ -3,15 +3,17 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <array>
 
 #include <igl/opengl/load_shader.h>
 #include <igl/opengl/create_shader_program.h>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "utils/utils.h"
 
-
+namespace {
 
 // Shader transforming the vertices from model coordinates to clip space
 constexpr const char* VertexShader = R"(
@@ -375,6 +377,7 @@ constexpr const char* SELECTION_PICKING_PASS_FRAG_SHADER = R"(
   }
 )";
 
+} // namespace
 
 using namespace igl::opengl;
 
@@ -447,43 +450,43 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
     // If the user specified a fragment shader, use that, otherwise, use the default one
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER, SELECTION_RENDERING_FRAG_SHADER, {},
-        program.program_object);
+        _gl_state.volume_pass.program_object);
 
-    program.uniform_location.entry_texture = glGetUniformLocation(
-        program.program_object, "entry_texture");
-    program.uniform_location.exit_texture = glGetUniformLocation(
-        program.program_object, "exit_texture");
-    program.uniform_location.volume_texture = glGetUniformLocation(
-        program.program_object, "volume_texture");
-    program.uniform_location.volume_dimensions = glGetUniformLocation(
-        program.program_object, "volume_dimensions");
-    program.uniform_location.volume_dimensions_rcp =
+    _gl_state.volume_pass.uniform_location.entry_texture = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "entry_texture");
+    _gl_state.volume_pass.uniform_location.exit_texture = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "exit_texture");
+    _gl_state.volume_pass.uniform_location.volume_texture = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "volume_texture");
+    _gl_state.volume_pass.uniform_location.volume_dimensions = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "volume_dimensions");
+    _gl_state.volume_pass.uniform_location.volume_dimensions_rcp =
         glGetUniformLocation(
-            program.program_object, "volume_dimensions_rcp"
+            _gl_state.volume_pass.program_object, "volume_dimensions_rcp"
         );
-    program.uniform_location.transfer_function = glGetUniformLocation(
-        program.program_object, "transfer_function");
-    program.uniform_location.sampling_rate = glGetUniformLocation(
-        program.program_object, "sampling_rate");
-    program.uniform_location.light_position = glGetUniformLocation(
-        program.program_object, "light_parameters.position");
-    program.uniform_location.light_color_ambient = glGetUniformLocation(
-        program.program_object, "light_parameters.ambient_color");
-    program.uniform_location.light_color_diffuse = glGetUniformLocation(
-        program.program_object, "light_parameters.diffuse_color");
-    program.uniform_location.light_color_specular = glGetUniformLocation(
-        program.program_object, "light_parameters.specular_color");
-    program.uniform_location.light_exponent_specular = glGetUniformLocation(
-        program.program_object, "light_parameters.specular_exponent");
+    _gl_state.volume_pass.uniform_location.transfer_function = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "transfer_function");
+    _gl_state.volume_pass.uniform_location.sampling_rate = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "sampling_rate");
+    _gl_state.volume_pass.uniform_location.light_position = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "light_parameters.position");
+    _gl_state.volume_pass.uniform_location.light_color_ambient = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "light_parameters.ambient_color");
+    _gl_state.volume_pass.uniform_location.light_color_diffuse = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "light_parameters.diffuse_color");
+    _gl_state.volume_pass.uniform_location.light_color_specular = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "light_parameters.specular_color");
+    _gl_state.volume_pass.uniform_location.light_exponent_specular = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "light_parameters.specular_exponent");
 
-    program.uniform_location.index_volume = glGetUniformLocation(
-        program.program_object, "index_volume");
-    program.uniform_location.color_by_identifier = glGetUniformLocation(
-        program.program_object, "color_by_identifier");
-    program.uniform_location.selection_emphasis_type = glGetUniformLocation(
-        program.program_object, "selection_emphasis_type");
-    program.uniform_location.highlight_factor = glGetUniformLocation(
-        program.program_object, "highlight_factor");
+    _gl_state.volume_pass.uniform_location.index_volume = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "index_volume");
+    _gl_state.volume_pass.uniform_location.color_by_identifier = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "color_by_identifier");
+    _gl_state.volume_pass.uniform_location.selection_emphasis_type = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "selection_emphasis_type");
+    _gl_state.volume_pass.uniform_location.highlight_factor = glGetUniformLocation(
+        _gl_state.volume_pass.program_object, "highlight_factor");
 
 
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
@@ -566,16 +569,16 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
     // Initialize transfer function
     // Texture
-    glGenTextures(1, &program.transfer_function_texture);
-    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
+    glGenTextures(1, &_gl_state.volume_pass.transfer_function_texture);
+    glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
 
     // SSBO
-    glGenBuffers(1, &program.contour_information_ssbo);
-    glGenBuffers(1, &program.selection_list_ssbo);
+    glGenBuffers(1, &_gl_state.volume_pass.contour_information_ssbo);
+    glGenBuffers(1, &_gl_state.volume_pass.selection_list_ssbo);
 
 }
 
@@ -584,12 +587,12 @@ void SelectionRenderer::destroy() {
     std::vector<GLuint> buffers = {
         bounding_box.vbo,
         bounding_box.ibo,
-        program.contour_information_ssbo,
-        program.selection_list_ssbo };
+        _gl_state.volume_pass.contour_information_ssbo,
+        _gl_state.volume_pass.selection_list_ssbo };
     std::vector<GLuint> textures = {
         bounding_box.entry_texture,
         bounding_box.exit_texture,
-        program.transfer_function_texture,
+        _gl_state.volume_pass.transfer_function_texture,
         _gl_state.picking_pass.picking_texture,
     };
     std::vector<GLuint> framebuffers = {
@@ -601,7 +604,7 @@ void SelectionRenderer::destroy() {
     glDeleteBuffers(buffers.size(), buffers.data());
     glDeleteTextures(textures.size(), textures.data());
     glDeleteFramebuffers(framebuffers.size(), framebuffers.data());
-    glDeleteProgram(program.program_object);
+    glDeleteProgram(_gl_state.volume_pass.program_object);
     glDeleteProgram(_gl_state.picking_pass.program_object);
     glDeleteProgram(bounding_box.program);
 
@@ -678,7 +681,7 @@ void SelectionRenderer::set_transfer_function(const std::vector<TfNode> &tf) {
         };
     }
 
-    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
+    glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, TRANSFER_FUNCTION_WIDTH, 0, GL_RGBA,
         GL_UNSIGNED_BYTE, transfer_function_data.data());
     glBindTexture(GL_TEXTURE_1D, 0);
@@ -766,69 +769,69 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
     //
     //  Volume rendering
     //
-    glUseProgram(program.program_object);
+    glUseProgram(_gl_state.volume_pass.program_object);
 
 
     // Contour Buffer
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.contour_information_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, program.contour_information_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.volume_pass.contour_information_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _gl_state.volume_pass.contour_information_ssbo);
 
     // Selection Buffer
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.selection_list_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, program.selection_list_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.volume_pass.selection_list_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.volume_pass.selection_list_ssbo);
 
-    glUniform1i(program.uniform_location.color_by_identifier, parameters.color_by_id ? 1 : 0);
+    glUniform1i(_gl_state.volume_pass.uniform_location.color_by_identifier, parameters.color_by_id ? 1 : 0);
 
-    glUniform1i(program.uniform_location.selection_emphasis_type, parameters.emphasize_by_selection);
+    glUniform1i(_gl_state.volume_pass.uniform_location.selection_emphasis_type, parameters.emphasize_by_selection);
 
-    glUniform1f(program.uniform_location.highlight_factor, parameters.highlight_factor);
+    glUniform1f(_gl_state.volume_pass.uniform_location.highlight_factor, parameters.highlight_factor);
 
 
 
     // Entry points texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
-    glUniform1i(program.uniform_location.entry_texture, 0);
+    glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 0);
 
     // Exit points texture
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
-    glUniform1i(program.uniform_location.entry_texture, 1);
+    glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 1);
 
     // Volume texture
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_3D, volume_texture);
-    glUniform1i(program.uniform_location.volume_texture, 2);
+    glUniform1i(_gl_state.volume_pass.uniform_location.volume_texture, 2);
 
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
-    glUniform1i(program.uniform_location.transfer_function, 3);
+    glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
+    glUniform1i(_gl_state.volume_pass.uniform_location.transfer_function, 3);
 
     // Index Texture
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, index_texture);
-    glUniform1i(program.uniform_location.index_volume, 4);
+    glUniform1i(_gl_state.volume_pass.uniform_location.index_volume, 4);
 
-    glUniform1f(program.uniform_location.sampling_rate, parameters.sampling_rate);
+    glUniform1f(_gl_state.volume_pass.uniform_location.sampling_rate, parameters.sampling_rate);
 
 
     // Rendering parameters
-    glUniform3iv(program.uniform_location.volume_dimensions, 1,
+    glUniform3iv(_gl_state.volume_pass.uniform_location.volume_dimensions, 1,
         glm::value_ptr(parameters.volume_dimensions));
 
     glm::vec3 volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(parameters.volume_dimensions);
-    glUniform3fv(program.uniform_location.volume_dimensions_rcp, 1,
+    glUniform3fv(_gl_state.volume_pass.uniform_location.volume_dimensions_rcp, 1,
         glm::value_ptr(volume_dimensions_rcp));
-    glUniform3fv(program.uniform_location.light_position, 1,
+    glUniform3fv(_gl_state.volume_pass.uniform_location.light_position, 1,
         glm::value_ptr(parameters.light_position));
-    glUniform3fv(program.uniform_location.light_color_ambient, 1,
+    glUniform3fv(_gl_state.volume_pass.uniform_location.light_color_ambient, 1,
                  glm::value_ptr(parameters.ambient));
-    glUniform3fv(program.uniform_location.light_color_diffuse, 1,
+    glUniform3fv(_gl_state.volume_pass.uniform_location.light_color_diffuse, 1,
                  glm::value_ptr(parameters.diffuse));
-    glUniform3fv(program.uniform_location.light_color_specular, 1,
+    glUniform3fv(_gl_state.volume_pass.uniform_location.light_color_specular, 1,
                  glm::value_ptr(parameters.specular));
-    glUniform1f(program.uniform_location.light_exponent_specular,
+    glUniform1f(_gl_state.volume_pass.uniform_location.light_exponent_specular,
                 parameters.specular_exponent);
 
     // Bind a vao so we can render
@@ -871,7 +874,7 @@ glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mous
 
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
+    glBindTexture(GL_TEXTURE_1D, _gl_state.volume_pass.transfer_function_texture);
     glUniform1i(_gl_state.picking_pass.uniform_location.transfer_function, 3);
 
     glUniform1f(_gl_state.picking_pass.uniform_location.sampling_rate,
@@ -907,13 +910,13 @@ glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mous
 }
 
 void SelectionRenderer::set_contour_data(uint32_t* contour_features, size_t num_features) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.contour_information_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.volume_pass.contour_information_ssbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, contour_features, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void SelectionRenderer::set_selection_data(uint32_t* selection_list, size_t num_features) {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, program.selection_list_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.volume_pass.selection_list_ssbo);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, selection_list, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
