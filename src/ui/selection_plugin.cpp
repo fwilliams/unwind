@@ -179,8 +179,7 @@ void Selection_Menu::draw_selection_volume() {
     }
 
 
-    render_bounding_box(volume_rendering, GM4f(viewer->core.model),
-        GM4f(viewer->core.view), GM4f(viewer->core.proj));
+    volume_rendering.render_bounding_box(GM4f(viewer->core.model), GM4f(viewer->core.view), GM4f(viewer->core.proj));
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -205,7 +204,7 @@ void Selection_Menu::draw_selection_volume() {
 
     glUniform1f(volume_rendering._gl_state.uniform_locations_rendering.highlight_factor, highlight_factor);
 
-    render_volume(volume_rendering, G3f(viewer->core.light_position), _state.low_res_volume.volume_texture);
+    volume_rendering.render_volume(G3f(viewer->core.light_position), _state.low_res_volume.volume_texture);
 
     glUseProgram(volume_rendering.picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);

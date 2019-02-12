@@ -116,15 +116,11 @@ struct SelectionRenderer {
 
     void initialize(const glm::ivec2& viewport_size, const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
     void destroy();
-
+    void render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
+    void render_volume(glm::vec3 light_position, GLuint volume_texture);
 };
 
 void update_transfer_function(Transfer_Function& transfer_function);
-
-void render_bounding_box(const SelectionRenderer& volume_rendering, glm::mat4 model_matrix,
-    glm::mat4 view_matrix, glm::mat4 proj_matrix);
-
-void render_volume(const SelectionRenderer& volume_rendering, glm::vec3 light_position, GLuint volume_texture);
 
 glm::vec3 pick_volume_location(const SelectionRenderer& volume_rendering,
     glm::ivec2 mouse_position, GLuint volume_texture);
