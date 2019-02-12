@@ -23,34 +23,35 @@ Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::deinitialize() {
     volumerendering::destroy(volume_rendering);
-    std::vector<GLuint> buffers = { _gl_state.contour_information_ssbo, _gl_state.selection_list_ssbo };
+    std::vector<GLuint> buffers = { volume_rendering._gl_state.contour_information_ssbo,
+                                    volume_rendering._gl_state.selection_list_ssbo };
     glDeleteBuffers(buffers.size(), buffers.data());
 }
 
 void Selection_Menu::initialize() {
-    volumerendering::initialize(volume_rendering,
+    volume_rendering.initialize(
         glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]),
         ContourTreeFragmentShader, ContourTreePickingFragmentShader);
 
-    _gl_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
+    volume_rendering._gl_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
         volume_rendering.program.program_object, "index_volume"
     );
-    _gl_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
+    volume_rendering._gl_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
         volume_rendering.program.program_object, "color_by_identifier"
     );
-    _gl_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
+    volume_rendering._gl_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
         volume_rendering.program.program_object, "selection_emphasis_type"
     );
-    _gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
+    volume_rendering._gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
         volume_rendering.program.program_object, "highlight_factor"
     );
-    _gl_state.uniform_locations_picking.index_volume = glGetUniformLocation(
+    volume_rendering._gl_state.uniform_locations_picking.index_volume = glGetUniformLocation(
         volume_rendering.picking_program.program_object, "index_volume"
     );
 
     // SSBO
-    glGenBuffers(1, &_gl_state.contour_information_ssbo);
-    glGenBuffers(1, &_gl_state.selection_list_ssbo);
+    glGenBuffers(1, &volume_rendering._gl_state.contour_information_ssbo);
+    glGenBuffers(1, &volume_rendering._gl_state.selection_list_ssbo);
 
     const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
     volume_rendering.parameters.volume_dimensions = volume_dims;
@@ -149,7 +150,7 @@ void Selection_Menu::draw_selection_volume() {
             }
         }
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.contour_information_ssbo);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
             buffer_data.data(), GL_DYNAMIC_DRAW);
 
@@ -160,7 +161,7 @@ void Selection_Menu::draw_selection_volume() {
         std::vector<uint32_t> selected = _state.selected_features;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.selection_list_ssbo);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
             selected.data(), GL_DYNAMIC_DRAW);
 
@@ -191,28 +192,28 @@ void Selection_Menu::draw_selection_volume() {
     // The default volume renderer already uses GL_TEXTURE0 through GL_TEXTURE3
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
-    glUniform1i(_gl_state.uniform_locations_rendering.index_volume, 4);
+    glUniform1i(volume_rendering._gl_state.uniform_locations_rendering.index_volume, 4);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _gl_state.contour_information_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.contour_information_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, volume_rendering._gl_state.contour_information_ssbo);
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.selection_list_ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.selection_list_ssbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, volume_rendering._gl_state.selection_list_ssbo);
 
-    glUniform1i(_gl_state.uniform_locations_rendering.color_by_identifier,
+    glUniform1i(volume_rendering._gl_state.uniform_locations_rendering.color_by_identifier,
         color_by_id ? 1 : 0);
 
-    glUniform1i(_gl_state.uniform_locations_rendering.selection_emphasis_type,
+    glUniform1i(volume_rendering._gl_state.uniform_locations_rendering.selection_emphasis_type,
         static_cast<int>(emphasize_by_selection));
 
-    glUniform1f(_gl_state.uniform_locations_rendering.highlight_factor, highlight_factor);
+    glUniform1f(volume_rendering._gl_state.uniform_locations_rendering.highlight_factor, highlight_factor);
 
     render_volume(volume_rendering, G3f(viewer->core.light_position), _state.low_res_volume.volume_texture);
 
     glUseProgram(volume_rendering.picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
-    glUniform1i(_gl_state.uniform_locations_picking.index_volume, 4);
+    glUniform1i(volume_rendering._gl_state.uniform_locations_picking.index_volume, 4);
 
     glm::vec3 picking = pick_volume_location(volume_rendering,
         { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y },

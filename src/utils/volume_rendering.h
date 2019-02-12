@@ -55,7 +55,7 @@ struct Parameters {
     float specular_exponent = 10.0;
 };
 
-struct Volume_Rendering {
+struct SelectionRenderer {
     Bounding_Box bounding_box;
     Transfer_Function transfer_function;
     Parameters parameters;
@@ -96,22 +96,39 @@ struct Volume_Rendering {
             GLint sampling_rate = 0;
         } uniform_location;
     } picking_program;
+
+    struct {
+        GLuint selection_list_ssbo;
+        GLuint contour_information_ssbo;
+
+        struct {
+            GLuint index_volume = 0;
+        } uniform_locations_picking;
+
+        struct {
+            GLuint index_volume = 0;
+            GLuint color_by_identifier = 0;
+            GLuint selection_emphasis_type = 0;
+            GLuint highlight_factor = 0;
+        } uniform_locations_rendering;
+
+    } _gl_state;
+
+    void initialize(const glm::ivec2& viewport_size, const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
 };
 
 
-void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_size,
-    const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
 
-void destroy(Volume_Rendering& volume_rendering);
+void destroy(SelectionRenderer& volume_rendering);
 
 void update_transfer_function(Transfer_Function& transfer_function);
 
-void render_bounding_box(const Volume_Rendering& volume_rendering, glm::mat4 model_matrix,
+void render_bounding_box(const SelectionRenderer& volume_rendering, glm::mat4 model_matrix,
     glm::mat4 view_matrix, glm::mat4 proj_matrix);
 
-void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position, GLuint volume_texture);
+void render_volume(const SelectionRenderer& volume_rendering, glm::vec3 light_position, GLuint volume_texture);
 
-glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
+glm::vec3 pick_volume_location(const SelectionRenderer& volume_rendering,
     glm::ivec2 mouse_position, GLuint volume_texture);
 
 } // namespace volumerendering

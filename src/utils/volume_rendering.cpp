@@ -256,18 +256,18 @@ using namespace igl::opengl;
 
 namespace volumerendering {
 
-void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_size,
+void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
                 const char* fragment_shader, const char* picking_shader)
 {
     //
     //   Bounding box information
     //
-    glGenVertexArrays(1, &volume_rendering.bounding_box.vao);
-    glBindVertexArray(volume_rendering.bounding_box.vao);
+    glGenVertexArrays(1, &bounding_box.vao);
+    glBindVertexArray(bounding_box.vao);
 
     // Creating the vertex buffer object
-    glGenBuffers(1, &volume_rendering.bounding_box.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, volume_rendering.bounding_box.vbo);
+    glGenBuffers(1, &bounding_box.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, bounding_box.vbo);
 
     // Unit cube centered around 0.5 \in [0,1]
     const GLfloat vertexData[] = {
@@ -286,8 +286,8 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
 
 
     // Creating the index buffer object
-    glGenBuffers(1, &volume_rendering.bounding_box.ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, volume_rendering.bounding_box.ibo);
+    glGenBuffers(1, &bounding_box.ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bounding_box.ibo);
 
     // Specifying the 12 faces of the unit cube
     const GLubyte iboData[] = {
@@ -308,135 +308,135 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
 
     glBindVertexArray(0);
 
-    volume_rendering.bounding_box.program = igl::opengl::create_shader_program(
+    bounding_box.program = igl::opengl::create_shader_program(
         VertexShader,
         RAY_ENDPOINT_PASS_FRAGMENT_SHADER,
         { { "in_position", 0 } }
     );
 
-    volume_rendering.bounding_box.uniform_location.model_matrix = glGetUniformLocation(
-        volume_rendering.bounding_box.program, "model_matrix");
-    volume_rendering.bounding_box.uniform_location.view_matrix = glGetUniformLocation(
-        volume_rendering.bounding_box.program, "view_matrix");
-    volume_rendering.bounding_box.uniform_location.projection_matrix =
-        glGetUniformLocation(volume_rendering.bounding_box.program, "projection_matrix");
+    bounding_box.uniform_location.model_matrix = glGetUniformLocation(
+        bounding_box.program, "model_matrix");
+    bounding_box.uniform_location.view_matrix = glGetUniformLocation(
+        bounding_box.program, "view_matrix");
+    bounding_box.uniform_location.projection_matrix =
+        glGetUniformLocation(bounding_box.program, "projection_matrix");
 
 
     // If the user specified a fragment shader, use that, otherwise, use the default one
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
         fragment_shader ? fragment_shader : VOLUME_PASS_FRAGMENT_SHADER, {},
-        volume_rendering.program.program_object);
+        program.program_object);
 
-    volume_rendering.program.uniform_location.entry_texture = glGetUniformLocation(
-        volume_rendering.program.program_object, "entry_texture");
-    volume_rendering.program.uniform_location.exit_texture = glGetUniformLocation(
-        volume_rendering.program.program_object, "exit_texture");
-    volume_rendering.program.uniform_location.volume_texture = glGetUniformLocation(
-        volume_rendering.program.program_object, "volume_texture");
-    volume_rendering.program.uniform_location.volume_dimensions = glGetUniformLocation(
-        volume_rendering.program.program_object, "volume_dimensions");
-    volume_rendering.program.uniform_location.volume_dimensions_rcp =
+    program.uniform_location.entry_texture = glGetUniformLocation(
+        program.program_object, "entry_texture");
+    program.uniform_location.exit_texture = glGetUniformLocation(
+        program.program_object, "exit_texture");
+    program.uniform_location.volume_texture = glGetUniformLocation(
+        program.program_object, "volume_texture");
+    program.uniform_location.volume_dimensions = glGetUniformLocation(
+        program.program_object, "volume_dimensions");
+    program.uniform_location.volume_dimensions_rcp =
         glGetUniformLocation(
-            volume_rendering.program.program_object, "volume_dimensions_rcp"
+            program.program_object, "volume_dimensions_rcp"
         );
-    volume_rendering.program.uniform_location.transfer_function = glGetUniformLocation(
-        volume_rendering.program.program_object, "transfer_function");
-    volume_rendering.program.uniform_location.sampling_rate = glGetUniformLocation(
-        volume_rendering.program.program_object, "sampling_rate");
-    volume_rendering.program.uniform_location.light_position = glGetUniformLocation(
-        volume_rendering.program.program_object, "light_parameters.position");
-    volume_rendering.program.uniform_location.light_color_ambient = glGetUniformLocation(
-        volume_rendering.program.program_object, "light_parameters.ambient_color");
-    volume_rendering.program.uniform_location.light_color_diffuse = glGetUniformLocation(
-        volume_rendering.program.program_object, "light_parameters.diffuse_color");
-    volume_rendering.program.uniform_location.light_color_specular = glGetUniformLocation(
-        volume_rendering.program.program_object, "light_parameters.specular_color");
-    volume_rendering.program.uniform_location.light_exponent_specular =
+    program.uniform_location.transfer_function = glGetUniformLocation(
+        program.program_object, "transfer_function");
+    program.uniform_location.sampling_rate = glGetUniformLocation(
+        program.program_object, "sampling_rate");
+    program.uniform_location.light_position = glGetUniformLocation(
+        program.program_object, "light_parameters.position");
+    program.uniform_location.light_color_ambient = glGetUniformLocation(
+        program.program_object, "light_parameters.ambient_color");
+    program.uniform_location.light_color_diffuse = glGetUniformLocation(
+        program.program_object, "light_parameters.diffuse_color");
+    program.uniform_location.light_color_specular = glGetUniformLocation(
+        program.program_object, "light_parameters.specular_color");
+    program.uniform_location.light_exponent_specular =
         glGetUniformLocation(
-            volume_rendering.program.program_object, "light_parameters.specular_exponent"
+            program.program_object, "light_parameters.specular_exponent"
         );
 
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
         picking_shader ? picking_shader : VolumeRenderingPickingFragmentShader, {},
-        volume_rendering.picking_program.program_object);
+        picking_program.program_object);
 
-    volume_rendering.picking_program.uniform_location.entry_texture =
+    picking_program.uniform_location.entry_texture =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "entry_texture"
+            picking_program.program_object, "entry_texture"
         );
-    volume_rendering.picking_program.uniform_location.exit_texture =
+    picking_program.uniform_location.exit_texture =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "exit_texture"
+            picking_program.program_object, "exit_texture"
         );
-    volume_rendering.picking_program.uniform_location.volume_texture = 
+    picking_program.uniform_location.volume_texture =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "volume_texture"
+            picking_program.program_object, "volume_texture"
         );
-    volume_rendering.picking_program.uniform_location.volume_dimensions =
+    picking_program.uniform_location.volume_dimensions =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "volume_dimensions"
+            picking_program.program_object, "volume_dimensions"
         );
-    volume_rendering.picking_program.uniform_location.volume_dimensions_rcp =
+    picking_program.uniform_location.volume_dimensions_rcp =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "volume_dimensions_rcp"
+            picking_program.program_object, "volume_dimensions_rcp"
         );
-    volume_rendering.picking_program.uniform_location.transfer_function = 
+    picking_program.uniform_location.transfer_function =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "transfer_function"
+            picking_program.program_object, "transfer_function"
         );
-    volume_rendering.picking_program.uniform_location.sampling_rate = 
+    picking_program.uniform_location.sampling_rate =
         glGetUniformLocation(
-            volume_rendering.picking_program.program_object, "sampling_rate"
+            picking_program.program_object, "sampling_rate"
         );
 
 
     // Entry point texture and frame buffer
-    glGenTextures(1, &volume_rendering.bounding_box.entry_texture);
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.entry_texture);
+    glGenTextures(1, &bounding_box.entry_texture);
+    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &volume_rendering.bounding_box.entry_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.bounding_box.entry_framebuffer);
+    glGenFramebuffers(1, &bounding_box.entry_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.entry_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        volume_rendering.bounding_box.entry_texture, 0);
+        bounding_box.entry_texture, 0);
 
 
     // Exit point texture and frame buffer
-    glGenTextures(1, &volume_rendering.bounding_box.exit_texture);
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.exit_texture);
+    glGenTextures(1, &bounding_box.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &volume_rendering.bounding_box.exit_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.bounding_box.exit_framebuffer);
+    glGenFramebuffers(1, &bounding_box.exit_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.exit_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        volume_rendering.bounding_box.exit_texture, 0);
+        bounding_box.exit_texture, 0);
 
 
     // Picking texture and framebuffer
-    glGenTextures(1, &volume_rendering.picking_texture);
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.picking_texture);
+    glGenTextures(1, &picking_texture);
+    glBindTexture(GL_TEXTURE_2D, picking_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &volume_rendering.picking_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.picking_framebuffer);
+    glGenFramebuffers(1, &picking_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        volume_rendering.picking_texture, 0);
+        picking_texture, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
     // Initialize transfer function
     // Texture
-    glGenTextures(1, &volume_rendering.transfer_function.texture);
-    glBindTexture(GL_TEXTURE_1D, volume_rendering.transfer_function.texture);
+    glGenTextures(1, &transfer_function.texture);
+    glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -444,13 +444,13 @@ void initialize(Volume_Rendering& volume_rendering, const glm::ivec2& viewport_s
     // Create the initial nodes
     Transfer_Function::Node first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
     Transfer_Function::Node last = { 1.f, { 1.f, 1.f, 1.f, 1.f } };
-    volume_rendering.transfer_function.nodes.push_back(std::move(first));
-    volume_rendering.transfer_function.nodes.push_back(std::move(last));
-    volume_rendering.transfer_function.is_dirty = true;
+    transfer_function.nodes.push_back(std::move(first));
+    transfer_function.nodes.push_back(std::move(last));
+    transfer_function.is_dirty = true;
 }
 
 
-void destroy(Volume_Rendering& volume_rendering) {
+void destroy(SelectionRenderer& volume_rendering) {
     std::vector<GLuint> buffers = { volume_rendering.bounding_box.vbo, volume_rendering.bounding_box.ibo };
     std::vector<GLuint> textures = {
         volume_rendering.bounding_box.entry_texture,
@@ -471,7 +471,7 @@ void destroy(Volume_Rendering& volume_rendering) {
     glDeleteProgram(volume_rendering.picking_program.program_object);
     glDeleteProgram(volume_rendering.bounding_box.program);
 
-    volume_rendering = Volume_Rendering();
+    volume_rendering = SelectionRenderer();
 }
 
 void update_transfer_function(Transfer_Function& transfer_function) {
@@ -549,7 +549,7 @@ void update_transfer_function(Transfer_Function& transfer_function) {
     glBindTexture(GL_TEXTURE_1D, 0);
 }
 
-void render_bounding_box(const Volume_Rendering& volume_rendering,
+void render_bounding_box(const SelectionRenderer& volume_rendering,
                          glm::mat4 model_matrix, glm::mat4 view_matrix,
                          glm::mat4 proj_matrix)
 {
@@ -590,7 +590,7 @@ void render_bounding_box(const Volume_Rendering& volume_rendering,
     glPopDebugGroup();
 }
 
-void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_position, GLuint volume_texture) {
+void render_volume(const SelectionRenderer& volume_rendering, glm::vec3 light_position, GLuint volume_texture) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
     //
     //  Setup
@@ -661,7 +661,7 @@ void render_volume(const Volume_Rendering& volume_rendering, glm::vec3 light_pos
     glPopDebugGroup();
 }
 
-glm::vec3 pick_volume_location(const Volume_Rendering& volume_rendering,
+glm::vec3 pick_volume_location(const SelectionRenderer& volume_rendering,
                                glm::ivec2 mouse_position, GLuint volume_texture)
 {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
