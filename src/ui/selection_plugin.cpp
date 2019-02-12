@@ -146,10 +146,11 @@ void Selection_Menu::draw_selection_volume() {
                 buffer_data[j + 1] = static_cast<uint32_t>(i);
             }
         }
-
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.contour_information_ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
-            buffer_data.data(), GL_DYNAMIC_DRAW);
+        volume_rendering.set_contour_data(buffer_data.data(), buffer_data.size());
+//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.contour_information_ssbo);
+//        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
+//            buffer_data.data(), GL_DYNAMIC_DRAW);
+//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
         number_features_is_dirty = false;
     }
@@ -158,9 +159,10 @@ void Selection_Menu::draw_selection_volume() {
         std::vector<uint32_t> selected = _state.selected_features;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.selection_list_ssbo);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
-            selected.data(), GL_DYNAMIC_DRAW);
+        volume_rendering.set_selection_data(selected.data(), selected.size());
+//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.selection_list_ssbo);
+//        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
+//            selected.data(), GL_DYNAMIC_DRAW);
 
         selection_list_is_dirty = false;
     }

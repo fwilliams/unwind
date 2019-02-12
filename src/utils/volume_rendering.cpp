@@ -420,17 +420,17 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
 
 
     // Picking texture and framebuffer
-    glGenTextures(1, &picking_texture);
-    glBindTexture(GL_TEXTURE_2D, picking_texture);
+    glGenTextures(1, &picking_program.picking_texture);
+    glBindTexture(GL_TEXTURE_2D, picking_program.picking_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &picking_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
+    glGenFramebuffers(1, &picking_program.picking_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, picking_program.picking_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        picking_texture, 0);
+        picking_program.picking_texture, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
@@ -461,12 +461,12 @@ void SelectionRenderer::destroy() {
         bounding_box.entry_texture,
         bounding_box.exit_texture,
         transfer_function.texture,
-        picking_texture,
+        picking_program.picking_texture,
     };
     std::vector<GLuint> framebuffers = {
         bounding_box.entry_framebuffer,
         bounding_box.exit_texture,
-        picking_framebuffer
+        picking_program.picking_framebuffer
     };
 
     glDeleteBuffers(buffers.size(), buffers.data());
@@ -476,12 +476,10 @@ void SelectionRenderer::destroy() {
     glDeleteProgram(picking_program.program_object);
     glDeleteProgram(bounding_box.program);
 
-    picking_framebuffer = 0;
-    picking_texture = 0;
     bounding_box = Bounding_Box();
     parameters = Parameters();
-    program = VolumeProgram();
-    picking_program = PickingProgram();
+    program = VolumePass();
+    picking_program = PickingPass();
     _gl_state = GLState();
 }
 
@@ -632,6 +630,7 @@ void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 vi
 
 void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_texture) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume");
+
     //
     //  Setup
     //
@@ -711,18 +710,20 @@ void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_textur
     glBindVertexArray(bounding_box.vao);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glBindVertexArray(0);
+
     glPopDebugGroup();
 }
 
-glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture)
-{
+glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture) {
     glUseProgram(picking_program.program_object);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, index_texture);
     glUniform1i(_gl_state.uniform_locations_picking.index_volume, 4);
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
-    glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, picking_program.picking_framebuffer);
 
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -768,6 +769,7 @@ glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLu
     glReadPixels(mouse_position.x, mouse_position.y, 1, 1, GL_RGB, GL_FLOAT, colors);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindVertexArray(0);
 
     glPopDebugGroup();
 
@@ -778,4 +780,15 @@ glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLu
     };
 }
 
+void SelectionRenderer::set_contour_data(uint32_t* contour_features, size_t num_features) {
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.contour_information_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, contour_features, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void SelectionRenderer::set_selection_data(uint32_t* selection_list, size_t num_features) {
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * num_features, selection_list, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
 } // namespace volumerendering

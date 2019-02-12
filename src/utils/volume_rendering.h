@@ -70,7 +70,7 @@ struct SelectionRenderer {
     Transfer_Function transfer_function;
     Parameters parameters;
 
-    struct VolumeProgram {
+    struct VolumePass {
         GLuint program_object = 0;
         struct {
             GLint entry_texture = 0;
@@ -90,11 +90,12 @@ struct SelectionRenderer {
         } uniform_location;
     } program;
 
-    GLuint picking_framebuffer = 0;
-    GLuint picking_texture = 0;
-
-    struct PickingProgram {
+    struct PickingPass {
         GLuint program_object = 0;
+
+        GLuint picking_framebuffer = 0;
+        GLuint picking_texture = 0;
+
         struct {
             GLint entry_texture = 0;
             GLint exit_texture = 0;
@@ -124,12 +125,18 @@ struct SelectionRenderer {
 
     } _gl_state;
 
+    // Buffer contents:
+    // [0]: number of features
+    // [...]: A linearized map from voxel identifier -> feature number
+    void set_contour_data(uint32_t* contour_features, size_t num_features);
+    void set_selection_data(uint32_t* selection_list, size_t num_features);
+
     void initialize(const glm::ivec2& viewport_size, const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
     void destroy();
     void render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
     void render_volume(GLuint index_texture, GLuint volume_texture);
 
-    glm::vec3 pick_volume_location(glm::ivec2 mouse_position, GLuint picking_texture, GLuint volume_texture);
+    glm::vec3 pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture);
 };
 
 void update_transfer_function(Transfer_Function& transfer_function);
