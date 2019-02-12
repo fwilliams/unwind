@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #include <igl/opengl/load_shader.h>
 #include <igl/opengl/create_shader_program.h>
@@ -450,28 +451,38 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
 }
 
 
-void destroy(SelectionRenderer& volume_rendering) {
-    std::vector<GLuint> buffers = { volume_rendering.bounding_box.vbo, volume_rendering.bounding_box.ibo };
+void SelectionRenderer::destroy() {
+    std::vector<GLuint> buffers = {
+        bounding_box.vbo,
+        bounding_box.ibo,
+        _gl_state.contour_information_ssbo,
+        _gl_state.selection_list_ssbo };
     std::vector<GLuint> textures = {
-        volume_rendering.bounding_box.entry_texture,
-        volume_rendering.bounding_box.exit_texture,
-        volume_rendering.transfer_function.texture,
-        volume_rendering.picking_texture,
+        bounding_box.entry_texture,
+        bounding_box.exit_texture,
+        transfer_function.texture,
+        picking_texture,
     };
     std::vector<GLuint> framebuffers = {
-        volume_rendering.bounding_box.entry_framebuffer,
-        volume_rendering.bounding_box.exit_texture,
-        volume_rendering.picking_framebuffer
+        bounding_box.entry_framebuffer,
+        bounding_box.exit_texture,
+        picking_framebuffer
     };
 
     glDeleteBuffers(buffers.size(), buffers.data());
     glDeleteTextures(textures.size(), textures.data());
     glDeleteFramebuffers(framebuffers.size(), framebuffers.data());
-    glDeleteProgram(volume_rendering.program.program_object);
-    glDeleteProgram(volume_rendering.picking_program.program_object);
-    glDeleteProgram(volume_rendering.bounding_box.program);
+    glDeleteProgram(program.program_object);
+    glDeleteProgram(picking_program.program_object);
+    glDeleteProgram(bounding_box.program);
 
-    volume_rendering = SelectionRenderer();
+    picking_framebuffer = 0;
+    picking_texture = 0;
+    bounding_box = Bounding_Box();
+    parameters = Parameters();
+    program = VolumeProgram();
+    picking_program = PickingProgram();
+    _gl_state = GLState();
 }
 
 void update_transfer_function(Transfer_Function& transfer_function) {

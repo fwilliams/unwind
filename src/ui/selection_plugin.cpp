@@ -22,10 +22,7 @@
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::deinitialize() {
-    volumerendering::destroy(volume_rendering);
-    std::vector<GLuint> buffers = { volume_rendering._gl_state.contour_information_ssbo,
-                                    volume_rendering._gl_state.selection_list_ssbo };
-    glDeleteBuffers(buffers.size(), buffers.data());
+    volume_rendering.destroy();
 }
 
 void Selection_Menu::initialize() {

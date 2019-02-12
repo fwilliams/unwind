@@ -60,7 +60,7 @@ struct SelectionRenderer {
     Transfer_Function transfer_function;
     Parameters parameters;
 
-    struct {
+    struct VolumeProgram {
         GLuint program_object = 0;
         struct {
             GLint entry_texture = 0;
@@ -83,7 +83,7 @@ struct SelectionRenderer {
     GLuint picking_framebuffer = 0;
     GLuint picking_texture = 0;
 
-    struct {
+    struct PickingProgram {
         GLuint program_object = 0;
         struct {
             GLint entry_texture = 0;
@@ -97,7 +97,7 @@ struct SelectionRenderer {
         } uniform_location;
     } picking_program;
 
-    struct {
+    struct GLState {
         GLuint selection_list_ssbo;
         GLuint contour_information_ssbo;
 
@@ -115,11 +115,9 @@ struct SelectionRenderer {
     } _gl_state;
 
     void initialize(const glm::ivec2& viewport_size, const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
+    void destroy();
+
 };
-
-
-
-void destroy(SelectionRenderer& volume_rendering);
 
 void update_transfer_function(Transfer_Function& transfer_function);
 
