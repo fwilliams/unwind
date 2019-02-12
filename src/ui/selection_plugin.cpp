@@ -115,7 +115,13 @@ void Selection_Menu::resize_framebuffer_textures(glm::ivec2 framebuffer_size) {
         GL_RGBA, GL_FLOAT, nullptr);
 }
 
-void Selection_Menu::draw_setup() {
+bool Selection_Menu::pre_draw() {
+    bool ret = FishUIViewerPlugin::pre_draw();
+
+    return ret;
+}
+
+void Selection_Menu::draw_selection_volume() {
     if (viewer->core.viewport != target_viewport_size) {
         resize_framebuffer_textures(
             glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
@@ -160,15 +166,12 @@ void Selection_Menu::draw_setup() {
 
         selection_list_is_dirty = false;
     }
-}
 
-void Selection_Menu::draw() {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
 
     if (volume_rendering.transfer_function.is_dirty) {
         glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
@@ -250,7 +253,7 @@ void Selection_Menu::draw() {
     }
 }
 
-void Selection_Menu::key_down(unsigned int key, int modifiers) {
+bool Selection_Menu::key_down(int key, int modifiers) {
     if (key == 32) { // SPACE
         should_select = true;
     }
@@ -258,6 +261,8 @@ void Selection_Menu::key_down(unsigned int key, int modifiers) {
 
 bool Selection_Menu::post_draw() {
     bool ret = FishUIViewerPlugin::post_draw();
+
+    draw_selection_volume();
 
     int width;
     int height;

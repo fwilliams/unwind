@@ -113,32 +113,6 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
         return true;
     }
 
-    switch (_state.application_state) {
-        case Application_State::Segmentation:
-            selection_menu.draw_setup();
-            break;
-    }
-
-    return false;
-}
-
-bool post_draw(igl::opengl::glfw::Viewer& viewer) {
-    switch (_state.application_state) {
-        case Application_State::Segmentation:
-            selection_menu.draw();
-            break;
-    }
-
-    return false;
-}
-
-bool key_down(igl::opengl::glfw::Viewer& viewer, unsigned int key, int modifiers) {
-    switch (_state.application_state) {
-        case Application_State::Segmentation:
-            selection_menu.key_down(key, modifiers);
-            break;
-    }
-
     return false;
 }
 
@@ -175,8 +149,6 @@ int main(int argc, char** argv) {
     viewer.core.background_color = Eigen::Vector4f(0.1f, 0.1f, 0.1f, 1.f);
     viewer.callback_init = init;
     viewer.callback_pre_draw = pre_draw;
-    viewer.callback_post_draw = post_draw;
-    viewer.callback_key_pressed = key_down;
     viewer.callback_mouse_move = mouse_move;
     viewer.callback_mouse_down = mouse_down;
     viewer.callback_mouse_up = mouse_up;

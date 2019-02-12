@@ -15,14 +15,14 @@ public:
 
     void initialize();
     void deinitialize();
-    void draw_setup();
-    void draw();
 
-    void key_down(unsigned int key, int modifiers);
+    bool key_down(int key, int modifiers) override;
+    bool pre_draw() override;
     bool post_draw() override;
 
 private:
     void resize_framebuffer_textures(glm::ivec2 framebuffer_size);
+    void draw_selection_volume();
 
     State& _state;
 
