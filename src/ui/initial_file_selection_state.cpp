@@ -21,9 +21,17 @@ Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(
     strcpy(ui.file_prefix, "Sternopygus_arenatus_72um_1k"); //Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
     strcpy(ui.extension, "bmp");
     ui.start_index = 45; //2;
-    ui.end_index = 1798;
+    ui.end_index = 2534.;
     strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus/output"); //Plaagiotremus_tapinosoma/output");
     strcpy(ui.output_prefix, "Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
+
+//    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
+//    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
+//    strcpy(ui.extension, "bmp");
+//    ui.start_index = 2;
+//    ui.end_index = 1798;
+//    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
+//    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #endif
 }
 

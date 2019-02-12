@@ -151,7 +151,7 @@ public:
     public:
         CellIterator(const CellIterator& other) : cell(other.cell) {}
         CellIterator() : cell(std::shared_ptr<Cell>()) {}
-        CellIterator& operator=(const CellIterator& other) { cell = other.cell; }
+        CellIterator& operator=(const CellIterator& other) { cell = other.cell; return *this; }
 
         CellIterator operator++() {
             if (cell && cell->_right_keyframe) {
