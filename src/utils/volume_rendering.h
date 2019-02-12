@@ -78,6 +78,11 @@ struct SelectionRenderer {
             GLint light_color_diffuse = 0;
             GLint light_color_specular = 0;
             GLint light_exponent_specular = 0;
+
+            GLuint index_volume = 0;
+            GLuint color_by_identifier = 0;
+            GLuint selection_emphasis_type = 0;
+            GLuint highlight_factor = 0;
         } uniform_location;
     } program;
 

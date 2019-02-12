@@ -473,15 +473,22 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
         program.program_object, "light_parameters.diffuse_color");
     program.uniform_location.light_color_specular = glGetUniformLocation(
         program.program_object, "light_parameters.specular_color");
-    program.uniform_location.light_exponent_specular =
-        glGetUniformLocation(
-            program.program_object, "light_parameters.specular_exponent"
-        );
+    program.uniform_location.light_exponent_specular = glGetUniformLocation(
+        program.program_object, "light_parameters.specular_exponent");
+
+    program.uniform_location.index_volume = glGetUniformLocation(
+        program.program_object, "index_volume");
+    program.uniform_location.color_by_identifier = glGetUniformLocation(
+        program.program_object, "color_by_identifier");
+    program.uniform_location.selection_emphasis_type = glGetUniformLocation(
+        program.program_object, "selection_emphasis_type");
+    program.uniform_location.highlight_factor = glGetUniformLocation(
+        program.program_object, "highlight_factor");
+
 
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
         SELECTION_PICKING_PASS_FRAG_SHADER, {},
         picking_program.program_object);
-
     picking_program.uniform_location.entry_texture =
         glGetUniformLocation(
             picking_program.program_object, "entry_texture"
@@ -510,7 +517,9 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
         glGetUniformLocation(
             picking_program.program_object, "sampling_rate"
         );
-
+    picking_program.uniform_location.index_volume = glGetUniformLocation(
+        picking_program.program_object, "index_volume"
+    );
 
     // Entry point texture and frame buffer
     glGenTextures(1, &bounding_box.entry_texture);
@@ -563,24 +572,6 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-
-
-
-    _gl_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
-        program.program_object, "index_volume"
-    );
-    _gl_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
-        program.program_object, "color_by_identifier"
-    );
-    _gl_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
-        program.program_object, "selection_emphasis_type"
-    );
-    _gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
-        program.program_object, "highlight_factor"
-    );
-    picking_program.uniform_location.index_volume = glGetUniformLocation(
-        picking_program.program_object, "index_volume"
-    );
 
     // SSBO
     glGenBuffers(1, &_gl_state.contour_information_ssbo);
@@ -790,11 +781,11 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _gl_state.selection_list_ssbo);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, _gl_state.selection_list_ssbo);
 
-    glUniform1i(_gl_state.uniform_locations_rendering.color_by_identifier, parameters.color_by_id ? 1 : 0);
+    glUniform1i(program.uniform_location.color_by_identifier, parameters.color_by_id ? 1 : 0);
 
-    glUniform1i(_gl_state.uniform_locations_rendering.selection_emphasis_type, parameters.emphasize_by_selection);
+    glUniform1i(program.uniform_location.selection_emphasis_type, parameters.emphasize_by_selection);
 
-    glUniform1f(_gl_state.uniform_locations_rendering.highlight_factor, parameters.highlight_factor);
+    glUniform1f(program.uniform_location.highlight_factor, parameters.highlight_factor);
 
 
 
@@ -821,7 +812,7 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
     // Index Texture
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, index_texture);
-    glUniform1i(_gl_state.uniform_locations_rendering.index_volume, 4);
+    glUniform1i(program.uniform_location.index_volume, 4);
 
     glUniform1f(program.uniform_location.sampling_rate, parameters.sampling_rate);
 
