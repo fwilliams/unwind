@@ -3,7 +3,7 @@
 
 #include "fish_ui_viewer_plugin.h"
 #include "bounding_widget_2d.h"
-#include "volume_exporter.h"
+#include <utils/gl/volume_exporter.h>
 
 #include "bounding_widget_3d.h"
 #include "transfer_function_edit_widget.h"

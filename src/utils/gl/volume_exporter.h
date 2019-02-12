@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 
-#include "bounding_cage.h"
+#include "../bounding_cage.h"
 #include "glm_conversion.h"
 
 

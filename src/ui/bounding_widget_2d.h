@@ -2,9 +2,8 @@
 #define BOUNDING_POLYGON_WIDGET_H
 
 #include <Eigen/Core>
-#include "glad/glad.h"
+#include <utils/gl/volume_exporter.h>
 #include "state.h"
-#include "volume_exporter.h"
 
 
 namespace igl { namespace opengl { namespace glfw { class Viewer; }}}

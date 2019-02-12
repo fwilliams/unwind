@@ -2,8 +2,8 @@
 #define BOUNDING_WIDGET_3D_H
 
 #include <utils/gl/volume_renderer.h>
+#include <utils/gl/point_line_rendering.h>
 #include "state.h"
-#include "point_line_rendering.h"
 
 namespace igl { namespace opengl { namespace glfw { class Viewer; }}}
 

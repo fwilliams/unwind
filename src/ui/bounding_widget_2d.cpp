@@ -1,5 +1,5 @@
 #include "bounding_widget_2d.h"
-#include "volume_exporter.h"
+
 #include "bounding_polygon_plugin.h"
 
 #include <igl/opengl/create_shader_program.h>
@@ -15,7 +15,7 @@
 
 #include <vector>
 
-#include "volume_exporter.h"
+#include <utils/gl/volume_exporter.h>
 
 #pragma optimize ("", off)
 

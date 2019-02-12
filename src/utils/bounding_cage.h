@@ -563,6 +563,10 @@ public:
         keyframes.cage = this;
     }
 
+    void set_logger(std::shared_ptr<spdlog::logger> logger) {
+        this->logger = logger;
+    }
+
     friend class KeyFrame;
     friend class Cell;
 

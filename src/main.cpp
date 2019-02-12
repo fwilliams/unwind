@@ -7,8 +7,6 @@
 #include "ui/meshing_plugin.h"
 #include "ui/endpoint_selection_plugin.h"
 #include "ui/bounding_polygon_plugin.h"
-#include "ui/straightening_plugin.h"
-#include "ui/rasterization_plugin.h"
 #include "ui/state.h"
 
 State _state;
@@ -20,8 +18,6 @@ Selection_Menu selection_menu(_state);
 Meshing_Menu meshing_menu(_state);
 EndPoint_Selection_Menu endpoint_selection_menu(_state);
 Bounding_Polygon_Menu bounding_polygon_menu(_state);
-Straightening_Menu straightening_menu(_state);
-Rasterization_Menu rasterization_menu(_state);
 
 
 
@@ -52,13 +48,12 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     meshing_menu.init(&viewer);
     endpoint_selection_menu.init(&viewer);
     bounding_polygon_menu.init(&viewer);
-    //  straightening_menu.init(&viewer);
-    //  rasterization_menu.init(&viewer);
 
     viewer.plugins.push_back(&initial_file_selection);
 
     _state.logger = spdlog::stdout_color_mt(FishLoggerName);
     _state.logger->set_level(spdlog::level::trace);
+    _state.cage.set_logger(_state.logger);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(log_opengl_debug, NULL);
 
@@ -98,12 +93,6 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
             case Application_State::BoundingPolygon:
                 bounding_polygon_menu.initialize();
                 viewer.plugins.push_back(&bounding_polygon_menu);
-                break;
-            case Application_State::Straightening:
-                viewer.plugins.push_back(&straightening_menu);
-                break;
-            case Application_State::Rasterization:
-                viewer.plugins.push_back(&rasterization_menu);
                 break;
         }
 
