@@ -563,39 +563,70 @@ void update_transfer_function(Transfer_Function& transfer_function) {
 void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix)
 {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
-    //
-    //  Pre-Rendering
-    //
+
+
+    const glm::vec4 color_transparent(0.0);
+
+    // Back up face culling state so we can restore it when we're done
+    GLboolean face_culling_enabled = glIsEnabled(GL_CULL_FACE);
+
+    // Backup the previous viewport so we can restore it when we're done
+    GLint old_viewport[4];
+    glGetIntegerv(GL_VIEWPORT, old_viewport);
+
+    // Get the width and height of the entry and exit point textures so we can set the viewport correctly
+    GLint fb_tex_w, fb_tex_h;
+    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &fb_tex_w);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &fb_tex_h);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+
+
+    // We need face culling to render
+    glEnable(GL_CULL_FACE);
+
+    // Set the viewport to match the entry and exit framebuffer textures
+    glViewport(0, 0, fb_tex_w, fb_tex_h);
+
+    // Bind the bounding geometry
     glBindVertexArray(bounding_box.vao);
+
     glUseProgram(bounding_box.program);
 
+    // FIXME: Model matrix hack
     glm::mat4 scaling = glm::scale(glm::mat4(1.f), parameters.normalized_volume_dimensions);
     glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
-
     glm::mat4 model = model_matrix * scaling * translate;
 
     glUniformMatrix4fv(bounding_box.uniform_location.model_matrix, 1,
         GL_FALSE, glm::value_ptr(model));
-
     glUniformMatrix4fv(bounding_box.uniform_location.view_matrix, 1,
         GL_FALSE, glm::value_ptr(view_matrix));
-
     glUniformMatrix4fv(bounding_box.uniform_location.projection_matrix,
         1, GL_FALSE, glm::value_ptr(proj_matrix));
 
     // Render entry points of bounding box
     glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.entry_framebuffer);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
     glCullFace(GL_FRONT);
     glDrawElements(GL_TRIANGLES, 12 * 3, GL_UNSIGNED_BYTE, nullptr);
 
     // Render exit points of bounding box
     glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.exit_framebuffer);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
     glCullFace(GL_BACK);
     glDrawElements(GL_TRIANGLES, 12 * 3, GL_UNSIGNED_BYTE, nullptr);
 
+    // Restore OpenGL state
+    glBindVertexArray(0);
+    glUseProgram(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
+    if (face_culling_enabled == GL_FALSE) {
+        glDisable(GL_CULL_FACE);
+    }
+
     glPopDebugGroup();
 }
 
@@ -676,6 +707,9 @@ void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_textur
     glUniform1f(program.uniform_location.light_exponent_specular,
                 parameters.specular_exponent);
 
+    // Bind a vao so we can render
+    glBindVertexArray(bounding_box.vao);
+
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glPopDebugGroup();
 }
@@ -723,6 +757,9 @@ glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLu
         glm::value_ptr(parameters.volume_dimensions));
     glUniform3fv(picking_program.uniform_location.volume_dimensions_rcp,
         1, glm::value_ptr(parameters.volume_dimensions_rcp));
+
+    // Bind a vao so we can render
+    glBindVertexArray(bounding_box.vao);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glUseProgram(0);
