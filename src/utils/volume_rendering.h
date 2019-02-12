@@ -37,8 +37,6 @@ struct Bounding_Box {
 
 struct Parameters {
     glm::ivec3 volume_dimensions = { 0, 0, 0 };
-    glm::vec3 volume_dimensions_rcp = { 0.f, 0.f, 0.f };
-    glm::vec3 normalized_volume_dimensions = { 0.f, 0.f, 0.f };
 
     glm::vec3 light_position;
     float highlight_factor;

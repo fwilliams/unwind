@@ -27,23 +27,19 @@ void Selection_Menu::initialize() {
 
     const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
     volume_rendering.parameters.volume_dimensions = volume_dims;
-    volume_rendering.parameters.volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(volume_dims);
-
-    const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
-    const float md = static_cast<float>(maxDim);
-
-    const glm::vec3 normalized_volume_dims = {
-      volume_rendering.parameters.volume_dimensions[0] / md,
-      volume_rendering.parameters.volume_dimensions[1] / md,
-      volume_rendering.parameters.volume_dimensions[2] / md
-    };
-    volume_rendering.parameters.normalized_volume_dimensions = normalized_volume_dims;
 
     _state.selected_features.clear();
     number_features_is_dirty = true;
     selection_list_is_dirty = false;
     target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
 
+    const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
+    const float md = static_cast<float>(maxDim);
+    const glm::vec3 normalized_volume_dims = {
+      volume_rendering.parameters.volume_dimensions[0] / md,
+      volume_rendering.parameters.volume_dimensions[1] / md,
+      volume_rendering.parameters.volume_dimensions[2] / md
+    };
     double w = normalized_volume_dims[0]/2.0, h = normalized_volume_dims[1]/2.0, d = normalized_volume_dims[2]/2.0;
     Eigen::MatrixXd volume_bbox_v(8, 3);
     volume_bbox_v <<
@@ -55,7 +51,6 @@ void Selection_Menu::initialize() {
          w, -h,  d,
          w,  h, -d,
          w,  h,  d;
-
     Eigen::MatrixXi volume_bbox_i(12, 3);
     volume_bbox_i <<
         0, 6, 4,
@@ -70,10 +65,9 @@ void Selection_Menu::initialize() {
         0, 5, 1,
         1, 5, 7,
         1, 7, 3;
-
     viewer->core.align_camera_center(volume_bbox_v, volume_bbox_i);
 
-    volume_rendering.parameters.sampling_rate = 1.0 / glm::length(glm::vec3(volume_rendering.parameters.volume_dimensions));
+
 
     if (transfer_function.empty()) {
         // Create the initial nodes
@@ -134,12 +128,25 @@ void Selection_Menu::draw_selection_volume() {
         transfer_function_dirty = false;
     }
 
+    volume_rendering.parameters.sampling_rate = 1.0 / glm::length(glm::vec3(volume_rendering.parameters.volume_dimensions));
     volume_rendering.parameters.light_position = G3f(viewer->core.light_position);
     volume_rendering.parameters.highlight_factor = highlight_factor;
     volume_rendering.parameters.emphasize_by_selection = static_cast<int>(emphasize_by_selection);
     volume_rendering.parameters.color_by_id = color_by_id;
 
-    volume_rendering.render_bounding_box(GM4f(viewer->core.model), GM4f(viewer->core.view), GM4f(viewer->core.proj));
+    const int maxDim = glm::compMax(volume_rendering.parameters.volume_dimensions);
+    const float md = static_cast<float>(maxDim);
+    const glm::vec3 normalized_volume_dims = {
+      volume_rendering.parameters.volume_dimensions[0] / md,
+      volume_rendering.parameters.volume_dimensions[1] / md,
+      volume_rendering.parameters.volume_dimensions[2] / md
+    };
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dims);
+    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+    glm::mat4 model = GM4f(viewer->core.model) * scaling * translate;
+    glm::mat4 view = GM4f(viewer->core.view);
+    glm::mat4 proj = GM4f(viewer->core.proj);
+    volume_rendering.render_bounding_box(model, view, proj);
     volume_rendering.render_volume(
                 _state.low_res_volume.index_texture,
                 _state.low_res_volume.volume_texture);

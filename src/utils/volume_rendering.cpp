@@ -733,13 +733,8 @@ void SelectionRenderer::render_bounding_box(glm::mat4 model_matrix, glm::mat4 vi
 
     glUseProgram(bounding_box.program);
 
-    // FIXME: Model matrix hack
-    glm::mat4 scaling = glm::scale(glm::mat4(1.f), parameters.normalized_volume_dimensions);
-    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
-    glm::mat4 model = model_matrix * scaling * translate;
-
     glUniformMatrix4fv(bounding_box.uniform_location.model_matrix, 1,
-        GL_FALSE, glm::value_ptr(model));
+        GL_FALSE, glm::value_ptr(model_matrix));
     glUniformMatrix4fv(bounding_box.uniform_location.view_matrix, 1,
         GL_FALSE, glm::value_ptr(view_matrix));
     glUniformMatrix4fv(bounding_box.uniform_location.projection_matrix,
@@ -834,8 +829,10 @@ void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_textur
     // Rendering parameters
     glUniform3iv(program.uniform_location.volume_dimensions, 1,
         glm::value_ptr(parameters.volume_dimensions));
+
+    glm::vec3 volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(parameters.volume_dimensions);
     glUniform3fv(program.uniform_location.volume_dimensions_rcp, 1,
-        glm::value_ptr(parameters.volume_dimensions_rcp));
+        glm::value_ptr(volume_dimensions_rcp));
     glUniform3fv(program.uniform_location.light_position, 1,
         glm::value_ptr(parameters.light_position));
     glUniform3fv(program.uniform_location.light_color_ambient, 1,
@@ -897,8 +894,9 @@ glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLu
     // Rendering parameters
     glUniform3iv(picking_program.uniform_location.volume_dimensions, 1,
         glm::value_ptr(parameters.volume_dimensions));
+    glm::vec3 volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(parameters.volume_dimensions);
     glUniform3fv(picking_program.uniform_location.volume_dimensions_rcp,
-        1, glm::value_ptr(parameters.volume_dimensions_rcp));
+        1, glm::value_ptr(volume_dimensions_rcp));
 
     // Bind a vao so we can render
     glBindVertexArray(bounding_box.vao);
