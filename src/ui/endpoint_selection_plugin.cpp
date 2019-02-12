@@ -132,6 +132,8 @@ void EndPoint_Selection_Menu::initialize() {
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
     viewer->core.viewport = Eigen::RowVector4f(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
+
+    state.endpoint_pairs.clear();
 }
 
 void EndPoint_Selection_Menu::deinitialize() {
