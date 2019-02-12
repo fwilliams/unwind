@@ -17,9 +17,14 @@ public:
     virtual bool pre_draw() override;
     virtual bool mouse_down(int button, int modifier) override;
     void initialize();
+    void deinitialize();
 
 private:
     State& state;
+
+    Eigen::Vector4f old_viewport;
+
+    float view_hsplit = 0.2f;
 
     bool selecting_endpoints = false;
 

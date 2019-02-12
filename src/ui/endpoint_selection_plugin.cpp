@@ -126,10 +126,27 @@ void EndPoint_Selection_Menu::initialize() {
     points_overlay_id = static_cast<int>(viewer->selected_data_index);
 
     viewer->selected_data_index = mesh_overlay_id;
+
+    old_viewport = viewer->core.viewport;
+
+    int window_width, window_height;
+    glfwGetWindowSize(viewer->window, &window_width, &window_height);
+    viewer->core.viewport = Eigen::RowVector4f(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
 }
 
+void EndPoint_Selection_Menu::deinitialize() {
+    for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
+        viewer->erase_mesh(i);
+    }
+    viewer->data().clear();
+    viewer->core.viewport = old_viewport;
+}
 
 bool EndPoint_Selection_Menu::pre_draw() {
+    int window_width, window_height;
+    glfwGetWindowSize(viewer->window, &window_width, &window_height);
+    viewer->core.viewport = Eigen::RowVector4f(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
+
     bool ret = FishUIViewerPlugin::pre_draw();
     const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
 
@@ -157,6 +174,9 @@ bool EndPoint_Selection_Menu::pre_draw() {
 
 bool EndPoint_Selection_Menu::post_draw() {
     bool ret = FishUIViewerPlugin::post_draw();
+    int window_width, window_height;
+    glfwGetWindowSize(viewer->window, &window_width, &window_height);
+    viewer->core.viewport = Eigen::RowVector4f(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
 
     int width;
     int height;
@@ -165,10 +185,11 @@ bool EndPoint_Selection_Menu::post_draw() {
     ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiSetCond_Always);
     float w = static_cast<float>(width);
     float h = static_cast<float>(height);
-    ImGui::SetNextWindowSize(ImVec2(w * 0.2f, h), ImGuiSetCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(w * view_hsplit, h), ImGuiSetCond_Always);
     ImGui::Begin("Select Endpoints", nullptr,
-        ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_AlwaysAutoResize);
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
+                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
 
     if (done_extracting_skeleton) {
         state.set_application_state(Application_State::BoundingPolygon);

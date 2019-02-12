@@ -66,6 +66,9 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
         case Application_State::Segmentation:
           selection_menu.deinitialize();
             break;
+        case Application_State::EndPointSelection:
+          endpoint_selection_menu.deinitialize();
+            break;
         }
 
         viewer.plugins.clear();

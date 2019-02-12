@@ -34,8 +34,6 @@ void Selection_Menu::initialize() {
 
     int window_width, window_height;
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
-    Eigen::RowVector4f viewport(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
-    viewer->core.viewport = viewport;
 
     const int maxDim = glm::compMax(rendering_params.volume_dimensions);
     const float md = static_cast<float>(maxDim);
@@ -81,6 +79,9 @@ void Selection_Menu::initialize() {
     }
 
     old_viewport = viewer->core.viewport;
+
+    Eigen::RowVector4f viewport(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
+    viewer->core.viewport = viewport;
 }
 
 void Selection_Menu::draw_selection_volume() {
