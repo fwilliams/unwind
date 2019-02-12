@@ -174,6 +174,14 @@ bool Bounding_Polygon_Menu::post_draw() {
     const float min_cut_index = static_cast<float>(state.cage.min_index());
     const float max_cut_index = static_cast<float>(state.cage.max_index());
 
+    ImVec2 prev_kf_text_size = ImGui::CalcTextSize(" < Prev KF ");
+    ImVec2 nudge_left_text_size = ImGui::CalcTextSize(" < ");
+    ImVec2 next_kf_text_size = ImGui::CalcTextSize(" Next KF > ");
+    ImVec2 nudge_right_text_size = ImGui::CalcTextSize(" > ");
+    float text_button_w = std::max(prev_kf_text_size.x, next_kf_text_size.x);
+    float nudge_button_w = std::max(nudge_left_text_size.x, nudge_right_text_size.x);
+
+    ImGui::PushItemWidth(text_button_w);
     if (ImGui::Button("< Prev KF")) {
         BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
         it--;
@@ -182,12 +190,18 @@ bool Bounding_Polygon_Menu::post_draw() {
         }
         current_cut_index = static_cast<float>(it->index());
     }
+    ImGui::PopItemWidth();
     ImGui::SameLine();
+
+    ImGui::PushItemWidth(nudge_button_w);
     if (ImGui::Button("<")) {
         current_cut_index = std::max(min_cut_index, std::min(current_cut_index - keyframe_nudge_amount, max_cut_index));
     }
+    ImGui::PopItemWidth();
+
     ImGui::SameLine();
-    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.85f);
+    ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() - 2.f*cursor_pos.x);
     if(ImGui::SliderFloat("", &current_cut_index,
                           static_cast<float>(state.cage.min_index()),
                           static_cast<float>(state.cage.max_index()))) {
@@ -195,10 +209,15 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
     ImGui::PopItemWidth();
     ImGui::SameLine();
+
+    ImGui::PushItemWidth(nudge_button_w);
     if (ImGui::Button(">")) {
         current_cut_index = std::max(min_cut_index, std::min(current_cut_index + keyframe_nudge_amount, max_cut_index));
     }
+    ImGui::PopItemWidth();
     ImGui::SameLine();
+
+    ImGui::PushItemWidth(text_button_w);
     if (ImGui::Button("Next KF >")) {
         BoundingCage::KeyFrameIterator it = state.cage.keyframe_for_index(current_cut_index);
         it++;
@@ -207,9 +226,9 @@ bool Bounding_Polygon_Menu::post_draw() {
         }
         current_cut_index = static_cast<float>(it->index());
     }
+    ImGui::PopItemWidth();
 
     if (ImGui::InputFloat("Nudge Amount", &keyframe_nudge_amount, 0.01, 0.1, 5)) {}
-
 
     BoundingCage::KeyFrameIterator kf = state.cage.keyframe_for_index(current_cut_index);
     if (ImGui::Button("Insert KF")) {
