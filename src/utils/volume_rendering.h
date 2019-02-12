@@ -118,6 +118,8 @@ struct SelectionRenderer {
     void destroy();
     void render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
     void render_volume(glm::vec3 light_position, GLuint volume_texture);
+
+    glm::vec3 pick_volume_location(glm::ivec2 mouse_position, GLuint picking_texture, GLuint volume_texture);
 };
 
 void update_transfer_function(Transfer_Function& transfer_function);

@@ -658,45 +658,49 @@ void SelectionRenderer::render_volume(glm::vec3 light_position, GLuint volume_te
     glPopDebugGroup();
 }
 
-glm::vec3 pick_volume_location(const SelectionRenderer& volume_rendering,
-                               glm::ivec2 mouse_position, GLuint volume_texture)
+glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture)
 {
+    glUseProgram(picking_program.program_object);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_3D, index_texture);
+    glUniform1i(_gl_state.uniform_locations_picking.index_volume, 4);
+
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
-    glBindFramebuffer(GL_FRAMEBUFFER, volume_rendering.picking_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, picking_framebuffer);
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(volume_rendering.picking_program.program_object);
+    glUseProgram(picking_program.program_object);
 
     // Entry points texture
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.entry_texture);
-    glUniform1i(volume_rendering.picking_program.uniform_location.entry_texture, 0);
+    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
+    glUniform1i(picking_program.uniform_location.entry_texture, 0);
 
     // Exit points texture
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, volume_rendering.bounding_box.exit_texture);
-    glUniform1i(volume_rendering.picking_program.uniform_location.entry_texture, 1);
+    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glUniform1i(picking_program.uniform_location.entry_texture, 1);
 
     // Volume texture
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_3D, volume_texture);
-    glUniform1i(volume_rendering.picking_program.uniform_location.volume_texture, 2);
+    glUniform1i(picking_program.uniform_location.volume_texture, 2);
 
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_1D, volume_rendering.transfer_function.texture);
-    glUniform1i(volume_rendering.picking_program.uniform_location.transfer_function, 3);
+    glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
+    glUniform1i(picking_program.uniform_location.transfer_function, 3);
 
-    glUniform1f(volume_rendering.picking_program.uniform_location.sampling_rate,
-        volume_rendering.parameters.sampling_rate);
+    glUniform1f(picking_program.uniform_location.sampling_rate,
+        parameters.sampling_rate);
 
 
     // Rendering parameters
-    glUniform3iv(volume_rendering.picking_program.uniform_location.volume_dimensions, 1,
-        glm::value_ptr(volume_rendering.parameters.volume_dimensions));
-    glUniform3fv(volume_rendering.picking_program.uniform_location.volume_dimensions_rcp,
-        1, glm::value_ptr(volume_rendering.parameters.volume_dimensions_rcp));
+    glUniform3iv(picking_program.uniform_location.volume_dimensions, 1,
+        glm::value_ptr(parameters.volume_dimensions));
+    glUniform3fv(picking_program.uniform_location.volume_dimensions_rcp,
+        1, glm::value_ptr(parameters.volume_dimensions_rcp));
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glUseProgram(0);
@@ -706,7 +710,10 @@ glm::vec3 pick_volume_location(const SelectionRenderer& volume_rendering,
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    glUseProgram(0);
+
     glPopDebugGroup();
+
     return {
         colors[0],
         colors[1],

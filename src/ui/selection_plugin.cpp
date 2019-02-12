@@ -206,14 +206,11 @@ void Selection_Menu::draw_selection_volume() {
 
     volume_rendering.render_volume(G3f(viewer->core.light_position), _state.low_res_volume.volume_texture);
 
-    glUseProgram(volume_rendering.picking_program.program_object);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_3D, _state.low_res_volume.index_texture);
-    glUniform1i(volume_rendering._gl_state.uniform_locations_picking.index_volume, 4);
-
-    glm::vec3 picking = pick_volume_location(volume_rendering,
-        { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y },
-                                             _state.low_res_volume.volume_texture);
+    glm::ivec2 inv_mouse_coords { viewer->current_mouse_x, viewer->core.viewport[3] - viewer->current_mouse_y };
+    glm::vec3 picking = volume_rendering.pick_volume_location(
+                inv_mouse_coords,
+                _state.low_res_volume.index_texture,
+                _state.low_res_volume.volume_texture);
 
     glUseProgram(0);
 
