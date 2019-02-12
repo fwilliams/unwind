@@ -1,4 +1,4 @@
-#include "volume_rendering_2.h"
+#include "selection_renderer.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
@@ -7,8 +7,6 @@
 
 #include <algorithm>
 #include <iostream>
-
-#include "bounding_cage.h"
 
 
 namespace {

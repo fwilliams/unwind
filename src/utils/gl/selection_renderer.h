@@ -5,14 +5,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-
-namespace volumerendering {
-
-struct TfNode {
-    float t;
-    glm::vec4 rgba;
-};
-
+#include "volume_renderer.h"
 
 struct Parameters {
     glm::ivec3 volume_dimensions = { 0, 0, 0 };
@@ -126,7 +119,5 @@ public:
     glm::vec3 picking_pass(Parameters parameters, glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture);
 
 };
-
-} // namespace volumerendering
 
 #endif

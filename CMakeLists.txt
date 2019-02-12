@@ -91,8 +91,8 @@ target_include_directories(contourtree PUBLIC ${CT_INCLUDE_DIRS})
 
 # Utils static library
 set(UTILS_INCLUDE_DIRS src src/utils)
-file(GLOB UTILS_SRCS src/utils/*.cpp)
-file(GLOB UTILS_HEADER src/utils/*.h)
+file(GLOB UTILS_SRCS src/utils/*.cpp src/utils/gl/*.cpp)
+file(GLOB UTILS_HEADER src/utils/*.h src/utils/gl/*.h)
 list(FILTER UTILS_SRCS EXCLUDE REGEX cgal*)
 list(FILTER UTILS_HEADER EXCLUDE REGEX cgal*)
 add_library(utils STATIC ${UTILS_SRCS} ${UTILS_HEADER})

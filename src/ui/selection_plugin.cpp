@@ -6,8 +6,6 @@
 #include <imgui/imgui_internal.h>
 #include <GLFW/glfw3.h>
 
-#include <utils/volume_rendering.h>
-
 #include "utils/glm_conversion.h"
 
 #include <glm/glm.hpp>
@@ -71,8 +69,8 @@ void Selection_Menu::initialize() {
 
     if (transfer_function.empty()) {
         // Create the initial nodes
-        volumerendering::TfNode first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
-        volumerendering::TfNode last = { 1.f, { 1.f, 1.f, 1.f, 1.f } };
+        TfNode first = { 0.f, { 0.f, 0.f, 0.f, 0.f } };
+        TfNode last = { 1.f, { 1.f, 1.f, 1.f, 1.f } };
         transfer_function.push_back(std::move(first));
         transfer_function.push_back(std::move(last));
         transfer_function_dirty = true;
@@ -368,13 +366,13 @@ bool Selection_Menu::post_draw() {
 
         // First render the lines
         for (size_t i = 0; i < transfer_function.size(); ++i) {
-            volumerendering::TfNode& node = transfer_function[i];
+            TfNode& node = transfer_function[i];
 
             const float x = canvas_pos.x + canvas_size.x * node.t;
             const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
             if (i > 0) {
-                volumerendering::TfNode& prev_node = transfer_function[i - 1];
+                TfNode& prev_node = transfer_function[i - 1];
 
                 const float prev_x = canvas_pos.x + canvas_size.x * prev_node.t;
                 const float prev_y = canvas_pos.y + canvas_size.y * (1.f - prev_node.rgba[3]);
@@ -384,7 +382,7 @@ bool Selection_Menu::post_draw() {
         }
 
         for (size_t i = 0; i < transfer_function.size(); ++i) {
-            volumerendering::TfNode& node = transfer_function[i];
+            TfNode& node = transfer_function[i];
 
             const float x = canvas_pos.x + canvas_size.x * node.t;
             const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
@@ -412,7 +410,7 @@ bool Selection_Menu::post_draw() {
         if (mouse_in_tf_editor) {
             if (ImGui::IsMouseDown(0)) {
                 for (size_t i = 0; i < transfer_function.size(); ++i) {
-                    volumerendering::TfNode& node = transfer_function[i];
+                    TfNode& node = transfer_function[i];
                     const float x = canvas_pos.x + canvas_size.x * node.t;
                     const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
 
@@ -459,7 +457,7 @@ bool Selection_Menu::post_draw() {
                     }
                     transfer_function[current_interaction_index].rgba[3] = new_a;
 
-                    using N = volumerendering::TfNode;
+                    using N = TfNode;
                     std::sort(transfer_function.begin(), transfer_function.end(),
                         [](const N& lhs, const N& rhs) { return lhs.t < rhs.t; });
                     transfer_function_dirty = true;
@@ -475,10 +473,10 @@ bool Selection_Menu::post_draw() {
                             canvas_size.y);
 
                         for (size_t i = 0; i < transfer_function.size(); ++i) {
-                            volumerendering::TfNode& node = transfer_function[i];
+                            TfNode& node = transfer_function[i];
 
                             if (node.t > t) {
-                                volumerendering::TfNode& prev = transfer_function[i - 1];
+                                TfNode& prev = transfer_function[i - 1];
 
                                 const float t_prime = (t - prev.t) / (node.t - prev.t);
 

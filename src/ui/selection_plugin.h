@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
-#include <utils/volume_rendering.h>
+#include <utils/gl/selection_renderer.h>
 
 struct State;
 
@@ -25,8 +25,8 @@ private:
 
     State& _state;
 
-    volumerendering::Parameters rendering_params;
-    volumerendering::SelectionRenderer selection_renderer;
+    Parameters rendering_params;
+    SelectionRenderer selection_renderer;
 
     glm::vec2 clicked_mouse_position = { 0.f, 0.f };
     bool is_currently_interacting = false;
@@ -36,7 +36,7 @@ private:
     bool number_features_is_dirty = true;
     bool transfer_function_dirty = true;
 
-    std::vector<volumerendering::TfNode> transfer_function;
+    std::vector<TfNode> transfer_function;
 
     int current_selected_feature = -1;
 

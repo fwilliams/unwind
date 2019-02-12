@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
-#include "volume_rendering_2.h"
+#include <utils/gl/volume_renderer.h>
 
 class TransferFunctionEditWidget
 {

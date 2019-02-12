@@ -1,4 +1,4 @@
-#include "volume_rendering.h"
+#include "selection_renderer.h"
 
 #include <fstream>
 #include <iostream>
@@ -380,8 +380,6 @@ constexpr const char* SELECTION_PICKING_PASS_FRAG_SHADER = R"(
 } // namespace
 
 using namespace igl::opengl;
-
-namespace volumerendering {
 
 void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 {
@@ -934,4 +932,3 @@ void SelectionRenderer::resize_framebuffer(glm::ivec2 framebuffer_size) {
 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-} // namespace volumerendering

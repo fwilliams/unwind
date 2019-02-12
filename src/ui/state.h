@@ -3,7 +3,6 @@
 
 #include "bounding_cage.h"
 #include "preprocessing.hpp"
-#include "volume_rendering.h"
 #include "utils/utils.h"
 #include "utils/datfile.h"
 
