@@ -8,9 +8,6 @@
 
 #include <utils/volume_rendering.h>
 
-#include "volume_fragment_shader.h"
-#include "picking_fragment_shader.h"
-
 #include "utils/glm_conversion.h"
 
 #include <glm/glm.hpp>
@@ -26,29 +23,7 @@ void Selection_Menu::deinitialize() {
 }
 
 void Selection_Menu::initialize() {
-    volume_rendering.initialize(
-        glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]),
-        ContourTreeFragmentShader, ContourTreePickingFragmentShader);
-
-    volume_rendering._gl_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
-        volume_rendering.program.program_object, "index_volume"
-    );
-    volume_rendering._gl_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
-        volume_rendering.program.program_object, "color_by_identifier"
-    );
-    volume_rendering._gl_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
-        volume_rendering.program.program_object, "selection_emphasis_type"
-    );
-    volume_rendering._gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
-        volume_rendering.program.program_object, "highlight_factor"
-    );
-    volume_rendering._gl_state.uniform_locations_picking.index_volume = glGetUniformLocation(
-        volume_rendering.picking_program.program_object, "index_volume"
-    );
-
-    // SSBO
-    glGenBuffers(1, &volume_rendering._gl_state.contour_information_ssbo);
-    glGenBuffers(1, &volume_rendering._gl_state.selection_list_ssbo);
+    volume_rendering.initialize(glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
 
     const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
     volume_rendering.parameters.volume_dimensions = volume_dims;

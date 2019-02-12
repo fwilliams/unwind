@@ -77,10 +77,25 @@ constexpr const char* VOLUME_PASS_VERTEX_SHADER = R"(
 // 6. Perform front-to-back compositing
 // 7. Stop if either the ray is exhausted or the combined transparency is above an
 //    early-ray termination threshold (0.99 in this case)
-constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
-#version 150
+constexpr const char* SELECTION_RENDERING_FRAG_SHADER = R"(
+#version 450
+  // Keep in sync with main.cpp UI_State::Emphasis
+  const int SELECTION_EMPHASIS_TYPE_NONE = 0;
+  const int SELECTION_EMPHASIS_TYPE_ONSELECTION = 1;
+  const int SELECTION_EMPHASIS_TYPE_ONNONSELECTION = 2;
+
   in vec2 uv;
   out vec4 out_color;
+
+  layout (std430, binding = 0) buffer Contour {
+      uint nFeatures;
+      uint values[];
+  } contour;
+
+  layout (std430, binding = 1) buffer SelectionList {
+      uint nFeatures;
+      uint features[];
+  } selection;
 
   uniform sampler2D entry_texture;
   uniform sampler2D exit_texture;
@@ -88,34 +103,82 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
   uniform sampler3D volume_texture;
   uniform sampler1D transfer_function;
 
+  uniform usampler3D index_volume;
+  uniform int color_by_identifier;
+
   uniform ivec3 volume_dimensions;
   uniform vec3 volume_dimensions_rcp;
   uniform float sampling_rate;
 
+  uniform int selection_emphasis_type;
+  uniform float highlight_factor;
+
   struct Light_Parameters {
-    vec3 position; 
+    vec3 position;
     vec3 ambient_color;
-    vec3 diffuse_color; 
+    vec3 diffuse_color;
     vec3 specular_color;
     float specular_exponent;
   };
   uniform Light_Parameters light_parameters;
 
+  uniform int id;
 
   // Early-ray termination
   const float ERT_THRESHOLD = 0.99;
   const float REF_SAMPLING_INTERVAL = 150.0;
 
+  // Code from https://raw.githubusercontent.com/kbinani/glsl-colormap/master/shaders/transform_rainbow.frag
+  // Under MIT license
+  vec4 colormap(float x) {
+    float r = 0.0, g = 0.0, b = 0.0;
+
+    if (x < 0.0) {
+      r = 127.0 / 255.0;
+    } else if (x <= 1.0 / 9.0) {
+      r = 1147.5 * (1.0 / 9.0 - x) / 255.0;
+    } else if (x <= 5.0 / 9.0) {
+      r = 0.0;
+    } else if (x <= 7.0 / 9.0) {
+      r = 1147.5 * (x - 5.0 / 9.0) / 255.0;
+    } else {
+      r = 1.0;
+    }
+
+    if (x <= 1.0 / 9.0) {
+      g = 0.0;
+    } else if (x <= 3.0 / 9.0) {
+      g = 1147.5 * (x - 1.0 / 9.0) / 255.0;
+    } else if (x <= 7.0 / 9.0) {
+      g = 1.0;
+    } else if (x <= 1.0) {
+      g = 1.0 - 1147.5 * (x - 7.0 / 9.0) / 255.0;
+    } else {
+      g = 0.0;
+    }
+
+    if (x <= 3.0 / 9.0) {
+      b = 1.0;
+    } else if (x <= 5.0 / 9.0) {
+      b = 1.0 - 1147.5 * (x - 3.0 / 9.0) / 255.0;
+    } else {
+      b = 0.0;
+    }
+
+    return vec4(r, g, b, 1.0);
+  }
+
+
   vec3 centralDifferenceGradient(vec3 pos) {
     vec3 f;
-    f.x = texture(volume_texture, pos + vec3(volume_dimensions_rcp.x, 0.0, 0.0)).a;
-    f.y = texture(volume_texture, pos + vec3(0.0, volume_dimensions_rcp.y, 0.0)).a;
-    f.z = texture(volume_texture, pos + vec3(0.0, 0.0, volume_dimensions_rcp.z)).a;
+    f.x = texture(volume_texture, pos + vec3(volume_dimensions_rcp.x, 0.0, 0.0)).r;
+    f.y = texture(volume_texture, pos + vec3(0.0, volume_dimensions_rcp.y, 0.0)).r;
+    f.z = texture(volume_texture, pos + vec3(0.0, 0.0, volume_dimensions_rcp.z)).r;
 
     vec3 b;
-    b.x = texture(volume_texture, pos - vec3(volume_dimensions_rcp.x, 0.0, 0.0)).a;
-    b.y = texture(volume_texture, pos - vec3(0.0, volume_dimensions_rcp.y, 0.0)).a;
-    b.z = texture(volume_texture, pos - vec3(0.0, 0.0, volume_dimensions_rcp.z)).a;
+    b.x = texture(volume_texture, pos - vec3(volume_dimensions_rcp.x, 0.0, 0.0)).r;
+    b.y = texture(volume_texture, pos - vec3(0.0, volume_dimensions_rcp.y, 0.0)).r;
+    b.z = texture(volume_texture, pos - vec3(0.0, 0.0, volume_dimensions_rcp.z)).r;
 
     return (f - b) / 2.0;
   }
@@ -138,48 +201,91 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
     return ambient + diffuse + specular;
   }
 
+  bool is_feature_selected(uint feature) {
+    for (int i = 0; i < selection.nFeatures; ++i) {
+      if (selection.features[i] == feature) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  float selection_factor(bool is_selected) {
+    if (selection.nFeatures == 0) {
+      return 1.f;
+    }
+
+    if (selection_emphasis_type == SELECTION_EMPHASIS_TYPE_NONE) {
+      return 1.f;
+    }
+    else if (selection_emphasis_type == SELECTION_EMPHASIS_TYPE_ONSELECTION) {
+      if (is_selected) {
+        return 1.f;
+      }
+      else {
+        return highlight_factor;
+      }
+    }
+    else if (selection_emphasis_type == SELECTION_EMPHASIS_TYPE_ONNONSELECTION) {
+      if (is_selected) {
+        return highlight_factor;
+      }
+      else {
+        return 1.f;
+      }
+    }
+  }
+
   void main() {
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
     if (entry == exit) {
-      out_color = vec4(0.0, 0.0, 0.0, 1.0);
+      out_color = vec4(0.0);
       return;
     }
 
     // Combined final color that the volume rendering computed
     vec4 result = vec4(0.0);
-    
+
     vec3 ray_direction = exit - entry;
 
     float t_end = length(ray_direction);
     float t_incr = sampling_rate;
-    /*
-    min(
-      t_end,
-      t_end / (sampling_rate * length(ray_direction * volume_dimensions))
-    );
-    */
 
     vec3 normalized_ray_direction = normalize(ray_direction);
 
     float t = 0.0;
     while (t < t_end) {
       vec3 sample_pos = entry + t * normalized_ray_direction;
-      float value = texture(volume_texture, sample_pos).r;
-      vec4 color = texture(transfer_function, value);
-      if (color.a > 0) {
-        // Gradient
-        vec3 gradient = centralDifferenceGradient(sample_pos);
 
-        // Lighting
-        //color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
-                                //sample_pos, gradient, -normalized_ray_direction);
+      uint segVoxel = texture(index_volume, sample_pos).r;
+      uint feature = contour.values[segVoxel] + 1;
 
-        // Front-to-back Compositing
-        color.a = 1.0 - pow(1.0 - color.a, t_incr * REF_SAMPLING_INTERVAL);
-        result.rgb = result.rgb + (1.0 - result.a) * color.a * color.rgb;
-        result.a = result.a + (1.0 - result.a) * color.a;
-      }      
+      if (feature != 0) {
+        float value = texture(volume_texture, sample_pos).r;
+        vec4 color;
+        if (color_by_identifier == 1) {
+            const float normFeature = float(feature) / float(contour.nFeatures);
+            color.rgb = colormap(normFeature).rgb;
+            color.a = selection_factor(is_feature_selected(feature));
+        } else {
+          color = texture(transfer_function, value);
+          color.a *= selection_factor(is_feature_selected(feature));
+        }
+        if (color.a > 0) {
+          // Gradient
+          vec3 gradient = centralDifferenceGradient(sample_pos);
+          vec3 normal = gradient / max(length(gradient), 0.001);
+          // Lighting
+          color.rgb = blinn_phong(light_parameters, color.rgb, color.rgb, vec3(1.0),
+                                  sample_pos, normal, -normalized_ray_direction);
+
+          // Front-to-back Compositing
+          color.a = 1.0 - pow(1.0 - color.a, t_incr * REF_SAMPLING_INTERVAL);
+          result.rgb = result.rgb + (1.0 - result.a) * color.a * color.rgb;
+          result.a = result.a + (1.0 - result.a) * color.a;
+        }
+      }
 
       if (result.a > ERT_THRESHOLD) {
         t = t_end;
@@ -188,8 +294,8 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
         t += t_incr;
       }
     }
-    
-    result.a = 1.0;
+
+    //result.a = 1.0;
     out_color = result;
   }
 )";
@@ -202,16 +308,31 @@ constexpr const char* VOLUME_PASS_FRAGMENT_SHADER = R"(
 // 3. Convert sample to color using the transfer function
 // 4. Exit the first time the alpha value is > 0 and write the current position as
 //    color
-constexpr const char* VolumeRenderingPickingFragmentShader = R"(
-#version 150
+// Shader that performs the actual volume rendering
+// Steps:
+// 1. Compute the ray direction by exit point color - entry point color
+// 2. Sample the volume along the ray
+// 3. Convert sample to color using the transfer function
+// 4. Compute central difference gradient
+// 5. Use the gradient for Phong shading
+// 6. Perform front-to-back compositing
+// 7. Stop if either the ray is exhausted or the combined transparency is above an
+//    early-ray termination threshold (0.99 in this case)
+constexpr const char* SELECTION_PICKING_PASS_FRAG_SHADER = R"(
+#version 450
   in vec2 uv;
   out vec4 out_color;
+
+  layout (std430, binding = 0) buffer Contour {
+      uint nFeatures;
+      uint values[];
+  } contour;
+
 
   uniform sampler2D entry_texture;
   uniform sampler2D exit_texture;
 
-  uniform sampler3D volume_texture;
-  uniform sampler1D transfer_function;
+  uniform usampler3D index_volume;
 
   uniform ivec3 volume_dimensions;
   uniform vec3 volume_dimensions_rcp;
@@ -221,7 +342,7 @@ constexpr const char* VolumeRenderingPickingFragmentShader = R"(
     vec3 entry = texture(entry_texture, uv).rgb;
     vec3 exit = texture(exit_texture, uv).rgb;
     if (entry == exit) {
-      out_color = vec4(0.0, 0.0, 0.0, 1.0);
+      out_color = vec4(0.0);
       return;
     }
 
@@ -239,16 +360,18 @@ constexpr const char* VolumeRenderingPickingFragmentShader = R"(
     float t = 0.0;
     while (t < t_end) {
       vec3 sample_pos = entry + t * normalized_ray_direction;
-      float value = texture(volume_texture, sample_pos).r;
-      vec4 color = texture(transfer_function, value);
-      if (color.a > 0) {
-        out_color = vec4(sample_pos, 1.0);
+      const uint segVoxel = texture(index_volume, sample_pos).r;
+      const uint feature = contour.values[segVoxel];
+      if (feature != -1) {
+        out_color = vec4(vec3(float(feature + 1)), 1.0);
         return;
-      }      
-      t += t_incr;
+      }
+      else {
+        t += t_incr;
+      }
     }
 
-    out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    out_color = vec4(0.0);
   }
 )";
 
@@ -257,8 +380,7 @@ using namespace igl::opengl;
 
 namespace volumerendering {
 
-void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
-                const char* fragment_shader, const char* picking_shader)
+void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 {
     //
     //   Bounding box information
@@ -324,8 +446,7 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
 
 
     // If the user specified a fragment shader, use that, otherwise, use the default one
-    igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
-        fragment_shader ? fragment_shader : VOLUME_PASS_FRAGMENT_SHADER, {},
+    igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER, SELECTION_RENDERING_FRAG_SHADER, {},
         program.program_object);
 
     program.uniform_location.entry_texture = glGetUniformLocation(
@@ -358,7 +479,7 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
         );
 
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
-        picking_shader ? picking_shader : VolumeRenderingPickingFragmentShader, {},
+        SELECTION_PICKING_PASS_FRAG_SHADER, {},
         picking_program.program_object);
 
     picking_program.uniform_location.entry_texture =
@@ -436,11 +557,35 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size,
 
     // Initialize transfer function
     // Texture
-    glGenTextures(1, &transfer_function.texture);
-    glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
+    glGenTextures(1, &program.transfer_function_texture);
+    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+
+
+
+    _gl_state.uniform_locations_rendering.index_volume = glGetUniformLocation(
+        program.program_object, "index_volume"
+    );
+    _gl_state.uniform_locations_rendering.color_by_identifier = glGetUniformLocation(
+        program.program_object, "color_by_identifier"
+    );
+    _gl_state.uniform_locations_rendering.selection_emphasis_type = glGetUniformLocation(
+        program.program_object, "selection_emphasis_type"
+    );
+    _gl_state.uniform_locations_rendering.highlight_factor = glGetUniformLocation(
+        program.program_object, "highlight_factor"
+    );
+    _gl_state.uniform_locations_picking.index_volume = glGetUniformLocation(
+        picking_program.program_object, "index_volume"
+    );
+
+    // SSBO
+    glGenBuffers(1, &_gl_state.contour_information_ssbo);
+    glGenBuffers(1, &_gl_state.selection_list_ssbo);
+
 }
 
 
@@ -453,7 +598,7 @@ void SelectionRenderer::destroy() {
     std::vector<GLuint> textures = {
         bounding_box.entry_texture,
         bounding_box.exit_texture,
-        transfer_function.texture,
+        program.transfer_function_texture,
         picking_program.picking_texture,
     };
     std::vector<GLuint> framebuffers = {
@@ -546,7 +691,7 @@ void SelectionRenderer::set_transfer_function(const std::vector<TfNode> &tf) {
         };
     }
 
-    glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
+    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, TRANSFER_FUNCTION_WIDTH, 0, GL_RGBA,
         GL_UNSIGNED_BYTE, transfer_function_data.data());
     glBindTexture(GL_TEXTURE_1D, 0);
@@ -675,7 +820,7 @@ void SelectionRenderer::render_volume(GLuint index_texture, GLuint volume_textur
 
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
+    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
     glUniform1i(program.uniform_location.transfer_function, 3);
 
     // Index Texture
@@ -742,7 +887,7 @@ glm::vec3 SelectionRenderer::pick_volume_location(glm::ivec2 mouse_position, GLu
 
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_1D, transfer_function.texture);
+    glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
     glUniform1i(picking_program.uniform_location.transfer_function, 3);
 
     glUniform1f(picking_program.uniform_location.sampling_rate,

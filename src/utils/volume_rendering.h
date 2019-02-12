@@ -35,10 +35,6 @@ struct Bounding_Box {
     } uniform_location;
 };
 
-struct Transfer_Function {
-    GLuint texture = 0;
-};
-
 struct Parameters {
     glm::ivec3 volume_dimensions = { 0, 0, 0 };
     glm::vec3 volume_dimensions_rcp = { 0.f, 0.f, 0.f };
@@ -65,11 +61,11 @@ struct Parameters {
 
 struct SelectionRenderer {
     Bounding_Box bounding_box;
-    Transfer_Function transfer_function;
     Parameters parameters;
 
     struct VolumePass {
         GLuint program_object = 0;
+        GLuint transfer_function_texture;
         struct {
             GLint entry_texture = 0;
             GLint exit_texture = 0;
@@ -131,18 +127,13 @@ struct SelectionRenderer {
     void resize_framebuffer(glm::ivec2 framebuffer_size);
     void set_transfer_function(const std::vector<TfNode>& tf);
 
-    void initialize(const glm::ivec2& viewport_size, const char* fragment_shader = nullptr, const char* picking_shader = nullptr);
+    void initialize(const glm::ivec2& viewport_size);
     void destroy();
     void render_bounding_box(glm::mat4 model_matrix, glm::mat4 view_matrix, glm::mat4 proj_matrix);
     void render_volume(GLuint index_texture, GLuint volume_texture);
     glm::vec3 pick_volume_location(glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture);
 
 };
-
-void update_transfer_function(Transfer_Function& transfer_function);
-
-glm::vec3 pick_volume_location(const SelectionRenderer& volume_rendering,
-    glm::ivec2 mouse_position, GLuint volume_texture);
 
 } // namespace volumerendering
 
