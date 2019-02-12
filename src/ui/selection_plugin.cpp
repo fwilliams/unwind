@@ -276,6 +276,7 @@ bool Selection_Menu::post_draw() {
         ImGui::PopStyleVar();
     }
 
+    /*
     ImGui::Separator();
     if (ImGui::CollapsingHeader("Advanced", nullptr, ImGuiTreeNodeFlags(0))) {
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
@@ -501,6 +502,7 @@ bool Selection_Menu::post_draw() {
             ImGui::ColorPicker4("Change Color", rgba);
         }
     }
+    */
     ImGui::End();
     ImGui::Render();
     return ret;
