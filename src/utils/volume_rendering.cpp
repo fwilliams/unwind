@@ -388,12 +388,12 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
     //
     //   Bounding box information
     //
-    glGenVertexArrays(1, &bounding_box.vao);
-    glBindVertexArray(bounding_box.vao);
+    glGenVertexArrays(1, &_gl_state.geometry_pass.vao);
+    glBindVertexArray(_gl_state.geometry_pass.vao);
 
     // Creating the vertex buffer object
-    glGenBuffers(1, &bounding_box.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, bounding_box.vbo);
+    glGenBuffers(1, &_gl_state.geometry_pass.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, _gl_state.geometry_pass.vbo);
 
     // Unit cube centered around 0.5 \in [0,1]
     const GLfloat vertexData[] = {
@@ -412,8 +412,8 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
 
     // Creating the index buffer object
-    glGenBuffers(1, &bounding_box.ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bounding_box.ibo);
+    glGenBuffers(1, &_gl_state.geometry_pass.ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _gl_state.geometry_pass.ibo);
 
     // Specifying the 12 faces of the unit cube
     const GLubyte iboData[] = {
@@ -434,18 +434,18 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
     glBindVertexArray(0);
 
-    bounding_box.program = igl::opengl::create_shader_program(
+    _gl_state.geometry_pass.program = igl::opengl::create_shader_program(
         VertexShader,
         RAY_ENDPOINT_PASS_FRAGMENT_SHADER,
         { { "in_position", 0 } }
     );
 
-    bounding_box.uniform_location.model_matrix = glGetUniformLocation(
-        bounding_box.program, "model_matrix");
-    bounding_box.uniform_location.view_matrix = glGetUniformLocation(
-        bounding_box.program, "view_matrix");
-    bounding_box.uniform_location.projection_matrix =
-        glGetUniformLocation(bounding_box.program, "projection_matrix");
+    _gl_state.geometry_pass.uniform_location.model_matrix = glGetUniformLocation(
+        _gl_state.geometry_pass.program, "model_matrix");
+    _gl_state.geometry_pass.uniform_location.view_matrix = glGetUniformLocation(
+        _gl_state.geometry_pass.program, "view_matrix");
+    _gl_state.geometry_pass.uniform_location.projection_matrix =
+        glGetUniformLocation(_gl_state.geometry_pass.program, "projection_matrix");
 
 
     // If the user specified a fragment shader, use that, otherwise, use the default one
@@ -525,31 +525,31 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
     );
 
     // Entry point texture and frame buffer
-    glGenTextures(1, &bounding_box.entry_texture);
-    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
+    glGenTextures(1, &_gl_state.geometry_pass.entry_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.entry_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &bounding_box.entry_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.entry_framebuffer);
+    glGenFramebuffers(1, &_gl_state.geometry_pass.entry_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.geometry_pass.entry_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        bounding_box.entry_texture, 0);
+        _gl_state.geometry_pass.entry_texture, 0);
 
 
     // Exit point texture and frame buffer
-    glGenTextures(1, &bounding_box.exit_texture);
-    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glGenTextures(1, &_gl_state.geometry_pass.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.exit_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &bounding_box.exit_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.exit_framebuffer);
+    glGenFramebuffers(1, &_gl_state.geometry_pass.exit_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.geometry_pass.exit_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        bounding_box.exit_texture, 0);
+        _gl_state.geometry_pass.exit_texture, 0);
 
 
     // Picking texture and framebuffer
@@ -585,19 +585,19 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
 void SelectionRenderer::destroy() {
     std::vector<GLuint> buffers = {
-        bounding_box.vbo,
-        bounding_box.ibo,
+        _gl_state.geometry_pass.vbo,
+        _gl_state.geometry_pass.ibo,
         _gl_state.volume_pass.contour_information_ssbo,
         _gl_state.volume_pass.selection_list_ssbo };
     std::vector<GLuint> textures = {
-        bounding_box.entry_texture,
-        bounding_box.exit_texture,
+        _gl_state.geometry_pass.entry_texture,
+        _gl_state.geometry_pass.exit_texture,
         _gl_state.volume_pass.transfer_function_texture,
         _gl_state.picking_pass.picking_texture,
     };
     std::vector<GLuint> framebuffers = {
-        bounding_box.entry_framebuffer,
-        bounding_box.exit_texture,
+        _gl_state.geometry_pass.entry_framebuffer,
+        _gl_state.geometry_pass.exit_texture,
         _gl_state.picking_pass.picking_framebuffer
     };
 
@@ -606,7 +606,7 @@ void SelectionRenderer::destroy() {
     glDeleteFramebuffers(framebuffers.size(), framebuffers.data());
     glDeleteProgram(_gl_state.volume_pass.program_object);
     glDeleteProgram(_gl_state.picking_pass.program_object);
-    glDeleteProgram(bounding_box.program);
+    glDeleteProgram(_gl_state.geometry_pass.program);
 
     _gl_state = GLState();
 }
@@ -705,7 +705,7 @@ void SelectionRenderer::geometry_pass(glm::mat4 model_matrix, glm::mat4 view_mat
 
     // Get the width and height of the entry and exit point textures so we can set the viewport correctly
     GLint fb_tex_w, fb_tex_h;
-    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.exit_texture);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &fb_tex_w);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &fb_tex_h);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -719,25 +719,25 @@ void SelectionRenderer::geometry_pass(glm::mat4 model_matrix, glm::mat4 view_mat
     glViewport(0, 0, fb_tex_w, fb_tex_h);
 
     // Bind the bounding geometry
-    glBindVertexArray(bounding_box.vao);
+    glBindVertexArray(_gl_state.geometry_pass.vao);
 
-    glUseProgram(bounding_box.program);
+    glUseProgram(_gl_state.geometry_pass.program);
 
-    glUniformMatrix4fv(bounding_box.uniform_location.model_matrix, 1,
+    glUniformMatrix4fv(_gl_state.geometry_pass.uniform_location.model_matrix, 1,
         GL_FALSE, glm::value_ptr(model_matrix));
-    glUniformMatrix4fv(bounding_box.uniform_location.view_matrix, 1,
+    glUniformMatrix4fv(_gl_state.geometry_pass.uniform_location.view_matrix, 1,
         GL_FALSE, glm::value_ptr(view_matrix));
-    glUniformMatrix4fv(bounding_box.uniform_location.projection_matrix,
+    glUniformMatrix4fv(_gl_state.geometry_pass.uniform_location.projection_matrix,
         1, GL_FALSE, glm::value_ptr(proj_matrix));
 
     // Render entry points of bounding box
-    glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.entry_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.geometry_pass.entry_framebuffer);
     glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
     glCullFace(GL_FRONT);
     glDrawElements(GL_TRIANGLES, 12 * 3, GL_UNSIGNED_BYTE, nullptr);
 
     // Render exit points of bounding box
-    glBindFramebuffer(GL_FRAMEBUFFER, bounding_box.exit_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.geometry_pass.exit_framebuffer);
     glClearBufferfv(GL_COLOR, 0, glm::value_ptr(color_transparent));
     glCullFace(GL_BACK);
     glDrawElements(GL_TRIANGLES, 12 * 3, GL_UNSIGNED_BYTE, nullptr);
@@ -790,12 +790,12 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
 
     // Entry points texture
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.entry_texture);
     glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 0);
 
     // Exit points texture
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.exit_texture);
     glUniform1i(_gl_state.volume_pass.uniform_location.entry_texture, 1);
 
     // Volume texture
@@ -835,7 +835,7 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
                 parameters.specular_exponent);
 
     // Bind a vao so we can render
-    glBindVertexArray(bounding_box.vao);
+    glBindVertexArray(_gl_state.geometry_pass.vao);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -859,12 +859,12 @@ glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mous
 
     // Entry points texture
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.entry_texture);
     glUniform1i(_gl_state.picking_pass.uniform_location.entry_texture, 0);
 
     // Exit points texture
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.exit_texture);
     glUniform1i(_gl_state.picking_pass.uniform_location.entry_texture, 1);
 
     // Volume texture
@@ -889,7 +889,7 @@ glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mous
         1, glm::value_ptr(volume_dimensions_rcp));
 
     // Bind a vao so we can render
-    glBindVertexArray(bounding_box.vao);
+    glBindVertexArray(_gl_state.geometry_pass.vao);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glUseProgram(0);
@@ -923,12 +923,12 @@ void SelectionRenderer::set_selection_data(uint32_t* selection_list, size_t num_
 
 void SelectionRenderer::resize_framebuffer(glm::ivec2 framebuffer_size) {
     // Entry point texture and frame buffer
-    glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.entry_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
         GL_RGBA, GL_FLOAT, nullptr);
 
     // Exit point texture and frame buffer
-    glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.geometry_pass.exit_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, framebuffer_size.x, framebuffer_size.y, 0,
         GL_RGBA, GL_FLOAT, nullptr);
 

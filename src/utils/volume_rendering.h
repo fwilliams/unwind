@@ -36,58 +36,26 @@ struct Parameters {
     bool color_by_id = true;
 };
 
-struct SelectionRenderer {
-    struct GeometryPass {
-        GLuint vao = 0;
-        GLuint vbo = 0;
-        GLuint ibo = 0;
-
-        GLuint entry_framebuffer = 0;
-        GLuint entry_texture = 0;
-
-        GLuint exit_framebuffer = 0;
-        GLuint exit_texture = 0;
-
-        GLuint program = 0;
-        struct {
-            GLint model_matrix = 0;
-            GLint view_matrix = 0;
-            GLint projection_matrix = 0;
-        } uniform_location;
-    } bounding_box;
-    //Parameters parameters;
-
-    struct VolumePass {
-        GLuint program_object = 0;
-        GLuint transfer_function_texture;
-
-        GLuint selection_list_ssbo;
-        GLuint contour_information_ssbo;
-
-        struct {
-            GLint entry_texture = 0;
-            GLint exit_texture = 0;
-            GLint volume_texture = 0;
-            GLint transfer_function = 0;
-
-            GLint volume_dimensions = 0;
-            GLint volume_dimensions_rcp = 0;
-            GLint sampling_rate = 0;
-
-            GLint light_position = 0;
-            GLint light_color_ambient = 0;
-            GLint light_color_diffuse = 0;
-            GLint light_color_specular = 0;
-            GLint light_exponent_specular = 0;
-
-            GLuint index_volume = 0;
-            GLuint color_by_identifier = 0;
-            GLuint selection_emphasis_type = 0;
-            GLuint highlight_factor = 0;
-        } uniform_location;
-    } ___volume_pass;
-
+class SelectionRenderer {
     struct GLState {
+        struct GeometryPass {
+            GLuint vao = 0;
+            GLuint vbo = 0;
+            GLuint ibo = 0;
+
+            GLuint entry_framebuffer = 0;
+            GLuint entry_texture = 0;
+
+            GLuint exit_framebuffer = 0;
+            GLuint exit_texture = 0;
+
+            GLuint program = 0;
+            struct {
+                GLint model_matrix = 0;
+                GLint view_matrix = 0;
+                GLint projection_matrix = 0;
+            } uniform_location;
+        } geometry_pass;
 
         struct VolumePass {
             GLuint program_object = 0;
@@ -138,6 +106,9 @@ struct SelectionRenderer {
             } uniform_location;
         } picking_pass;
     } _gl_state;
+
+public:
+    const GLState& gl_state() const { return _gl_state; }
 
     // Buffer contents:
     // [0]: number of features
