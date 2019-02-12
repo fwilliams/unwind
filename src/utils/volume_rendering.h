@@ -107,7 +107,28 @@ struct SelectionRenderer {
             GLint sampling_rate = 0;
             GLuint index_volume = 0;
         } uniform_location;
-    } picking_program;
+    } ___picking_pass;
+
+    struct GLState {
+        struct PickingPass {
+            GLuint program_object = 0;
+
+            GLuint picking_framebuffer = 0;
+            GLuint picking_texture = 0;
+
+            struct {
+                GLint entry_texture = 0;
+                GLint exit_texture = 0;
+                GLint volume_texture = 0;
+                GLint transfer_function = 0;
+
+                GLint volume_dimensions = 0;
+                GLint volume_dimensions_rcp = 0;
+                GLint sampling_rate = 0;
+                GLuint index_volume = 0;
+            } uniform_location;
+        } picking_pass;
+    } _gl_state;
 
     // Buffer contents:
     // [0]: number of features

@@ -488,37 +488,37 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
     igl::opengl::create_shader_program(VOLUME_PASS_VERTEX_SHADER,
         SELECTION_PICKING_PASS_FRAG_SHADER, {},
-        picking_program.program_object);
-    picking_program.uniform_location.entry_texture =
+        _gl_state.picking_pass.program_object);
+    _gl_state.picking_pass.uniform_location.entry_texture =
         glGetUniformLocation(
-            picking_program.program_object, "entry_texture"
+            _gl_state.picking_pass.program_object, "entry_texture"
         );
-    picking_program.uniform_location.exit_texture =
+    _gl_state.picking_pass.uniform_location.exit_texture =
         glGetUniformLocation(
-            picking_program.program_object, "exit_texture"
+            _gl_state.picking_pass.program_object, "exit_texture"
         );
-    picking_program.uniform_location.volume_texture =
+    _gl_state.picking_pass.uniform_location.volume_texture =
         glGetUniformLocation(
-            picking_program.program_object, "volume_texture"
+            _gl_state.picking_pass.program_object, "volume_texture"
         );
-    picking_program.uniform_location.volume_dimensions =
+    _gl_state.picking_pass.uniform_location.volume_dimensions =
         glGetUniformLocation(
-            picking_program.program_object, "volume_dimensions"
+            _gl_state.picking_pass.program_object, "volume_dimensions"
         );
-    picking_program.uniform_location.volume_dimensions_rcp =
+    _gl_state.picking_pass.uniform_location.volume_dimensions_rcp =
         glGetUniformLocation(
-            picking_program.program_object, "volume_dimensions_rcp"
+            _gl_state.picking_pass.program_object, "volume_dimensions_rcp"
         );
-    picking_program.uniform_location.transfer_function =
+    _gl_state.picking_pass.uniform_location.transfer_function =
         glGetUniformLocation(
-            picking_program.program_object, "transfer_function"
+            _gl_state.picking_pass.program_object, "transfer_function"
         );
-    picking_program.uniform_location.sampling_rate =
+    _gl_state.picking_pass.uniform_location.sampling_rate =
         glGetUniformLocation(
-            picking_program.program_object, "sampling_rate"
+            _gl_state.picking_pass.program_object, "sampling_rate"
         );
-    picking_program.uniform_location.index_volume = glGetUniformLocation(
-        picking_program.program_object, "index_volume"
+    _gl_state.picking_pass.uniform_location.index_volume = glGetUniformLocation(
+        _gl_state.picking_pass.program_object, "index_volume"
     );
 
     // Entry point texture and frame buffer
@@ -550,17 +550,17 @@ void SelectionRenderer::initialize(const glm::ivec2& viewport_size)
 
 
     // Picking texture and framebuffer
-    glGenTextures(1, &picking_program.picking_texture);
-    glBindTexture(GL_TEXTURE_2D, picking_program.picking_texture);
+    glGenTextures(1, &_gl_state.picking_pass.picking_texture);
+    glBindTexture(GL_TEXTURE_2D, _gl_state.picking_pass.picking_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, viewport_size.x, viewport_size.y, 0, GL_RGB,
         GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glGenFramebuffers(1, &picking_program.picking_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, picking_program.picking_framebuffer);
+    glGenFramebuffers(1, &_gl_state.picking_pass.picking_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.picking_pass.picking_framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-        picking_program.picking_texture, 0);
+        _gl_state.picking_pass.picking_texture, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
@@ -590,25 +590,21 @@ void SelectionRenderer::destroy() {
         bounding_box.entry_texture,
         bounding_box.exit_texture,
         program.transfer_function_texture,
-        picking_program.picking_texture,
+        _gl_state.picking_pass.picking_texture,
     };
     std::vector<GLuint> framebuffers = {
         bounding_box.entry_framebuffer,
         bounding_box.exit_texture,
-        picking_program.picking_framebuffer
+        _gl_state.picking_pass.picking_framebuffer
     };
 
     glDeleteBuffers(buffers.size(), buffers.data());
     glDeleteTextures(textures.size(), textures.data());
     glDeleteFramebuffers(framebuffers.size(), framebuffers.data());
     glDeleteProgram(program.program_object);
-    glDeleteProgram(picking_program.program_object);
+    glDeleteProgram(_gl_state.picking_pass.program_object);
     glDeleteProgram(bounding_box.program);
 
-    bounding_box = GeometryPass();
-    //parameters = Parameters();
-    program = VolumePass();
-    picking_program = PickingPass();
     _gl_state = GLState();
 }
 
@@ -846,47 +842,47 @@ void SelectionRenderer::volume_pass(Parameters parameters, GLuint index_texture,
 }
 
 glm::vec3 SelectionRenderer::picking_pass(Parameters parameters, glm::ivec2 mouse_position, GLuint index_texture, GLuint volume_texture) {
-    glUseProgram(picking_program.program_object);
+    glUseProgram(_gl_state.picking_pass.program_object);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, index_texture);
-    glUniform1i(picking_program.uniform_location.index_volume, 4);
+    glUniform1i(_gl_state.picking_pass.uniform_location.index_volume, 4);
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Pick Volume");
-    glBindFramebuffer(GL_FRAMEBUFFER, picking_program.picking_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _gl_state.picking_pass.picking_framebuffer);
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(picking_program.program_object);
+    glUseProgram(_gl_state.picking_pass.program_object);
 
     // Entry points texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, bounding_box.entry_texture);
-    glUniform1i(picking_program.uniform_location.entry_texture, 0);
+    glUniform1i(_gl_state.picking_pass.uniform_location.entry_texture, 0);
 
     // Exit points texture
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, bounding_box.exit_texture);
-    glUniform1i(picking_program.uniform_location.entry_texture, 1);
+    glUniform1i(_gl_state.picking_pass.uniform_location.entry_texture, 1);
 
     // Volume texture
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_3D, volume_texture);
-    glUniform1i(picking_program.uniform_location.volume_texture, 2);
+    glUniform1i(_gl_state.picking_pass.uniform_location.volume_texture, 2);
 
     // Transfer function texture
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_1D, program.transfer_function_texture);
-    glUniform1i(picking_program.uniform_location.transfer_function, 3);
+    glUniform1i(_gl_state.picking_pass.uniform_location.transfer_function, 3);
 
-    glUniform1f(picking_program.uniform_location.sampling_rate,
+    glUniform1f(_gl_state.picking_pass.uniform_location.sampling_rate,
         parameters.sampling_rate);
 
 
     // Rendering parameters
-    glUniform3iv(picking_program.uniform_location.volume_dimensions, 1,
+    glUniform3iv(_gl_state.picking_pass.uniform_location.volume_dimensions, 1,
         glm::value_ptr(parameters.volume_dimensions));
     glm::vec3 volume_dimensions_rcp = glm::vec3(1.f) / glm::vec3(parameters.volume_dimensions);
-    glUniform3fv(picking_program.uniform_location.volume_dimensions_rcp,
+    glUniform3fv(_gl_state.picking_pass.uniform_location.volume_dimensions_rcp,
         1, glm::value_ptr(volume_dimensions_rcp));
 
     // Bind a vao so we can render
