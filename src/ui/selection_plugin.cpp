@@ -147,31 +147,15 @@ void Selection_Menu::draw_selection_volume() {
             }
         }
         volume_rendering.set_contour_data(buffer_data.data(), buffer_data.size());
-//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.contour_information_ssbo);
-//        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * buffer_data.size(),
-//            buffer_data.data(), GL_DYNAMIC_DRAW);
-//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
         number_features_is_dirty = false;
     }
 
     if (selection_list_is_dirty) {
         std::vector<uint32_t> selected = _state.selected_features;
         selected.insert(selected.begin(), static_cast<int>(selected.size()));
-
         volume_rendering.set_selection_data(selected.data(), selected.size());
-//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, volume_rendering._gl_state.selection_list_ssbo);
-//        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t) * selected.size(),
-//            selected.data(), GL_DYNAMIC_DRAW);
-
         selection_list_is_dirty = false;
     }
-
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (volume_rendering.transfer_function.is_dirty) {
         glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Update Transfer Function");
@@ -180,15 +164,12 @@ void Selection_Menu::draw_selection_volume() {
         glPopDebugGroup();
     }
 
-
-    volume_rendering.render_bounding_box(GM4f(viewer->core.model), GM4f(viewer->core.view), GM4f(viewer->core.proj));
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     volume_rendering.parameters.light_position = G3f(viewer->core.light_position);
     volume_rendering.parameters.highlight_factor = highlight_factor;
     volume_rendering.parameters.emphasize_by_selection = static_cast<int>(emphasize_by_selection);
     volume_rendering.parameters.color_by_id = color_by_id;
+
+    volume_rendering.render_bounding_box(GM4f(viewer->core.model), GM4f(viewer->core.view), GM4f(viewer->core.proj));
     volume_rendering.render_volume(
                 _state.low_res_volume.index_texture,
                 _state.low_res_volume.volume_texture);
@@ -198,8 +179,6 @@ void Selection_Menu::draw_selection_volume() {
                 inv_mouse_coords,
                 _state.low_res_volume.index_texture,
                 _state.low_res_volume.volume_texture);
-
-
     current_selected_feature = static_cast<int>(picking.x);
 
     if (should_select) {
