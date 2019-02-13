@@ -4,13 +4,13 @@
 #include <fstream>
 #include <cstdlib>
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 #include <libgen.h>
 #else
 #include <Windows.h>
 #endif
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
 std::pair<std::string, std::string> DatFile::dir_and_base_name(const char* name) {
   std::string filename = std::string(name);

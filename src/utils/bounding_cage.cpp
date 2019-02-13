@@ -134,6 +134,7 @@ bool BoundingCage::KeyFrame::rotate_torsion_frame(double d_angle) {
     }
 
     _angle += d_angle;
+    return true;
 }
 
 bool BoundingCage::KeyFrame::set_angle(double angle) {
@@ -143,6 +144,7 @@ bool BoundingCage::KeyFrame::set_angle(double angle) {
     }
 
     _angle = angle;
+    return true;
 }
 
 

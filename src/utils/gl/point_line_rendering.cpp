@@ -74,6 +74,7 @@ bool PointLineRenderer::update_polyline_3d(int polyline_id, GLfloat* vertices, G
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glPopDebugGroup();
+    return true;
 }
 
 bool PointLineRenderer::update_polyline_3d(int polyline_id, GLfloat* vertices, glm::vec4 color, GLsizei num_vertices, PolylineStyle style) {
@@ -103,6 +104,7 @@ bool PointLineRenderer::update_polyline_3d(int polyline_id, GLfloat* vertices, g
     glBindVertexArray(0);
 
     glPopDebugGroup();
+    return true;
 }
 
 

@@ -201,7 +201,9 @@ void Selection_Menu::draw_selection_volume() {
 bool Selection_Menu::key_down(int key, int modifiers) {
     if (key == 32) { // SPACE
         should_select = true;
+        return true;
     }
+    return false;
 }
 
 bool Selection_Menu::post_draw() {

@@ -8,7 +8,7 @@
 
 struct DatFile {
 private:
-#ifdef _MSC_VER
+#ifdef _WIN32
   std::pair<std::string, std::string> dir_and_base_name(const char* name);
 #endif
   bool set_filename(const std::string& filename);

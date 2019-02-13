@@ -2,7 +2,7 @@
 #define MKPATH_H
 
 #include <sys/stat.h>
-#ifdef WIN32
+#ifdef _MSC_VER
 using mode_t = int;
 #endif // WIN32
 

@@ -280,5 +280,5 @@ bool TransferFunctionEditWidget::post_draw() {
         ImGui::PopItemWidth();
         ImGui::SetCursorPosY(ImGui::GetCursorPosY()+_node_radius*click_scale);
     }
-
+    return false;
 }
