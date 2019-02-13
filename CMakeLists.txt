@@ -101,7 +101,7 @@ list(FILTER UTILS_HEADER EXCLUDE REGEX cgal*)
 add_library(utils STATIC ${UTILS_SRCS} ${UTILS_HEADER})
 set_property(TARGET utils PROPERTY CXX_STANDARD 17)
 set_property(TARGET utils PROPERTY CXX_STANDARD_REQUIRED ON)
-target_link_libraries(utils igl::core igl::opengl spdlog)
+target_link_libraries(utils igl::core igl::opengl igl::cgal igl::triangle spdlog)
 target_include_directories(utils PUBLIC ${UTILS_INCLUDE_DIRS})
 target_include_directories(utils SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/external/glm")
 
