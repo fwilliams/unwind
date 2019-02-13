@@ -6,7 +6,7 @@
 #include <imgui_fonts_droid_sans.h>
 #include <GLFW/glfw3.h>
 
-IGL_INLINE void FishUIViewerPlugin::init(igl::opengl::glfw::Viewer* _viewer) {
+void FishUIViewerPlugin::init(igl::opengl::glfw::Viewer* _viewer) {
     ViewerPlugin::init(_viewer);
     // Setup ImGui binding
     if (_viewer) {
@@ -22,7 +22,7 @@ IGL_INLINE void FishUIViewerPlugin::init(igl::opengl::glfw::Viewer* _viewer) {
     }
 }
 
-IGL_INLINE void FishUIViewerPlugin::reload_font(int font_size) {
+void FishUIViewerPlugin::reload_font(int font_size) {
     hidpi_scaling_ = hidpi_scaling();
     pixel_ratio_ = pixel_ratio();
     ImGuiIO& io = ImGui::GetIO();
@@ -32,14 +32,14 @@ IGL_INLINE void FishUIViewerPlugin::reload_font(int font_size) {
     io.FontGlobalScale = 1.f / pixel_ratio_;
 }
 
-IGL_INLINE void FishUIViewerPlugin::shutdown() {
+void FishUIViewerPlugin::shutdown() {
     // Cleanup
     ImGui_ImplGlfwGL3_Shutdown();
     ImGui::DestroyContext(context_);
     context_ = nullptr;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::pre_draw() {
+bool FishUIViewerPlugin::pre_draw() {
     glfwPollEvents();
 
     // Check whether window dpi has changed
@@ -53,11 +53,11 @@ IGL_INLINE bool FishUIViewerPlugin::pre_draw() {
     return false;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::post_draw() {
+bool FishUIViewerPlugin::post_draw() {
     return false;
 }
 
-IGL_INLINE void FishUIViewerPlugin::post_resize(int width, int height) {
+void FishUIViewerPlugin::post_resize(int width, int height) {
     if (context_) {
         ImGui::GetIO().DisplaySize.x = float(width);
         ImGui::GetIO().DisplaySize.y = float(height);
@@ -66,43 +66,43 @@ IGL_INLINE void FishUIViewerPlugin::post_resize(int width, int height) {
 
 
 // Mouse IO
-IGL_INLINE bool FishUIViewerPlugin::mouse_down(int button, int modifier) {
+bool FishUIViewerPlugin::mouse_down(int button, int modifier) {
     ImGui_ImplGlfwGL3_MouseButtonCallback(viewer->window, button, GLFW_PRESS, modifier);
     return ImGui::GetIO().WantCaptureMouse;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::mouse_up(int button, int modifier) {
+bool FishUIViewerPlugin::mouse_up(int button, int modifier) {
     return ImGui::GetIO().WantCaptureMouse;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::mouse_move(int mouse_x, int mouse_y) {
+bool FishUIViewerPlugin::mouse_move(int mouse_x, int mouse_y) {
     return ImGui::GetIO().WantCaptureMouse;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::mouse_scroll(float delta_y) {
+bool FishUIViewerPlugin::mouse_scroll(float delta_y) {
     ImGui_ImplGlfwGL3_ScrollCallback(viewer->window, 0.f, delta_y);
     return ImGui::GetIO().WantCaptureMouse;
 }
 
 
 // Keyboard IO
-IGL_INLINE bool FishUIViewerPlugin::key_pressed(unsigned int key, int modifiers) {
+bool FishUIViewerPlugin::key_pressed(unsigned int key, int modifiers) {
     ImGui_ImplGlfwGL3_CharCallback(nullptr, key);
     return ImGui::GetIO().WantCaptureKeyboard;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::key_down(int key, int modifiers) {
+bool FishUIViewerPlugin::key_down(int key, int modifiers) {
     ImGui_ImplGlfwGL3_KeyCallback(viewer->window, key, 0, GLFW_PRESS, modifiers);
     return ImGui::GetIO().WantCaptureKeyboard;
 }
 
-IGL_INLINE bool FishUIViewerPlugin::key_up(int key, int modifiers) {
+bool FishUIViewerPlugin::key_up(int key, int modifiers) {
     ImGui_ImplGlfwGL3_KeyCallback(viewer->window, key, 0, GLFW_RELEASE, modifiers);
     return ImGui::GetIO().WantCaptureKeyboard;
 }
 
 
-IGL_INLINE float FishUIViewerPlugin::pixel_ratio() {
+float FishUIViewerPlugin::pixel_ratio() {
     // Computes pixel ratio for hidpi devices
     GLFWwindow* window = glfwGetCurrentContext();
 
@@ -114,7 +114,7 @@ IGL_INLINE float FishUIViewerPlugin::pixel_ratio() {
     return static_cast<float>(buf_size[0]) / static_cast<float>(win_size[0]);
 }
 
-IGL_INLINE float FishUIViewerPlugin::hidpi_scaling() {
+float FishUIViewerPlugin::hidpi_scaling() {
     // Computes scaling factor for hidpi devices
     GLFWwindow* window = glfwGetCurrentContext();
 

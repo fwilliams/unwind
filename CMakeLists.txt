@@ -35,9 +35,10 @@ else ()
   include_directories(/usr/include/suitesparse) # Ubuntu puts cholmod.h here
 endif ()
 
+
 # LibIGL
 set(CGAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/cgal)
-option(LIBIGL_USE_STATIC_LIBRARY     "Use libigl as static library" ON)
+option(LIBIGL_USE_STATIC_LIBRARY     "Use libigl as static library" OFF)
 option(LIBIGL_WITH_ANTTWEAKBAR       "Use AntTweakBar"    OFF)
 option(LIBIGL_WITH_CGAL              "Use CGAL"           ON)
 option(LIBIGL_WITH_COMISO            "Use CoMiso"         OFF)
@@ -68,8 +69,6 @@ find_package(Qt5Widgets REQUIRED)
 add_library(spdlog INTERFACE)
 target_include_directories(spdlog INTERFACE external/spdlog/include)
 
-# FreeImage static library
-include(external/FreeImage/CMakeLists.txt)
 
 # Quartet static library
 set(QUARTET_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/quartet/src")

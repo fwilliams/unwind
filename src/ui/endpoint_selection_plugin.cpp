@@ -110,8 +110,6 @@ void EndPoint_Selection_Menu::initialize() {
         viewer->erase_mesh(i);
     }
     viewer->data().clear();
-
-    viewer->data_list.clear();
     viewer->append_mesh();
 
     mesh_overlay_id = static_cast<int>(viewer->selected_data_index);
