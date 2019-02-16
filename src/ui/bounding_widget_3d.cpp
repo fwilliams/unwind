@@ -34,21 +34,29 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_
     center_bounding_cage_mesh();
 }
 void Bounding_Widget_3d::center_bounding_cage_mesh() {
-    Eigen::MatrixXd V(8, 3);
-    V << -.5f, -.5f, -.5f,
-            -.5f, -.5f,  .5f,
-            -.5f,  .5f, -.5f,
-            -.5f,  .5f,  .5f,
-            .5f, -.5f, -.5f,
-            .5f, -.5f,  .5f,
-            .5f,  .5f, -.5f,
-            .5f,  .5f,  .5f;
-    glm::ivec3 voldims = G3i(_state.low_res_volume.dims());
-    Eigen::RowVector3d volume_dims(voldims[0], voldims[1], voldims[2]);
-    Eigen::RowVector3d normalized_volume_dims = volume_dims / volume_dims.maxCoeff();
-    for (int i = 0; i < V.rows(); i++) { V.row(i) *= normalized_volume_dims; }
+    typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
+    const Eigen::RowVector3d volume_size = _state.low_res_volume.dims().cast<double>();
+
+
+    glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
+    glm::vec3 normalized_volume_dimensions = glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
+    glm::mat4 translate = glm::translate(glm::mat4(1.f), glm::vec3(-0.5f));
+    glm::mat4 scaling = glm::scale(glm::mat4(1.f), normalized_volume_dimensions);
+    glm::mat4 model_matrix = GM4f(_viewer->core.model);
+
+    int num_vertices = 0;
+    Eigen::MatrixXd V(_state.cage.mesh_vertices().rows(), 3);
+    for (BoundingCage::KeyFrame& kf : _state.cage.keyframes) {
+        Eigen::MatrixXd kfV = kf.bounding_box_vertices_3d();
+        for (int i = 0; i < kfV.rows(); i++) {
+            glm::vec4 v(kfV(i, 0) / volume_size[0], kfV(i, 1) / volume_size[1], kfV(i, 2) / volume_size[2], 1.0);
+            glm::vec4 vtx = scaling * translate * v;
+            V.row(num_vertices++) = E3d(glm::vec3(vtx));
+        }
+    }
     _viewer->core.align_camera_center(V);
 }
+
 void Bounding_Widget_3d::center_straight_mesh() {
     glm::vec3 volume_dims = glm::vec3(_parent->exporter.export_dims()) / glm::vec3(export_rescale_factor);
     glm::vec3 normalized_volume_dims = glm::vec3(volume_dims) / static_cast<float>(glm::compMax(volume_dims));
