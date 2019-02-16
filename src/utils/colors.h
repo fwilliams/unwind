@@ -20,6 +20,7 @@ namespace ColorRGB {
   const Eigen::RowVector3d DARK_MAGENTA = Eigen::RowVector3d(139.0/255.0, 0.0/255.0, 139.0/255.0);
   const Eigen::RowVector3d NAVY = Eigen::RowVector3d(0.0, 0.0, 0.5);
   const Eigen::RowVector3d SILVER = Eigen::RowVector3d(0.75, 0.75, 0.75);
+  const Eigen::RowVector3d WHITE = Eigen::RowVector3d(1.0, 1.0, 1.0);
 }
 
 #endif // COLORS_H

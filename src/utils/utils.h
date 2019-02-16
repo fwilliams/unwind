@@ -5,6 +5,24 @@
 #include <vector>
 #include <array>
 
+
+// Scale a vector so its values lie between zero and one
+void scale_zero_one(const Eigen::VectorXd& V, Eigen::VectorXd& V_scaled);
+
+// Compute approximate geodesic distance
+void geodesic_distances(const Eigen::MatrixXd& TV,
+                        const Eigen::MatrixXi& TT,
+                        const std::vector<std::pair<int, int>>& endpoints,
+                        Eigen::VectorXd& isovals,
+                        bool normalized = true);
+
+// Compute heat diffusion distances
+void heat_diffusion_distances(const Eigen::MatrixXd& TV,
+                                const Eigen::MatrixXi& TT,
+                                const std::vector<std::pair<int, int>>& endpoints,
+                                Eigen::VectorXd& isovals,
+                                bool normalize);
+
 void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& components, std::vector<Eigen::MatrixXi>& out);
 
 

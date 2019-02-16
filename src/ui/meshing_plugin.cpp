@@ -204,7 +204,7 @@ void Meshing_Menu::dilate_volume() {
     double time_1;
     double time_2;
     vor3d::CompressedVolume output;
-    op.dilation(input, output, 3, time_1, time_2);
+    op.dilation(input, output, dilation_radius, time_1, time_2);
 
     dexels_to_mesh(2 * _state.low_res_volume.dims()[0], output, extracted_surface.V_fat, extracted_surface.F_fat);
 }
@@ -236,11 +236,7 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
     Vec3f xmax(static_cast<float>(v_max[0]), static_cast<float>(v_max[1]),
         static_cast<float>(v_max[2]));
 
-    // Build triangle mesh data structure
-    TriMesh trimesh(surf_x, surf_tri);
-
     // Make the level set
-
     // Determining dimensions of voxel grid.
     // Round up to ensure voxel grid completely contains bounding box.
     // Also add padding of 2 grid points around the bounding box.

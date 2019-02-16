@@ -17,6 +17,8 @@ public:
     void initialize();
 
 private:
+    double dilation_radius = 3;
+
     State& _state;
 
     // Intermediate state of the extracted surface

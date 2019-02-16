@@ -2,7 +2,8 @@
 
 #include "state.h"
 #include "utils/colors.h"
-#include "utils/geodesic_distances.h"
+#include "utils/utils.h"
+
 #include <igl/boundary_facets.h>
 #include <igl/marching_tets.h>
 #include <igl/unproject_onto_mesh.h>
@@ -172,6 +173,102 @@ bool EndPoint_Selection_Menu::pre_draw() {
     return ret;
 }
 
+void EndPoint_Selection_Menu::debug_draw_intermediate_state() {
+    if (debug.drew_debug_state) {
+        return;
+    }
+
+    viewer->data().clear();
+    const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
+    const Eigen::MatrixXi& TF = state.dilated_tet_mesh.TF;
+    Eigen::MatrixXd V1, V2;
+    edge_endpoints(TV, TF, V1, V2);
+    viewer->data().add_edges(V1, V2, ColorRGB::SILVER);
+
+    size_t skel_mesh = viewer->append_mesh() - 1;
+    viewer->selected_data_index = skel_mesh;
+    {
+        const Eigen::MatrixXd& skV = state.cage.skeleton_vertices();
+        V1.resize(skV.rows()-1, 3);
+        V2.resize(skV.rows()-1, 3);
+        for (int i = 0; i < skV.rows()-1; i++) {
+            V1.row(i) = skV.row(i);
+            V2.row(i) = skV.row(i+1);
+        }
+        viewer->data().point_size = 5.0;
+        viewer->data().line_width = 2.0;
+        viewer->data().add_edges(V1, V2, ColorRGB::GREEN);
+        viewer->data().add_points(skV, ColorRGB::GREEN);
+    }
+
+    size_t skel_mesh2 = viewer->append_mesh() - 1;
+    viewer->selected_data_index = skel_mesh2;
+    {
+        const Eigen::MatrixXd& skV = state.cage.smooth_skeleton_vertices();
+        V1.resize(skV.rows()-1, 3);
+        V2.resize(skV.rows()-1, 3);
+        for (int i = 0; i < skV.rows()-1; i++) {
+            V1.row(i) = skV.row(i);
+            V2.row(i) = skV.row(i+1);
+        }
+        viewer->data().point_size = 5.0;
+        viewer->data().line_width = 2.0;
+        viewer->data().add_edges(V1, V2, ColorRGB::DARK_MAGENTA);
+        viewer->data().add_points(skV, ColorRGB::DARK_MAGENTA);
+    }
+
+    size_t kf_mesh = viewer->append_mesh() - 1;
+    viewer->selected_data_index = kf_mesh;
+    {
+        Eigen::MatrixXd kf_centers(state.cage.num_keyframes(), 3);
+        Eigen::MatrixXd kf_centroids(state.cage.num_keyframes(), 3);
+        int count = 0;
+        for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
+            kf_centers.row(count) = kf.origin();
+            kf_centroids.row(count) = kf.centroid_3d();
+
+            Eigen::MatrixXd p1(2, 3), p2(2, 3);
+            Eigen::MatrixXd c(2, 3);
+            c.row(0) = ColorRGB::RED;
+            c.row(0) = ColorRGB::GREEN;
+            p1.row(0) = kf.origin(); p2.row(0) = kf.origin() + 10.0*kf.up_rotated_3d();
+            p1.row(1) = kf.origin(); p2.row(1) = kf.origin() + 10.0*kf.right_rotated_3d();
+
+            viewer->data().add_edges(p1, p2, c);
+            Eigen::MatrixXd bboxv = kf.bounding_box_vertices_3d();
+            viewer->data().add_points(bboxv, ColorRGB::CYAN);
+            count += 1;
+        }
+
+        viewer->data().point_size = 10.0;
+        viewer->data().line_width = 2.0;
+        viewer->data().add_points(kf_centroids, ColorRGB::MAGENTA);
+        viewer->data().add_points(kf_centers, ColorRGB::STEEL_BLUE);
+    }
+
+    size_t cell_mesh = viewer->append_mesh() - 1;
+    viewer->selected_data_index = cell_mesh;
+    viewer->data().set_mesh(state.cage.mesh_vertices(), state.cage.mesh_faces());
+    viewer->data().show_faces = false;
+    viewer->data().line_color = Eigen::Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+    viewer->data().line_width = 2.0;
+
+    size_t pts_mesh = viewer->append_mesh() - 1;
+    viewer->selected_data_index = pts_mesh;
+    {
+        Eigen::MatrixXd C;
+        double min_z = state.dilated_tet_mesh.geodesic_dists.minCoeff();
+        double max_z = state.dilated_tet_mesh.geodesic_dists.maxCoeff();
+        igl::colormap(igl::COLOR_MAP_TYPE_PARULA, state.dilated_tet_mesh.geodesic_dists, min_z, max_z, C);
+
+        viewer->data().add_points(TV, C);
+        viewer->data().point_size = 2.0;
+    }
+
+    debug.drew_debug_state = true;
+}
+
+
 bool EndPoint_Selection_Menu::post_draw() {
     bool ret = FishUIViewerPlugin::post_draw();
     int window_width, window_height;
@@ -192,7 +289,12 @@ bool EndPoint_Selection_Menu::post_draw() {
                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
 
     if (done_extracting_skeleton) {
-        state.set_application_state(Application_State::BoundingPolygon);
+        if (debug.enabled) {
+            debug_draw_intermediate_state();
+            if (ImGui::Button("COOL?")) {
+                state.set_application_state(Application_State::BoundingPolygon);
+            }
+        }
     }
 
     if (extracting_skeleton) {
@@ -358,7 +460,8 @@ void EndPoint_Selection_Menu::extract_skeleton() {
         Eigen::MatrixXd skeleton_vertices;
 
         const bool normalized = true;
-        geodesic_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
+        heat_diffusion_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
+        // geodesic_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
         compute_skeleton(TV, TT, state.dilated_tet_mesh.geodesic_dists,
             state.endpoint_pairs, state.dilated_tet_mesh.connected_components,
             100, skeleton_vertices);

@@ -20,6 +20,13 @@ public:
     void deinitialize();
 
 private:
+    struct {
+        bool drew_debug_state = false;
+        bool enabled = true;
+    } debug;
+    void debug_draw_intermediate_state();
+
+
     State& state;
 
     Eigen::Vector4f old_viewport;
