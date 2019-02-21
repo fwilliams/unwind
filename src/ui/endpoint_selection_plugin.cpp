@@ -262,7 +262,7 @@ void EndPoint_Selection_Menu::debug_draw_intermediate_state() {
         igl::colormap(igl::COLOR_MAP_TYPE_PARULA, state.dilated_tet_mesh.geodesic_dists, min_z, max_z, C);
 
         viewer->data().add_points(TV, C);
-        viewer->data().point_size = 2.0;
+        viewer->data().point_size = 4.0;
     }
 
     debug.drew_debug_state = true;
@@ -456,12 +456,17 @@ void EndPoint_Selection_Menu::extract_skeleton() {
 
         const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
         const Eigen::MatrixXi& TT = state.dilated_tet_mesh.TT;
+        const Eigen::VectorXi& C = state.dilated_tet_mesh.connected_components;
+        const int comp = C[state.endpoint_pairs[0].first];
 
+        Eigen::MatrixXd TV2;
+        Eigen::MatrixXi TT2;
+        remesh_connected_components(comp, C, TV, TT, TV2, TT2);
         Eigen::MatrixXd skeleton_vertices;
 
         const bool normalized = true;
-        heat_diffusion_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
-        // geodesic_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
+        //heat_diffusion_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
+        geodesic_distances(TV2, TT2, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
         compute_skeleton(TV, TT, state.dilated_tet_mesh.geodesic_dists,
             state.endpoint_pairs, state.dilated_tet_mesh.connected_components,
             100, skeleton_vertices);

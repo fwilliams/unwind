@@ -322,6 +322,9 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
     assert(cells.rbegin() == cells.rend());
     assert(keyframes.rbegin() == keyframes.rend());
 
+    const int UPSAMPLE_RATE = 4;
+    const int LOOKAHEAD = 1;
+
     std::function<void(int)> smooth_skeleton = [&](int num_iters) {
         Eigen::MatrixXd SV_i = SV;
         SV_smooth.resize(SV_i.rows(), 3);
@@ -358,7 +361,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
         assert("Bad mid index" && (mid > 0) && (mid < SV_smooth.rows()-1));
 
         Eigen::RowVector2d mid_centroid = 0.5 * (cell->_left_keyframe->centroid_2d() + cell->_right_keyframe->centroid_2d());
-        Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+10) - SV_smooth.row(mid-10)).normalized();
+        Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+LOOKAHEAD) - SV_smooth.row(mid-LOOKAHEAD)).normalized();
         Eigen::MatrixXd mid_pts_2d = 0.5 * (cell->_left_keyframe->vertices_2d() + cell->_left_keyframe->vertices_2d());
         std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->_left_keyframe, 0.0, mid_pts_2d, mid_centroid, cell, mid, this));
         assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
@@ -382,31 +385,35 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
         return false;
     }
 
-    const int UPSAMPLE_RATE = 4;
-    double min_dist = std::numeric_limits<double>::max();
-    std::vector<double> kf_dists(SV.rows());
-    kf_dists[0] = 0.0;
-    for (int i = 1; i < kf_dists.size(); i++) {
-        double dist = kf_dists[i-1] + (SV.row(i) - SV.row(i-1)).norm();
-        min_dist = std::min(min_dist, dist);
-        kf_dists[i] = dist;
-    }
-    int num_subdivs = UPSAMPLE_RATE * int(kf_dists.back() / min_dist);
-    Eigen::MatrixXd SV_resampled(num_subdivs, 3);
-    double total_dist = kf_dists.back();
-    for (int i = 0; i < num_subdivs; i++) {
-        double dist = i*(total_dist/num_subdivs);
-        auto it = std::lower_bound(kf_dists.begin(), kf_dists.end(), dist);
-        int idx = it - kf_dists.begin();
-        double lam = (dist - kf_dists[idx-1]) / (kf_dists[idx] - kf_dists[idx-1]);
-        SV_resampled.row(i) = (1.0-lam)*SV.row(idx-1) + lam*SV.row(idx);
-    }
-    SV = SV_resampled;
+    logger->debug("About to do smoothing pass");
+    smooth_skeleton(smoothing_iters);
 
-    smooth_skeleton(UPSAMPLE_RATE*smoothing_iters);
+//    logger->debug("Reparameterize");
+//    SV = SV_smooth;
+//    double min_dist = std::numeric_limits<double>::max();
+//    std::vector<double> kf_dists(SV.rows());
+//    kf_dists[0] = 0.0;
+//    for (int i = 1; i < kf_dists.size(); i++) {
+//        double dist = kf_dists[i-1] + (SV.row(i) - SV.row(i-1)).norm();
+//        min_dist = std::min(min_dist, dist);
+//        kf_dists[i] = dist;
+//    }
+//    int num_subdivs = UPSAMPLE_RATE * int(kf_dists.back() / min_dist);
+//    Eigen::MatrixXd SV_resampled(num_subdivs, 3);
+//    double total_dist = kf_dists.back();
+//    for (int i = 0; i < num_subdivs; i++) {
+//        double dist = i*(total_dist/num_subdivs);
+//        auto it = std::lower_bound(kf_dists.begin(), kf_dists.end(), dist);
+//        int idx = it - kf_dists.begin();
+//        double lam = (dist - kf_dists[idx-1]) / (kf_dists[idx] - kf_dists[idx-1]);
+//        SV_resampled.row(i) = (1.0-lam)*SV.row(idx-1) + lam*SV.row(idx);
+//    }
+//    SV_smooth = SV_resampled;
+//    smooth_skeleton(UPSAMPLE_RATE*smoothing_iters);
 
-    Eigen::RowVector3d front_normal = SV_smooth.row(1) - SV_smooth.row(0);
-    Eigen::RowVector3d back_normal = SV_smooth.row(SV_smooth.rows()-1) - SV_smooth.row(SV_smooth.rows()-2);
+
+    Eigen::RowVector3d front_normal = SV_smooth.row(LOOKAHEAD) - SV_smooth.row(0);
+    Eigen::RowVector3d back_normal = SV_smooth.row(SV_smooth.rows()-1) - SV_smooth.row(SV_smooth.rows()-1-LOOKAHEAD);
     front_normal.normalize();
     back_normal.normalize();
 
@@ -519,7 +526,6 @@ bool BoundingCage::skeleton_in_cell(std::shared_ptr<Cell> cell) const {
                      CHV.rows(), V.rows());
     }
 
-    logger->debug("CONVEX HULL start={}, end={}", start, end);
     assert(start < end);
     if ((end - start) <= 1) {
         return false;

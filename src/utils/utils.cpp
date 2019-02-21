@@ -9,6 +9,8 @@
 #include <iostream>
 #include <igl/harmonic.h>
 #include <igl/grad.h>
+#include <igl/adjacency_list.h>
+#include <igl/components.h>
 
 
 void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& components, std::vector<Eigen::MatrixXi>& out) {
@@ -291,6 +293,55 @@ void heat_diffusion_distances(const Eigen::MatrixXd& TV,
   }
 }
 
+void uniform_grad(const Eigen::MatrixXi& F, Eigen::SparseMatrix<double>& G) {
+    std::vector<std::vector<int>> adj_list;
+    igl::adjacency_list(F, adj_list);
+    std::vector<Eigen::Triplet<double>> triplets;
+    for (int i = 0; i < adj_list.size(); i++) {
+        triplets.push_back(Eigen::Triplet<double>(i, i, 1.0));
+        for (int j = 0; j < adj_list[i].size(); j++) {
+            if (i == adj_list[i][j]) {
+                std::cout << "Including self adjacency!" << std::endl << std::flush;
+                exit(EXIT_FAILURE);
+            }
+            double value = -1.0 / adj_list[i].size();
+            Eigen::Triplet<double> tpl(i, adj_list[i][j], value);
+            triplets.push_back(tpl);
+        }
+    }
+    G.resize(adj_list.size(), adj_list.size());
+    G.setFromTriplets(triplets.begin(), triplets.end());
+}
+
+void remesh_connected_components(int comp, const Eigen::VectorXi& C, const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, Eigen::MatrixXd& outTV, Eigen::MatrixXi& outTT) {
+    Eigen::VectorXi c_map(C.size());
+    outTV.resize(TV.rows(), TV.cols());
+    int v_count = 0;
+    for (int i = 0; i < C.size(); i++) {
+        if (C[i] == comp) {
+            c_map[i] = v_count;
+            outTV.row(v_count) = TV.row(i);
+            v_count += 1;
+        } else {
+            c_map[i] = -1;
+        }
+    }
+    outTV.conservativeResize(v_count, TV.cols());
+
+    int f_count = 0;
+    outTT.resize(TT.rows(), TT.cols());
+    for (int i = 0; i < TT.rows(); i++) {
+        int c = C[TT(i, 0)];
+        if (c == comp) {
+            for (int j = 0; j < TT.cols(); j++) {
+                outTT(f_count, j) = c_map[TT(i, j)];
+            }
+            f_count += 1;
+        }
+    }
+    outTT.conservativeResize(f_count, TT.cols());
+}
+
 // Compute approximate geodesic distance
 void geodesic_distances(const Eigen::MatrixXd& TV,
                         const Eigen::MatrixXi& TT,
@@ -305,23 +356,14 @@ void geodesic_distances(const Eigen::MatrixXd& TV,
   // Discrete Gradient operator
   SparseMatrixXd G;
   igl::grad(TV, TT, G);
+  //uniform_grad(TT, G);
 
-  std::cout << "GSIZE = " << G.rows() << ", " << G.cols() << std::endl;
-
-//  Eigen::MatrixXd Gdense((G.transpose()*G).eval());
-//  JacobiSVD<MatrixXd> svd(MatrixXd(G.transpose()*G), ComputeThinU | ComputeThinV);
-//  double cond = svd.singularValues()(0) / svd.singularValues()(svd.singularValues().size()-1);
-//  std::cout << "Condition number of G is " << cond << std::endl;
-
-
-  heat_diffusion_distances(TV, TT, endpoints, isovals, false/*normalize*/);
+  heat_diffusion_distances(TV, TT, endpoints, isovals, true /*normalize*/);
 
   VectorXd g = G*isovals;
-  Map<MatrixXd> V(g.data(), TT.rows(), 3);
-  V.rowwise().normalize();
-
   SimplicialLDLT<SparseMatrixXd> solver;
   solver.compute(G.transpose()*G);
+  std::cout << "solver.determinant = " << solver.determinant() << std::endl;
   isovals = solver.solve(G.transpose()*g);
   if (normalized) {
     scale_zero_one(isovals, isovals);

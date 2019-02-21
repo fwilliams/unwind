@@ -61,7 +61,7 @@ struct State {
     LoadedVolume hi_res_volume;
 
     // Topological features
-    int num_selected_features = 10;
+    int num_selected_features = 5;
     contourtree::TopologicalFeatures topological_features;
     std::vector<uint32_t> selected_features;
 
@@ -72,6 +72,8 @@ struct State {
         Eigen::MatrixXi TT;
         Eigen::MatrixXi TF;
         Eigen::VectorXi connected_components;
+
+        double dilation_radius = 3.0;
 
         // Geodesic distances stored at each tet vertex
         Eigen::VectorXd geodesic_dists;

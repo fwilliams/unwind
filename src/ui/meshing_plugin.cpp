@@ -204,7 +204,7 @@ void Meshing_Menu::dilate_volume() {
     double time_1;
     double time_2;
     vor3d::CompressedVolume output;
-    op.dilation(input, output, dilation_radius, time_1, time_2);
+    op.dilation(input, output, _state.dilated_tet_mesh.dilation_radius, time_1, time_2);
 
     dexels_to_mesh(2 * _state.low_res_volume.dims()[0], output, extracted_surface.V_fat, extracted_surface.F_fat);
 }
@@ -221,20 +221,15 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
 
     std::vector<Vec3f> surf_x(V.rows());
     for (int i = 0; i < V.rows(); i++) {
-        surf_x[i] = Vec3f(
-            static_cast<float>(V.row(i)[0]),
-            static_cast<float>(V.row(i)[1]),
-            static_cast<float>(V.row(i)[2]));
+        surf_x[i] = Vec3f(V.row(i)[0], V.row(i)[1], V.row(i)[2]);
     }
 
     // Compute the bounding box of the mesh
-    const Eigen::RowVector3d v_min = V.colwise().minCoeff();
-    Vec3f xmin(static_cast<float>(v_min[0]), static_cast<float>(v_min[1]),
-        static_cast<float>(v_min[2]));
+    const Eigen::RowVector3f v_min = V.colwise().minCoeff().cast<float>();
+    Vec3f xmin(v_min[0], v_min[1], v_min[2]);
 
-    const Eigen::RowVector3d v_max = V.colwise().maxCoeff();
-    Vec3f xmax(static_cast<float>(v_max[0]), static_cast<float>(v_max[1]),
-        static_cast<float>(v_max[2]));
+    const Eigen::RowVector3f v_max = V.colwise().maxCoeff().cast<float>();
+    Vec3f xmax(v_max[0], v_max[1], v_max[2]);
 
     // Make the level set
     // Determining dimensions of voxel grid.
@@ -243,11 +238,11 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
     // NOTE: We add 5 here so as to add 4 grid points of padding, as well as
     // 1 grid point at the maximal boundary of the bounding box
     // ie: (xmax-xmin)/dx + 1 grid points to cover one axis of the bounding box
-    constexpr float dx = 0.8f; // TODO: Play with this a little bit
-    Vec3f origin = xmin - Vec3f(2 * dx);
-    int ni = static_cast<int>(std::ceil((xmax[0] - xmin[0]) / dx) + 5);
-    int nj = static_cast<int>(std::ceil((xmax[1] - xmin[1]) / dx) + 5);
-    int nk = static_cast<int>(std::ceil((xmax[2] - xmin[2]) / dx) + 5);
+    const float dx = 0.5f*_state.dilated_tet_mesh.dilation_radius; //0.8f; 
+    Vec3f origin = xmin - 2*Vec3f(dx, dx, dx);
+    int ni = static_cast<int>(std::ceil((xmax[0] - xmin[0]) / dx) + 4);
+    int nj = static_cast<int>(std::ceil((xmax[1] - xmin[1]) / dx) + 4);
+    int nk = static_cast<int>(std::ceil((xmax[2] - xmin[2]) / dx) + 4);
 
     SDF sdf(origin, dx, ni, nj, nk); // Initialize signed distance field.
     
@@ -265,8 +260,8 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
 
     _state.dilated_tet_mesh.TV.resize(mesh.verts().size(), 3);
     for (int i = 0; i < mesh.verts().size(); i++) {
-        _state.dilated_tet_mesh.TV.row(i) =
-            Eigen::Vector3d(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
+        Eigen::Vector3d vi(mesh.verts()[i][0], mesh.verts()[i][1], mesh.verts()[i][2]);
+        _state.dilated_tet_mesh.TV.row(i) = vi;
     }
     _state.dilated_tet_mesh.TT.resize(mesh.tets().size(), 4);
     for (int i = 0; i < mesh.tets().size(); i++) {

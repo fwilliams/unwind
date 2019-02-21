@@ -152,45 +152,58 @@ void VolumeExporter::update(BoundingCage& cage, GLuint volume_texture, glm::ivec
     glBindTexture(GL_TEXTURE_3D, volume_texture);
     glUniform1i(slice.texture_location, 0);
 
+    std::vector<double> kf_depths;
+    cage.keyframe_depths(kf_depths);
+    double cage_length = kf_depths.back();
+    int kf_i = 0;
+    for (const BoundingCage::Cell& cell : cage.cells) {
+        double start_depth = kf_depths[kf_i];
+        double end_depth = kf_depths[kf_i + 1];
 
-    for (int i = 0; i < d; i++) {
-        double index =  double(i) / double(d-1) * (cage.max_index() - cage.min_index());
+        int start_frame = int(d * (start_depth / cage_length));
+        int end_frame = int(d * (end_depth / cage_length));
 
-        BoundingCage::KeyFrameIterator kf = cage.keyframe_for_index(index);
+        double start_index = cell.left_keyframe()->index();
+        double end_index = cell.right_keyframe()->index();
 
-        glm::vec3 u_axis = glm::vec3(G3f(kf->right_rotated_3d()));
-        glm::vec3 v_axis = glm::vec3(G3f(kf->up_rotated_3d()));
-        glm::vec3 kf_center = glm::vec3(G3f(kf->origin()));
-        glm::vec2 ctr = G2f(kf->centroid_2d());
+        for (int i = start_frame; i < end_frame; i++) {
+            double lam = double(i-start_frame)/double(end_frame-start_frame);
+            double index = (1.0-lam)*start_index + lam*end_index;
+            BoundingCage::KeyFrameIterator kf = cage.keyframe_for_index(index);
 
-        glm::vec3 ll = kf_center + u_axis*(min_u+ctr[0]) + v_axis*(min_v+ctr[1]);
-        glm::vec3 lr = kf_center + u_axis*(max_u+ctr[0]) + v_axis*(min_v+ctr[1]);
-        glm::vec3 ul = kf_center + u_axis*(min_u+ctr[0]) + v_axis*(max_v+ctr[1]);
-        glm::vec3 ur = kf_center + u_axis*(max_u+ctr[0]) + v_axis*(max_v+ctr[1]);
+            Eigen::MatrixXd v3d = kf->bounding_box_vertices_3d();
+            glm::vec3 ll(v3d(0, 0), v3d(0, 1), v3d(0, 2));
+            glm::vec3 lr(v3d(1, 0), v3d(1, 1), v3d(1, 2));
+            glm::vec3 ur(v3d(2, 0), v3d(2, 1), v3d(2, 2));
+            glm::vec3 ul(v3d(3, 0), v3d(3, 1), v3d(3, 2));
 
-        ll /= glm::vec3(volume_dims);
-        ul /= glm::vec3(volume_dims);
-        lr /= glm::vec3(volume_dims);
-        ur /= glm::vec3(volume_dims);
+            ll /= glm::vec3(volume_dims);
+            ul /= glm::vec3(volume_dims);
+            lr /= glm::vec3(volume_dims);
+            ur /= glm::vec3(volume_dims);
 
-        glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, render_texture, 0, i);
-        GLenum draw_buffers[1] = {GL_COLOR_ATTACHMENT0};
-        glDrawBuffers(1, draw_buffers);
-        if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            exit(EXIT_FAILURE);
+            glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, render_texture, 0, i);
+            GLenum draw_buffers[1] = {GL_COLOR_ATTACHMENT0};
+            glDrawBuffers(1, draw_buffers);
+            if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                exit(EXIT_FAILURE);
+            }
+
+            glClearColor(0.f, 0.f, 0.f, 0.f);
+            glViewport(0, 0, w, h);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glUniform3fv(slice.ll_location, 1, glm::value_ptr(ll));
+            glUniform3fv(slice.lr_location, 1, glm::value_ptr(lr));
+            glUniform3fv(slice.ul_location, 1, glm::value_ptr(ul));
+            glUniform3fv(slice.ur_location, 1, glm::value_ptr(ur));
+
+            glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
-        glClearColor(0.f, 0.f, 0.f, 0.f);
-        glViewport(0, 0, w, h);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glUniform3fv(slice.ll_location, 1, glm::value_ptr(ll));
-        glUniform3fv(slice.lr_location, 1, glm::value_ptr(lr));
-        glUniform3fv(slice.ul_location, 1, glm::value_ptr(ul));
-        glUniform3fv(slice.ur_location, 1, glm::value_ptr(ur));
-
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        kf_i += 1;
     }
+
     glBindVertexArray(0);
     glUseProgram(0);
     glPopDebugGroup();
