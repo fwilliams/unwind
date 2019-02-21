@@ -12,6 +12,8 @@ class Initial_File_Selection_Menu : public FishUIViewerPlugin {
 public:
     Initial_File_Selection_Menu(State& state);
 
+    void initialize();
+    void deinitialize();
     bool post_draw() override;
 
 private:
@@ -35,6 +37,10 @@ private:
         bool write_original = true;
     } ui;
 
+    bool old_is_animating;
+    bool slice_loading = false;
+    std::vector<uint8_t> byte_data;
+    int loading_progress = -1;
     std::atomic_bool done_loading;
     std::atomic_bool is_loading;
     std::thread loading_thread;

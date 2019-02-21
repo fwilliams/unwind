@@ -52,6 +52,7 @@ private:
 
 public:
     void init();
+    void destroy();
 
     void set_line_antialiasing(bool enabled) { _line_antialiasing_enabled = enabled; }
 

@@ -22,6 +22,7 @@ enum class Application_State {
     Meshing,
     EndPointSelection,
     BoundingPolygon,
+    NoState,
 };
 
 struct State {
@@ -29,12 +30,20 @@ struct State {
 
     typedef Eigen::Matrix<unsigned int, Eigen::Dynamic, 1> VectorXui;
 
+    struct DirtyFlags {
+        bool file_loading_dirty = true;
+        bool mesh_dirty = true;
+        bool endpoints_dirty = true;
+    } dirty_flags;
+
     Application_State application_state = Application_State::Initial_File_Selection;
 
     void set_application_state(Application_State new_state) {
         application_state = new_state;
         glfwPostEmptyEvent();
     }
+
+    std::shared_ptr<spdlog::logger> logger;
 
     struct LoadedVolume {
         DatFile metadata;
@@ -61,10 +70,28 @@ struct State {
     LoadedVolume hi_res_volume;
 
     // Topological features
-    int num_selected_features = 5;
-    contourtree::TopologicalFeatures topological_features;
-    std::vector<uint32_t> selected_features;
+    struct FeatureSegmentation {
+        std::vector<uint32_t> buffer_data;
+        contourtree::TopologicalFeatures topological_features;
+        std::vector<contourtree::Feature> features;
+        std::vector<uint32_t> selected_features;
+        int num_selected_features = 5;
 
+        void recompute_feature_map() {
+            selected_features.clear();
+            features = topological_features.getFeatures(num_selected_features, 0.f);
+
+            uint32_t size = topological_features.ctdata.noArcs;
+            buffer_data.resize(size + 1 + 1, static_cast<uint32_t>(-1));
+            buffer_data[0] = static_cast<uint32_t>(features.size());
+            for (size_t i = 0; i < features.size(); ++i) {
+                for (uint32_t j : features[i].arcs) {
+                    // +1 since the first value of the vector contains the number of features
+                    buffer_data[j + 1] = static_cast<uint32_t>(i);
+                }
+            }
+        }
+    } segmented_features;
 
     // Output of the dilation and tetrahedralization
     struct DilatedTetMesh {
@@ -91,10 +118,6 @@ struct State {
     std::vector<std::pair<int, int>> endpoint_pairs;
 
     BoundingCage cage;
-
-
-
-    std::shared_ptr<spdlog::logger> logger;
 };
 
 #endif // __FISH_DEFORMATION_STATE__

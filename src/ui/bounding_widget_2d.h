@@ -15,6 +15,7 @@ public:
     Bounding_Polygon_Widget(State& state);
 
     void initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu* parent);
+    void deinitialize();
 
     bool mouse_move(int mouse_x, int mouse_y, bool in_focus);
     bool mouse_down(int button, int modifier, bool in_focus);

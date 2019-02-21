@@ -25,7 +25,7 @@ class VolumeExporter {
         GLint tf_location;
     } slice;
 
-    GLsizei w, h, d;
+    GLsizei w = 0, h = 0, d = 0;
 
 public:
 
@@ -48,6 +48,8 @@ public:
     void set_export_dims(GLsizei w, GLsizei h, GLsizei d);
 
     void init(GLsizei w, GLsizei h, GLsizei d);
+
+    void destroy();
 
     void update(BoundingCage& cage, GLuint volume_texture, glm::ivec3 volume_dims);
 };

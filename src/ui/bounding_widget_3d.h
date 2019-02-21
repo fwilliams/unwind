@@ -15,6 +15,7 @@ public:
     Bounding_Widget_3d(State& state);
 
     void initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu* parent);
+    void deinitialize();
     bool pre_draw(float current_cut_index);
     bool post_draw_curved(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);
     bool post_draw_straight(const glm::vec4& viewport, BoundingCage::KeyFrameIterator current_kf);

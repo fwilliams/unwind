@@ -203,6 +203,24 @@ void Bounding_Polygon_Widget::update_selection() {
     selection.closest_vertex_index = std::get<0>(cv);
 }
 
+void Bounding_Polygon_Widget::deinitialize() {
+    std::vector<GLuint> vertex_arrays = {
+        empty_vao,
+        polygon.vao,
+        blit.vao
+    };
+    std::vector<GLuint> buffers = {
+        polygon.vbo,
+        blit.vbo
+    };
+
+    glDeleteProgram(plane.program);
+    glDeleteProgram(polygon.program);
+    glDeleteVertexArrays(vertex_arrays.size(), vertex_arrays.data());
+    glDeleteBuffers(buffers.size(), buffers.data());
+    glDeleteTextures(1, &offscreen.texture);
+    glDeleteFramebuffers(1, &offscreen.fbo);
+}
 
 void Bounding_Polygon_Widget::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_Polygon_Menu *parent) {
     this->viewer = viewer;

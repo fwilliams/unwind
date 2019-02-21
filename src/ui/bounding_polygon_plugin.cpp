@@ -9,15 +9,6 @@
 
 #pragma optimize ("", off)
 
-void bounding_cage_polygon(BoundingCage& cage, Eigen::MatrixXf& V, Eigen::MatrixXi& F) {
-    V.resize(cage.num_keyframes(), 3);
-    F.resize((cage.num_keyframes()-1)*2*4+4, 3);
-
-    for (BoundingCage::KeyFrame& kf : cage.keyframes) {
-
-    }
-}
-
 Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
     : state(state)
     , widget_2d(Bounding_Polygon_Widget(state))
@@ -50,10 +41,15 @@ void Bounding_Polygon_Menu::initialize() {
     exporter.init(128, 128, 1024);
 
     state.logger->trace("Done initializing bounding polygon plugin!");
+
+    cage_dirty = true;
 }
 
 void Bounding_Polygon_Menu::deinitialize() {
     viewer->core.viewport = old_viewport;
+    widget_2d.deinitialize();
+    widget_3d.deinitialize();
+    exporter.destroy();
 }
 
 bool Bounding_Polygon_Menu::is_2d_widget_in_focus()  {
@@ -302,6 +298,12 @@ bool Bounding_Polygon_Menu::post_draw() {
     } else {
         show_display_options = false;
         mouse_in_popup = false;
+    }
+
+    ImGui::NewLine();
+    ImGui::Separator();
+    if (ImGui::Button("Back")) {
+        state.set_application_state(Application_State::EndPointSelection);
     }
 
     ImGui::End();

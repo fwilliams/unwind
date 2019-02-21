@@ -27,9 +27,18 @@ void Selection_Menu::initialize() {
     const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
     rendering_params.volume_dimensions = volume_dims;
 
-    _state.selected_features.clear();
-    number_features_is_dirty = true;
+    number_features_is_dirty = false;
     selection_list_is_dirty = false;
+    {
+        uint32_t* buffer_data = _state.segmented_features.buffer_data.data();
+        size_t num_features =_state.segmented_features.buffer_data.size();
+        selection_renderer.set_contour_data(buffer_data, num_features);
+
+        std::vector<uint32_t> selected = _state.segmented_features.selected_features;
+        selected.insert(selected.begin(), static_cast<uint32_t>(selected.size()));
+        selection_renderer.set_selection_data(selected.data(), selected.size());
+    }
+
     target_viewport_size = { -1.f, -1.f, -1.f, -1.f };
 
     int window_width, window_height;
@@ -98,34 +107,22 @@ void Selection_Menu::draw_selection_volume() {
     }
 
     if (number_features_is_dirty) {
-        _state.selected_features.clear();
         selection_list_is_dirty = true;
+        _state.segmented_features.recompute_feature_map();
 
-        std::vector<contourtree::Feature> features =
-            _state.topological_features.getFeatures(_state.num_selected_features, 0.f);
-
-        uint32_t size = _state.topological_features.ctdata.noArcs;
-
-        // Buffer contents:
-        // [0]: number of features
-        // [...]: A linearized map from voxel identifier -> feature number
-        std::vector<uint32_t> buffer_data(size + 1 + 1, static_cast<uint32_t>(-1));
-        buffer_data[0] = static_cast<uint32_t>(features.size());
-        for (size_t i = 0; i < features.size(); ++i) {
-            for (uint32_t j : features[i].arcs) {
-                // +1 since the first value of the vector contains the number of features
-                buffer_data[j + 1] = static_cast<uint32_t>(i);
-            }
-        }
-        selection_renderer.set_contour_data(buffer_data.data(), buffer_data.size());
+        uint32_t* buffer_data = _state.segmented_features.buffer_data.data();
+        size_t num_features =_state.segmented_features.buffer_data.size();
+        selection_renderer.set_contour_data(buffer_data, num_features);
         number_features_is_dirty = false;
+        _state.dirty_flags.mesh_dirty = true;
     }
 
     if (selection_list_is_dirty) {
-        std::vector<uint32_t> selected = _state.selected_features;
-        selected.insert(selected.begin(), static_cast<int>(selected.size()));
+        std::vector<uint32_t> selected = _state.segmented_features.selected_features;
+        selected.insert(selected.begin(), static_cast<uint32_t>(selected.size()));
         selection_renderer.set_selection_data(selected.data(), selected.size());
         selection_list_is_dirty = false;
+        _state.dirty_flags.mesh_dirty = true;
     }
 
     if (transfer_function_dirty) {
@@ -187,7 +184,7 @@ void Selection_Menu::draw_selection_volume() {
                 assert(std::is_sorted(indices.begin(), indices.end()));
             };
 
-            update(_state.selected_features);
+            update(_state.segmented_features.selected_features);
 
             selection_list_is_dirty = true;
         }
@@ -239,15 +236,15 @@ bool Selection_Menu::post_draw() {
 
     ImGui::Text("Number of features:");
     ImGui::PushItemWidth(-1);
-    if (ImGui::SliderInt("Number of features", &_state.num_selected_features, 1, 100)) {
+    if (ImGui::SliderInt("Number of features", &_state.segmented_features.num_selected_features, 1, 100)) {
         number_features_is_dirty = true;
     }
     ImGui::NewLine();
     ImGui::Separator();
 
     std::string list = std::accumulate(
-        _state.selected_features.begin(),
-        _state.selected_features.end(), std::string(),
+        _state.segmented_features.selected_features.begin(),
+        _state.segmented_features.selected_features.end(), std::string(),
         [](std::string s, int i) { return s + std::to_string(i) + ", "; });
     // Remove the last ", "
     list = list.substr(0, list.size() - 2);
@@ -255,13 +252,12 @@ bool Selection_Menu::post_draw() {
     ImGui::Text("Selected features: %s", list.c_str());
 
     if (ImGui::Button("Clear Selected Features", ImVec2(-1, 0))) {
-        _state.selected_features.clear();
+        _state.segmented_features.selected_features.clear();
         selection_list_is_dirty = true;
     }
 
-    ImGui::Separator();
-
     ImGui::NewLine();
+    ImGui::Separator();
     if (ImGui::Button("Back")) {
         _state.set_application_state(Application_State::Initial_File_Selection);
     }

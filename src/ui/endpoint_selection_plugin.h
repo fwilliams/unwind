@@ -22,7 +22,7 @@ public:
 private:
     struct {
         bool drew_debug_state = false;
-        bool enabled = true;
+        bool enabled = false;
     } debug;
     void debug_draw_intermediate_state();
 

@@ -45,8 +45,7 @@ void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
                       const std::vector<std::pair<int, int>>& endpoint_pairs,
                       const Eigen::VectorXi& connected_components,
                       int num_skeleton_vertices,
-                      Eigen::MatrixXd& skeleton_vertices)
-{
+                      Eigen::MatrixXd& skeleton_vertices) {
     std::vector<Eigen::MatrixXi> TT_comps;
     split_mesh_components(TT, connected_components, TT_comps);
 
@@ -86,18 +85,6 @@ void compute_skeleton(const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
 }
 
 
-void smooth_skeleton(const Eigen::MatrixXd& skeleton_vertices,
-                     Eigen::MatrixXd& smoothed_vertices)
-{
-    smoothed_vertices.resize(skeleton_vertices.rows(), 3);
-    smoothed_vertices.row(0) = skeleton_vertices.row(0);
-    for (int i = 1; i < skeleton_vertices.rows() - 1; i++) {
-        smoothed_vertices.row(i) = 0.5 * (skeleton_vertices.row(i - 1) +
-                                   skeleton_vertices.row(i + 1));
-    }
-    smoothed_vertices.row(skeleton_vertices.rows() - 1) = skeleton_vertices.row(skeleton_vertices.rows() - 1);
-}
-
 } // namespace
 
 EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state) : state(state) {
@@ -132,7 +119,17 @@ void EndPoint_Selection_Menu::initialize() {
     glfwGetWindowSize(viewer->window, &window_width, &window_height);
     viewer->core.viewport = Eigen::RowVector4f(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
 
-    state.endpoint_pairs.clear();
+    if (state.dirty_flags.endpoints_dirty) {
+        state.endpoint_pairs.clear();
+        state.dirty_flags.endpoints_dirty = false;
+    }
+
+    current_endpoint_idx = 0;
+    current_endpoints = { -1, -1 };
+    selecting_endpoints = false;
+
+    done_extracting_skeleton = false;
+    extracting_skeleton = false;
 }
 
 void EndPoint_Selection_Menu::deinitialize() {
@@ -294,6 +291,8 @@ bool EndPoint_Selection_Menu::post_draw() {
             if (ImGui::Button("COOL?")) {
                 state.set_application_state(Application_State::BoundingPolygon);
             }
+        } else {
+            state.set_application_state(Application_State::BoundingPolygon);
         }
     }
 

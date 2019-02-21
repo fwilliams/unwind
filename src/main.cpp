@@ -60,14 +60,17 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
     if (previous_state != _state.application_state) {
 
         switch (previous_state) {
+        case Application_State::Initial_File_Selection:
+            initial_file_selection.deinitialize();
+            break;
         case Application_State::BoundingPolygon:
-          bounding_polygon_menu.deinitialize();
-          break;
+            bounding_polygon_menu.deinitialize();
+            break;
         case Application_State::Segmentation:
-          selection_menu.deinitialize();
+            selection_menu.deinitialize();
             break;
         case Application_State::EndPointSelection:
-          endpoint_selection_menu.deinitialize();
+            endpoint_selection_menu.deinitialize();
             break;
         }
 
@@ -75,6 +78,7 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
 
         switch (_state.application_state) {
             case Application_State::Initial_File_Selection:
+                initial_file_selection.initialize();
                 viewer.plugins.push_back(&initial_file_selection);
                 break;
             case Application_State::Segmentation:
@@ -105,6 +109,7 @@ bool pre_draw(igl::opengl::glfw::Viewer& viewer) {
 }
 
 int main(int argc, char** argv) {
+    previous_state = Application_State::NoState;
     igl::opengl::glfw::Viewer viewer;
     viewer.core.background_color = Eigen::Vector4f(0.1f, 0.1f, 0.1f, 1.f);
     viewer.callback_init = init;

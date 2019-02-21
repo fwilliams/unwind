@@ -104,6 +104,13 @@ void VolumeExporter::set_export_dims(GLsizei w, GLsizei h, GLsizei d) {
     glBindTexture(GL_TEXTURE_3D, 0);
 }
 
+void VolumeExporter::destroy() {
+    glDeleteProgram(slice.program);
+    glDeleteFramebuffers(1, &framebuffer);
+    glDeleteTextures(1, &render_texture);
+    glDeleteVertexArrays(1, &empty_vao);
+    w = 0; h = 0; d = 0;
+}
 
 void VolumeExporter::init(GLsizei w, GLsizei h, GLsizei d) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Init Slice");

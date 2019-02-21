@@ -33,6 +33,12 @@ void Bounding_Widget_3d::initialize(igl::opengl::glfw::Viewer* viewer, Bounding_
 
     center_bounding_cage_mesh();
 }
+
+void Bounding_Widget_3d::deinitialize() {
+    renderer_2d.destroy();
+    volume_renderer.destroy();
+}
+
 void Bounding_Widget_3d::center_bounding_cage_mesh() {
     typedef Eigen::Matrix<GLfloat, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXfRm;
     const Eigen::RowVector3d volume_size = _state.low_res_volume.dims().cast<double>();
@@ -77,7 +83,6 @@ void Bounding_Widget_3d::center_straight_mesh() {
 }
 
 void Bounding_Widget_3d::update_volume_geometry(const Eigen::RowVector3d& volume_size, const Eigen::MatrixXd& cage_V, const Eigen::MatrixXi& cage_F) {
-//    Eigen::RowVector3d volume_size = _state.low_res_volume.dims().cast<double>();
     std::size_t num_vertices = cage_V.rows();
     std::size_t num_faces = cage_F.rows();
     std::vector<glm::vec3> V(num_vertices);

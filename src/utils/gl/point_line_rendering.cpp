@@ -47,6 +47,26 @@ void PointLineRenderer::init() {
     _gl_state.uniform_location.proj = glGetUniformLocation(_gl_state.program, "proj");
 }
 
+void PointLineRenderer::destroy() {
+    glDeleteProgram(_gl_state.program);
+
+    std::vector<GLuint> buffers;
+    std::vector<GLuint> vertex_arrays;
+
+    for (int i = 0; i < _polylines.size(); i++) {
+        buffers.push_back(_polylines[i].pos_vbo);
+        buffers.push_back(_polylines[i].clr_vbo);
+        vertex_arrays.push_back(_polylines[i].vao);
+    }
+
+    glDeleteBuffers(buffers.size(), buffers.data());
+    glDeleteVertexArrays(vertex_arrays.size(), vertex_arrays.data());
+
+    _polylines.clear();
+    _free_list.clear();
+}
+
+
 bool PointLineRenderer::update_polyline_3d(int polyline_id, GLfloat* vertices, GLfloat* colors, GLsizei num_vertices, PolylineStyle style) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "update_polyline_3d");
     if (polyline_id >= _polylines.size() || polyline_id < 0) {

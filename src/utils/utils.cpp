@@ -363,7 +363,6 @@ void geodesic_distances(const Eigen::MatrixXd& TV,
   VectorXd g = G*isovals;
   SimplicialLDLT<SparseMatrixXd> solver;
   solver.compute(G.transpose()*G);
-  std::cout << "solver.determinant = " << solver.determinant() << std::endl;
   isovals = solver.solve(G.transpose()*g);
   if (normalized) {
     scale_zero_one(isovals, isovals);
