@@ -122,11 +122,13 @@ void EndPoint_Selection_Menu::initialize() {
         state.skeleton_estimation_parameters.endpoint_pairs.clear();
         state.dirty_flags.endpoints_dirty = false;
         state.dirty_flags.bounding_cage_dirty = true;
+        selecting_endpoints = true;
+    } else {
+        selecting_endpoints = false;
     }
 
     current_endpoint_idx = 0;
     current_endpoints = { -1, -1 };
-    selecting_endpoints = false;
 
     done_extracting_skeleton = false;
     extracting_skeleton = false;
@@ -350,37 +352,6 @@ bool EndPoint_Selection_Menu::post_draw() {
     }
     ImGui::NewLine();
     ImGui::Separator();
-/*
-//    int num_digits_ep = !state.skeleton_estimation_parameters.endpoint_pairs.empty() ?
-//        static_cast<int>(log10(static_cast<double>(state.skeleton_estimation_parameters.endpoint_pairs.size())) + 1) :
-//        1;
-//    if (!state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
-//        ImGui::Text("Endpoint Pairs:");
-//        for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
-//            int num_digits_i = (i + 1) > 0 ?
-//                static_cast<int>(log10(static_cast<double>(i + 1)) + 1) :
-//                1;
-//            std::string label_text = "Endpoint ";
-//            for (int zi = 0; zi < num_digits_ep - num_digits_i; zi++) {
-//                label_text += std::string("0");
-//            }
-//            label_text += std::to_string(i);
-//            label_text += std::string(": ");
-//            std::string rm_button_text = std::string("Remove##") + std::to_string(i + 1);
-//            ImGui::BulletText("%s", label_text.c_str());
-//            ImGui::SameLine();
-//            if (ImGui::Button(rm_button_text.c_str(), ImVec2(-1, 0))) {
-//                state.dirty_flags.bounding_cage_dirty = true;
-//                assert(i < state.skeleton_estimation_parameters.endpoint_pairs.size());
-//                state.skeleton_estimation_parameters.endpoint_pairs.erase(state.skeleton_estimation_parameters.endpoint_pairs.begin() + i);
-//            }
-//        }
-//        ImGui::NewLine();
-//        ImGui::Separator();
-//    }
-*/
-
-
 
     if (ImGui::CollapsingHeader("Advanced", nullptr, ImGuiTreeNodeFlags(0))) {
         float cage_bbox_rad = (float)state.skeleton_estimation_parameters.cage_bbox_radius;

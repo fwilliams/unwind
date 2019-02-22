@@ -7,7 +7,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
-#pragma optimize ("", off)
 
 Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
     : state(state)
@@ -313,6 +312,20 @@ bool Bounding_Polygon_Menu::post_draw() {
         state.set_application_state(Application_State::EndPointSelection);
     }
 
+    ImGui::SameLine();
+    if (ImGui::Button("Serialize")) {
+        igl::serialize(state.cage, "cage", "bindata", true);
+        state.logger->trace("CAGE PRE : {}", state.cage.num_keyframes());
+        state.cage = BoundingCage();
+        state.cage.set_logger(state.logger);
+        state.logger->trace("CAGE DURING : {}", state.cage.num_keyframes());
+        igl::deserialize(state.cage, "cage", "bindata");
+        state.logger->trace("CAGE POST : {}", state.cage.num_keyframes());
+        for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
+            state.logger->trace("KF {}", kf.index());
+        }
+    }
+
     ImGui::End();
 
     // Draw a line separating the two half views
@@ -332,9 +345,10 @@ bool Bounding_Polygon_Menu::post_draw() {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         draw_list->AddLine(line_start, line_end, ImGui::GetColorU32(ImGuiCol_Separator));
         ImGui::End();
-        ImGui::Render();
     }
 
+
+    ImGui::Render();
     return ret;
 }
 

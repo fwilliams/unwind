@@ -8,6 +8,7 @@
 #include <igl/triangle/triangulate.h>
 #include <igl/segment_segment_intersect.h>
 
+
 // Parallel transport a coordinate system from a KeyFrame along a curve to a point with normal, to_n
 //static Eigen::Matrix3d parallel_transport(const BoundingCage::KeyFrame& from_kf, Eigen::RowVector3d to_n) {
 //    Eigen::Matrix3d R = Eigen::Quaterniond::FromTwoVectors(from_kf.normal().normalized(), to_n.normalized()).matrix();
@@ -147,6 +148,25 @@ bool BoundingCage::KeyFrame::set_angle(double angle) {
     return true;
 }
 
+void BoundingCage::KeyFrame::serialize(std::vector<char>& buffer) const {
+    igl::serialize(_orientation, std::string("orientation"), buffer);
+    igl::serialize(_origin, std::string("origin"), buffer);
+    igl::serialize(_vertices_2d, std::string("vertices_2d"), buffer);
+    igl::serialize(_centroid_2d, std::string("centroid_2d"), buffer);
+    igl::serialize(_in_cage, std::string("in_cage"), buffer);
+    igl::serialize(_index, std::string("index"), buffer);
+    igl::serialize(_angle, std::string("angle"), buffer);
+}
+
+void BoundingCage::KeyFrame::deserialize(const std::vector<char>& buffer) {
+    igl::deserialize(_orientation, std::string("orientation"), buffer);
+    igl::deserialize(_origin, std::string("origin"), buffer);
+    igl::deserialize(_vertices_2d, std::string("vertices_2d"), buffer);
+    igl::deserialize(_centroid_2d, std::string("centroid_2d"), buffer);
+    igl::deserialize(_in_cage, std::string("in_cage"), buffer);
+    igl::deserialize(_index, std::string("index"), buffer);
+    igl::deserialize(_angle, std::string("angle"), buffer);
+}
 
 
 // |----------------------------| //
@@ -228,9 +248,9 @@ std::shared_ptr<BoundingCage::KeyFrame> BoundingCage::Cell::split(std::shared_pt
     // The index of the keyframe is out of range, since this method is called, internally,
     // this should fail
     if (keyframe->index() > max_index() || keyframe->index() < min_index()) {
-        assert("split index is out of range" && false);
         logger->error("index of keyframe ({}) in split(), was out of range ({}, {})",
                       keyframe->index(), min_index(), max_index());
+        assert("split index is out of range" && false);
         return std::shared_ptr<KeyFrame>();
     }
 
@@ -293,6 +313,7 @@ std::shared_ptr<BoundingCage::Cell> BoundingCage::Cell::find(double index) {
     if (index < min_index() || index > max_index()) {
         logger->error("find_cell_r(cell, index) index, {} was out of range ({}, {})",
                       index, min_index(), max_index());
+        assert("find_cell_r(cell, index) out of range" && false);
         return std::shared_ptr<Cell>();
     } else if (is_leaf()) {
         return shared_from_this();
@@ -361,7 +382,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
         assert("Bad mid index" && (mid > 0) && (mid < SV_smooth.rows()-1));
 
         Eigen::RowVector2d mid_centroid = 0.5 * (cell->_left_keyframe->centroid_2d() + cell->_right_keyframe->centroid_2d());
-        Eigen::RowVector3d mid_normal = 0.5 * (SV_smooth.row(mid+LOOKAHEAD) - SV_smooth.row(mid-LOOKAHEAD)).normalized();
+        Eigen::RowVector3d mid_normal = (0.5 * (SV_smooth.row(mid+LOOKAHEAD) - SV_smooth.row(mid-LOOKAHEAD))).normalized();
         Eigen::MatrixXd mid_pts_2d = 0.5 * (cell->_left_keyframe->vertices_2d() + cell->_left_keyframe->vertices_2d());
         std::shared_ptr<KeyFrame> mid_keyframe(new KeyFrame(mid_normal, SV_smooth.row(mid), *cell->_left_keyframe, 0.0, mid_pts_2d, mid_centroid, cell, mid, this));
         assert("Parallel transport bug" && (1.0-fabs(mid_keyframe->normal().dot(mid_normal))) < 1e-6);
@@ -382,6 +403,7 @@ bool BoundingCage::set_skeleton_vertices(const Eigen::MatrixXd& new_SV, unsigned
 
     if (SV.rows() <= 1) {
         logger->error("Skeleton vertices contains {} vertices which is fewer than 1. Need 1 or more vertices.", SV.rows());
+        assert("Skeleton contains fewer than one vertices" && false);
         return false;
     }
 
@@ -470,6 +492,7 @@ BoundingCage::KeyFrameIterator BoundingCage::keyframe_for_index(double index) co
 
     if (!cell) {
         logger->error("vertices_2d_for_index() could not find cell at index {}", index);
+        assert("vertices_2d_for_index() could not find cell" && false);
         return KeyFrameIterator();
     }
 
@@ -621,6 +644,7 @@ bool BoundingCage::delete_keyframe(KeyFrameIterator& it) {
     std::shared_ptr<Cell> prev_cell = kf->left_cell();
     if (!next_cell || !prev_cell) {
         logger->error("next cell or prev cell was null");
+        assert(false);
         return false;
     }
 
@@ -695,3 +719,62 @@ const Eigen::MatrixXi BoundingCage::mesh_faces() const {
 
     return ret;
 }
+
+void BoundingCage::serialize(std::vector<char>& buffer) const {
+    std::vector<BoundingCage::KeyFrame> kfs;
+    for (const BoundingCage::KeyFrame& kf : keyframes) {
+        kfs.push_back(kf);
+    }
+    igl::serialize(kfs, "keyframes", buffer);
+    igl::serialize(SV, "skeleton_vertices", buffer);
+    igl::serialize(SV_smooth, "smooth_skeleton_vertices", buffer);
+    igl::serialize(_keyframe_bounding_box, "keyframe_bbox", buffer);
+}
+
+void BoundingCage::deserialize(const std::vector<char>& buffer) {
+    clear();
+    std::vector<BoundingCage::KeyFrame> kfs;
+    igl::deserialize(kfs, "keyframes", buffer);
+    igl::deserialize(SV, "skeleton_vertices", buffer);
+    igl::deserialize(SV_smooth, "smooth_skeleton_vertices", buffer);
+    igl::deserialize(_keyframe_bounding_box, "keyframe_bbox", buffer);
+
+    std::vector<std::shared_ptr<BoundingCage::KeyFrame>> kf_ptrs;
+    for (int i = 0; i < kfs.size(); i++) {
+        std::shared_ptr<BoundingCage::KeyFrame> kf(new BoundingCage::KeyFrame(kfs[i]));
+        kf->_cage = this;
+        kf_ptrs.push_back(kf);
+
+    }
+    std::shared_ptr<BoundingCage::KeyFrame> front_kf = kf_ptrs.front();
+    std::shared_ptr<BoundingCage::KeyFrame> back_kf = kf_ptrs.back();
+    front_kf->_left_cell = std::shared_ptr<Cell>();
+    front_kf->_right_cell = std::shared_ptr<Cell>();
+    back_kf->_left_cell = std::shared_ptr<Cell>();
+    back_kf->_right_cell = std::shared_ptr<Cell>();
+
+    root = Cell::make_cell(front_kf, back_kf, this);
+    cells.head = root;
+    cells.tail = root;
+    keyframes.cage = this;
+    if (!root) {
+        logger->error("BoundingCage deserialize was unable to fit the first Cell");
+        assert(false);
+        exit(EXIT_FAILURE);
+    }
+    cells.head = root;
+    cells.tail = cells.head;
+    _num_keyframes = 2;
+
+    for (int i = 1; i < kfs.size()-1; i++) {
+        std::shared_ptr<BoundingCage::KeyFrame> kf = kf_ptrs[i];
+        kf->_left_cell = kf_ptrs[i-1]->_right_cell;
+        kf->_right_cell = kf->_left_cell;
+        kf->_cage = this;
+        kf->_in_cage = false;
+        if (!split_internal(kf)) {
+            logger->error("BoundingCage deserialize failed to insert keyframe");
+        }
+    }
+}
+

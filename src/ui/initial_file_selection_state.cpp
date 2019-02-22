@@ -137,6 +137,8 @@ bool Initial_File_Selection_Menu::post_draw() {
                 glBindTexture(GL_TEXTURE_3D, 0);
                 _state.dirty_flags.file_loading_dirty = false;
                 _state.set_application_state(Application_State::Segmentation);
+                ImGui::End();
+                ImGui::Render();
                 return ret;
             }
 
@@ -179,36 +181,35 @@ bool Initial_File_Selection_Menu::post_draw() {
         auto thread_fun = [&]() {
             mkpath(ui.output_folder, 0777 /* mode */);
 
+            std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + ui.output_prefix + "-sample";
+
             SamplingOutput op = ImageData::writeOutput(ui.folder_name, ui.file_prefix,
                 ui.start_index, ui.end_index, ui.extension, ui.output_folder,
                 ui.output_prefix, ui.downsample_factor, ui.write_original);
             preProcessing(op.fileName, op.x, op.y, op.z);
-
-            std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + ui.output_prefix + "-sample";
-
-            // low res version
-            _state.low_res_volume.metadata = DatFile(volume_output_files_prefix + ".dat", _state.logger);
             _state.segmented_features.topological_features.loadData(volume_output_files_prefix);
-            
-            load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, _state.logger, true /* normalize */);
+            _state.segmented_features.recompute_feature_map();
 
+            // Load the low-res volume data
+            _state.low_res_volume.metadata = DatFile(volume_output_files_prefix + ".dat", _state.logger);
+            load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, _state.logger, true /* normalize */);
             _state.low_res_volume.max_value = _state.low_res_volume.volume_data.maxCoeff();
             _state.low_res_volume.min_value = _state.low_res_volume.volume_data.minCoeff();
 
+            // Load the low-res index data
             const size_t num_bytes = _state.low_res_volume.num_voxels() * sizeof(uint32_t);
             std::ifstream file;
             file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
             file.open(volume_output_files_prefix + ".part.raw", std::ifstream::binary);
-
             typedef decltype(_state.low_res_volume.index_data) IndexType;
             _state.low_res_volume.index_data.resize(num_bytes / sizeof(IndexType::Scalar));
             file.read(reinterpret_cast<char*>(_state.low_res_volume.index_data.data()), num_bytes);
 
+            // Pre-load and normalize data for the volume GL texture
             const Eigen::RowVector3i volume_dims = _state.low_res_volume.dims();
             const int size = volume_dims[0]*volume_dims[1]*volume_dims[2];
             byte_data.clear();
             byte_data.resize(size);
-
             const double min_value = _state.low_res_volume.min_value;
             const double value_range = _state.low_res_volume.max_value - _state.low_res_volume.min_value;
             float* texture_data = _state.low_res_volume.volume_data.data();
@@ -221,8 +222,6 @@ bool Initial_File_Selection_Menu::post_draw() {
                 }
             );
 
-            _state.segmented_features.recompute_feature_map();
-
             done_loading = true;
             loading_progress = -1;
             glfwPostEmptyEvent();
@@ -232,6 +231,8 @@ bool Initial_File_Selection_Menu::post_draw() {
             is_loading = false;
             done_loading = false;
             _state.set_application_state(Application_State::Segmentation);
+            ImGui::End();
+            ImGui::Render();
             return ret;
         }
 

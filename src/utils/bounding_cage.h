@@ -8,6 +8,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <igl/serialize.h>
 
 class BoundingCage {
 public:
@@ -272,6 +273,13 @@ public:
         std::shared_ptr<spdlog::logger> logger;
 
     public:
+        /// Used for serialization
+        ///
+        KeyFrame() {}
+
+        void serialize(std::vector<char>& buffer) const;
+
+        void deserialize(const std::vector<char>& buffer);
 
         /// Returns true if this KeyFrame is part of the bounding cage
         ///
@@ -533,7 +541,7 @@ public:
         const BoundingCage* cage;
 
     public:
-        KeyFrameIterator begin() {
+        KeyFrameIterator begin() const {
             if(cage->cells.head) {
                 return KeyFrameIterator(cage->cells.head->_left_keyframe);
             } else {
@@ -541,11 +549,11 @@ public:
             }
         }
 
-        KeyFrameIterator end() {
+        KeyFrameIterator end() const {
             return KeyFrameIterator();
         }
 
-        KeyFrameIterator rbegin() {
+        KeyFrameIterator rbegin() const {
             if(cage->cells.tail) {
                 return KeyFrameIterator(cage->cells.tail->_right_keyframe);
             } else {
@@ -553,11 +561,12 @@ public:
             }
         }
 
-        KeyFrameIterator rend() {
+        KeyFrameIterator rend() const {
             return KeyFrameIterator();
         }
 
     } keyframes;
+
 
     BoundingCage() {
         keyframes.cage = this;
@@ -589,6 +598,9 @@ public:
             out_depths.push_back(total_dist);
         }
     }
+
+    void serialize(std::vector<char>& buffer) const;
+    void deserialize(const std::vector<char>& buffer);
 
     /// Set the skeleton vertices to whatever the user provides.
     /// There must be at least two vertices, if not the method returns false.
@@ -660,6 +672,21 @@ public:
     KeyFrameIterator keyframe_for_index(double index) const;
 };
 
-
+namespace igl {
+namespace serialization {
+    template <> inline void serialize(const BoundingCage::KeyFrame& obj, std::vector<char>& buffer) {
+        obj.serialize(buffer);
+    }
+    template <> inline void deserialize(BoundingCage::KeyFrame& obj, const std::vector<char>& buffer){
+        obj.deserialize(buffer);
+    }
+    template <> inline void serialize(const BoundingCage& obj, std::vector<char>& buffer) {
+        obj.serialize(buffer);
+    }
+    template <> inline void deserialize(BoundingCage& obj, const std::vector<char>& buffer) {
+        obj.deserialize(buffer);
+    }
+}
+}
 
 #endif // BOUNDING_CAGE_H
