@@ -236,9 +236,10 @@ bool Selection_Menu::post_draw() {
 
     ImGui::Text("Number of features:");
     ImGui::PushItemWidth(-1);
-    if (ImGui::SliderInt("Number of features", &_state.segmented_features.num_selected_features, 1, 100)) {
+    if (ImGui::SliderInt("##numfeatures", &_state.segmented_features.num_selected_features, 1, 100)) {
         number_features_is_dirty = true;
     }
+    ImGui::PopItemWidth();
     ImGui::NewLine();
     ImGui::Separator();
 
@@ -250,11 +251,12 @@ bool Selection_Menu::post_draw() {
     list = list.substr(0, list.size() - 2);
 
     ImGui::Text("Selected features: %s", list.c_str());
-
+    ImGui::PushItemWidth(-1);
     if (ImGui::Button("Clear Selected Features", ImVec2(-1, 0))) {
         _state.segmented_features.selected_features.clear();
         selection_list_is_dirty = true;
     }
+    ImGui::PopItemWidth();
 
     ImGui::NewLine();
     ImGui::Separator();
@@ -262,17 +264,23 @@ bool Selection_Menu::post_draw() {
     if (ImGui::CollapsingHeader("Advanced", nullptr, ImGuiTreeNodeFlags(0))) {
         float dilation_amt = (float)_state.dilated_tet_mesh.dilation_radius;
         float voxel_width = (float)_state.dilated_tet_mesh.meshing_voxel_radius;
+        ImGui::Spacing();
         ImGui::Text("Meshing Dilation Amount:");
-        if (ImGui::InputFloat("Dilation Amount", &dilation_amt, 0.5, 1.0)) {
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputFloat("##dilationamt", &dilation_amt, 0.5, 1.0)) {
             _state.dilated_tet_mesh.dilation_radius = std::max((double)dilation_amt, 1.0);
             _state.dirty_flags.mesh_dirty = true;
         }
+        ImGui::PopItemWidth();
+
         ImGui::Spacing();
         ImGui::Text("Meshing Voxel Width:");
-        if (ImGui::InputFloat("Meshing Voxel Width", &voxel_width, 0.1, 0.2)) {
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputFloat("##voxelwidth", &voxel_width, 0.1, 0.2)) {
             _state.dilated_tet_mesh.meshing_voxel_radius = std::max((double)voxel_width, 0.1);
             _state.dirty_flags.mesh_dirty = true;
         }
+        ImGui::PopItemWidth();
     }
     ImGui::NewLine();
     ImGui::Separator();
@@ -293,233 +301,6 @@ bool Selection_Menu::post_draw() {
         ImGui::PopStyleVar();
     }
 
-    /*
-    ImGui::Separator();
-    if (ImGui::CollapsingHeader("Advanced", nullptr, ImGuiTreeNodeFlags(0))) {
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
-        ImGui::Checkbox("Color by feature id", &color_by_id);
-
-        ImGui::Text("%s", "Highlight Factor: ");
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.f);
-        ImGui::SliderFloat("Highlight Factor", &highlight_factor, 0.f, 1.f);
-
-        int selection_emphasis = static_cast<int>(emphasize_by_selection);
-        const char* const items[] = {
-          "None",
-          "Highlight Selected",
-          "Highlight Deselected"
-        };
-
-        bool changed = ImGui::Combo("Selection", &selection_emphasis, items, 3);
-        if (changed) {
-            emphasize_by_selection = static_cast<Emphasis>(selection_emphasis);
-        }
-
-        if (_state.Debugging) {
-            ImGui::Text("%s", "Debugging Status");
-
-            if (current_selected_feature == 0) {
-                ImGui::Text("Current highlighted id: %s", "none");
-            }
-            else {
-                ImGui::Text("Current highlighted id: %i", current_selected_feature);
-            }
-        }
-
-        ImGui::Text("%s", "Transfer Function");
-
-        constexpr const float Radius = 10.f;
-
-        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
-
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
-        //ImVec2 canvas_size = { 640.f, 150.f };
-
-        float aspect_ratio = 150.f / 200.f; // height / width
-        float canvas_width = 0.9f * ImGui::GetContentRegionAvailWidth();
-        float canvas_height = aspect_ratio * canvas_width;
-        ImVec2 canvas_size = { canvas_width, canvas_height };
-
-        draw_list->AddRectFilledMultiColor(canvas_pos,
-            ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
-            IM_COL32(50, 50, 50, 255), IM_COL32(50, 50, 60, 255),
-            IM_COL32(60, 60, 70, 255), IM_COL32(50, 50, 60, 255));
-        draw_list->AddRect(canvas_pos, ImVec2(canvas_pos.x + canvas_size.x,
-            canvas_pos.y + canvas_size.y), IM_COL32(255, 255, 255, 255));
-        ImGui::InvisibleButton("canvas", canvas_size);
-
-        // First render the lines
-        for (size_t i = 0; i < transfer_function.size(); ++i) {
-            TfNode& node = transfer_function[i];
-
-            const float x = canvas_pos.x + canvas_size.x * node.t;
-            const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
-
-            if (i > 0) {
-                TfNode& prev_node = transfer_function[i - 1];
-
-                const float prev_x = canvas_pos.x + canvas_size.x * prev_node.t;
-                const float prev_y = canvas_pos.y + canvas_size.y * (1.f - prev_node.rgba[3]);
-                draw_list->AddLine(ImVec2(prev_x, prev_y), ImVec2(x, y),
-                    IM_COL32(255, 255, 255, 255));
-            }
-        }
-
-        for (size_t i = 0; i < transfer_function.size(); ++i) {
-            TfNode& node = transfer_function[i];
-
-            const float x = canvas_pos.x + canvas_size.x * node.t;
-            const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
-
-            if (i == current_interaction_index) {
-                draw_list->AddCircleFilled(ImVec2(x, y), Radius * 1.5f,
-                    IM_COL32(255, 255, 255, 255));
-            }
-            else {
-                draw_list->AddCircleFilled(ImVec2(x, y), Radius,
-                    IM_COL32(255, 255, 255, 255));
-            }
-
-            draw_list->AddCircleFilled(ImVec2(x, y), Radius,
-                IM_COL32(node.rgba[0] * 255, node.rgba[1] * 255, node.rgba[2] * 255, 255));
-        }
-
-        // If the mouse button is pressed, we either have to add a new node or move an
-        // existing one
-        const bool mouse_in_tf_editor = ImGui::GetIO().MousePos.x >= canvas_pos.x &&
-            ImGui::GetIO().MousePos.x <= (canvas_pos.x + canvas_size.x) &&
-            ImGui::GetIO().MousePos.y >= canvas_pos.y &&
-            ImGui::GetIO().MousePos.y <= (canvas_pos.y + canvas_size.y);
-
-        if (mouse_in_tf_editor) {
-            if (ImGui::IsMouseDown(0)) {
-                for (size_t i = 0; i < transfer_function.size(); ++i) {
-                    TfNode& node = transfer_function[i];
-                    const float x = canvas_pos.x + canvas_size.x * node.t;
-                    const float y = canvas_pos.y + canvas_size.y * (1.f - node.rgba[3]);
-
-                    const float dx = ImGui::GetIO().MousePos.x - x;
-                    const float dy = ImGui::GetIO().MousePos.y - y;
-
-                    const float r = sqrt(dx * dx + dy * dy);
-
-                    if (r <= Radius * 2.5) {
-                        clicked_mouse_position[0] = ImGui::GetIO().MousePos.x;
-                        clicked_mouse_position[1] = ImGui::GetIO().MousePos.y;
-                        is_currently_interacting = true;
-                        current_interaction_index = static_cast<int>(i);
-                        break;
-                    }
-                }
-
-                if (is_currently_interacting) {
-                    const float dx = ImGui::GetIO().MousePos.x - clicked_mouse_position[0];
-                    const float dy = ImGui::GetIO().MousePos.y - clicked_mouse_position[1];
-
-                    const float r = sqrt(dx * dx + dy * dy);
-
-                    float new_t = (ImGui::GetIO().MousePos.x - canvas_pos.x) / canvas_size.x;
-                    if (new_t < 0.f) {
-                        new_t = 0.f;
-                    }
-                    if (new_t > 1.f) {
-                        new_t = 1.f;
-                    }
-
-                    float new_a = 1.f - (ImGui::GetIO().MousePos.y - canvas_pos.y) / canvas_size.y;
-                    if (new_a < 0.f) {
-                        new_a = 0.f;
-                    }
-                    if (new_a > 1.f) {
-                        new_a = 1.f;
-                    }
-                    // We don't want to move the first or last value
-                    const bool is_first = current_interaction_index == 0;
-                    const bool is_last = (current_interaction_index == transfer_function.size() - 1);
-                    if (!is_first && !is_last) {
-                        transfer_function[current_interaction_index].t = new_t;
-                    }
-                    transfer_function[current_interaction_index].rgba[3] = new_a;
-
-                    using N = TfNode;
-                    std::sort(transfer_function.begin(), transfer_function.end(),
-                        [](const N& lhs, const N& rhs) { return lhs.t < rhs.t; });
-                    transfer_function_dirty = true;
-                }
-                else {
-                    current_interaction_index = -1;
-                    // We want to only add one node per mouse click
-                    if (!has_added_node_since_initial_click) {
-                        // Didn't hit an existing node
-                        const float t = (ImGui::GetIO().MousePos.x - canvas_pos.x) /
-                            canvas_size.x;
-                        const float a = 1.f - ((ImGui::GetIO().MousePos.y - canvas_pos.y) /
-                            canvas_size.y);
-
-                        for (size_t i = 0; i < transfer_function.size(); ++i) {
-                            TfNode& node = transfer_function[i];
-
-                            if (node.t > t) {
-                                TfNode& prev = transfer_function[i - 1];
-
-                                const float t_prime = (t - prev.t) / (node.t - prev.t);
-
-                                const float r = prev.rgba[0] * (1.f - t_prime) +
-                                    node.rgba[0] * t_prime;
-                                const float g = prev.rgba[1] * (1.f - t_prime) +
-                                    node.rgba[1] * t_prime;
-                                const float b = prev.rgba[2] * (1.f - t_prime) +
-                                    node.rgba[2] * t_prime;
-                                const float a = prev.rgba[3] * (1.f - t_prime) +
-                                    node.rgba[3] * t_prime;
-
-                                transfer_function.insert(
-                                    transfer_function.begin() + i,
-                                    { t, { r, g, b, a } }
-                                );
-                                has_added_node_since_initial_click = true;
-                                transfer_function_dirty = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            else {
-                clicked_mouse_position[0] = 0.f;
-                clicked_mouse_position[1] = 0.f;
-                is_currently_interacting = false;
-
-                has_added_node_since_initial_click = false;
-            }
-        }
-
-        if (ImGui::Button("Remove node")) {
-            const bool is_first = current_interaction_index == 0;
-            const bool is_last = current_interaction_index == transfer_function.size() - 1;
-            if (!is_first && !is_last) {
-                transfer_function.erase(transfer_function.begin() + current_interaction_index);
-                current_interaction_index = -1;
-                transfer_function_dirty = true;
-            }
-        }
-
-        ImGui::PushItemWidth(-1);
-        if (current_interaction_index >= 1 &&
-            current_interaction_index <= transfer_function.size() - 1)
-        {
-            float* rgba = glm::value_ptr(transfer_function[current_interaction_index].rgba);
-            if (ImGui::ColorPicker4("Change Color", rgba)) {
-                transfer_function_dirty = true;
-            }
-        }
-        else {
-            float rgba[4];
-            ImGui::ColorPicker4("Change Color", rgba);
-        }
-    }
-    */
     ImGui::End();
     ImGui::Render();
     return ret;

@@ -149,7 +149,8 @@ int main(int argc, char *argv[]) {
   MatrixXd Vfat, Vthin;
   MatrixXi Ffat, Fthin, F_max_component_fat, F_max_component_thin;
   DatFile out_datfile;
-  if (!out_datfile.deserialize(argv[1])) {
+  std::shared_ptr<spdlog::logger> logger = spdlog::stdout_color_mt("Extract Surface");
+  if (!out_datfile.deserialize(argv[1], logger)) {
     return EXIT_FAILURE;
   }
   cout << endl;

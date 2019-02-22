@@ -15,7 +15,7 @@ public:
 
     virtual bool post_draw() override;
     virtual bool pre_draw() override;
-    virtual bool mouse_down(int button, int modifier) override;
+    virtual bool key_down(int key, int modifiers) override;
     void initialize();
     void deinitialize();
 

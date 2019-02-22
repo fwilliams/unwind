@@ -2,8 +2,10 @@
 #define UTILS_H
 
 #include <Eigen/Core>
+#include <spdlog/spdlog.h>
 #include <vector>
 #include <array>
+#include <memory>
 
 
 // Scale a vector so its values lie between zero and one
@@ -30,7 +32,7 @@ void tet_mesh_faces(const Eigen::MatrixXi& TT, Eigen::MatrixXi& TF, bool flip=fa
 
 void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi& TF, Eigen::MatrixXi& TT);
 
-bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXf &out, bool normalize = true);
+bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXf &out, std::shared_ptr<spdlog::logger> logger, bool normalize = true);
 
 
 void edge_endpoints(const Eigen::MatrixXd& V,

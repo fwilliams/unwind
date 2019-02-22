@@ -14,7 +14,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-constexpr const char* FISH_LOGGER_NAME = "fish_deformation_logger";
+const spdlog::level::level_enum FISH_LOGGER_LEVEL = spdlog::level::trace;
+constexpr const char* FISH_LOGGER_NAME = "Fish Deformation";
+const spdlog::level::level_enum CONTOURTREE_LOGGER_LEVEL = spdlog::level::trace;
+constexpr const char* CONTOURTREE_LOGGER_NAME = "Contour Tree";
 
 enum class Application_State {
     Initial_File_Selection = 0,
@@ -34,6 +37,7 @@ struct State {
         bool file_loading_dirty = true;
         bool mesh_dirty = true;
         bool endpoints_dirty = true;
+        bool bounding_cage_dirty = true;
     } dirty_flags;
 
     Application_State application_state = Application_State::Initial_File_Selection;
@@ -79,6 +83,7 @@ struct State {
 
         void recompute_feature_map() {
             selected_features.clear();
+            buffer_data.clear();
             features = topological_features.getFeatures(num_selected_features, 0.f);
 
             uint32_t size = topological_features.ctdata.noArcs;

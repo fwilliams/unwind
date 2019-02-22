@@ -2,8 +2,9 @@
 #define DATFILE_H
 
 #include <Eigen/Core>
-
+#include <spdlog/spdlog.h>
 #include <string>
+#include <memory>
 
 
 struct DatFile {
@@ -26,13 +27,13 @@ public:
   std::string m_thin_raw_filename;
   std::string m_thin_surface_mesh;
 
-  DatFile(const std::string& filename);
+  DatFile(const std::string& filename, std::shared_ptr<spdlog::logger> logger);
 
   DatFile() = default;
 
   bool serialize(const std::string& filename);
 
-  bool deserialize(const std::string& filename);
+  bool deserialize(const std::string& filename, std::shared_ptr<spdlog::logger> logger);
 };
 
 #endif // DATFILE_H

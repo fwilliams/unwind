@@ -87,9 +87,9 @@ set(CT_INCLUDE_DIRS external/Segmentangling/ContourTree)
 list(REMOVE_ITEM CT_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/external/Segmentangling/ContourTree/main.cpp")
 add_library(contourtree STATIC ${CT_SRCS})
 target_compile_options(contourtree PRIVATE "-fopenmp")
-target_link_libraries(contourtree Qt5::Core Qt5::Widgets -fopenmp)
+target_link_libraries(contourtree Qt5::Core Qt5::Widgets -fopenmp spdlog)
 target_include_directories(contourtree PUBLIC ${CT_INCLUDE_DIRS})
-
+target_compile_definitions(contourtree PUBLIC CONTOUR_TREE_USE_SPDLOG)
 
 # Utils static library
 set(UTILS_INCLUDE_DIRS src src/utils)
@@ -100,7 +100,7 @@ list(FILTER UTILS_HEADER EXCLUDE REGEX cgal*)
 add_library(utils STATIC ${UTILS_SRCS} ${UTILS_HEADER})
 set_property(TARGET utils PROPERTY CXX_STANDARD 17)
 set_property(TARGET utils PROPERTY CXX_STANDARD_REQUIRED ON)
-target_link_libraries(utils igl::core igl::opengl igl::cgal igl::triangle spdlog Qt5::Core Qt5::Widgets)
+target_link_libraries(utils igl::core igl::opengl igl::cgal igl::triangle spdlog Qt5::Core Qt5::Widgets spdlog)
 target_include_directories(utils PUBLIC ${UTILS_INCLUDE_DIRS})
 target_include_directories(utils SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/external/glm")
 

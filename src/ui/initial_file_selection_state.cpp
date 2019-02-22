@@ -17,21 +17,21 @@ Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(
     strcpy(ui.output_folder, "C:/Users/harishd/Desktop/Projects/Fish/data/Plagiotremus-tapinosoma-output");
     strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #else
-//    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
-//    strcpy(ui.file_prefix, "Sternopygus_arenatus_72um_1k"); //Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
-//    strcpy(ui.extension, "bmp");
-//    ui.start_index = 45; //2;
-//    ui.end_index = 2534.;
-//    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus/output"); //Plaagiotremus_tapinosoma/output");
-//    strcpy(ui.output_prefix, "Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
-
-    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
-    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
+    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
+    strcpy(ui.file_prefix, "Sternopygus_arenatus_72um_1k"); //Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
     strcpy(ui.extension, "bmp");
-    ui.start_index = 2;
-    ui.end_index = 1798;
-    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
-    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
+    ui.start_index = 45; //2;
+    ui.end_index = 2534.;
+    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus/output"); //Plaagiotremus_tapinosoma/output");
+    strcpy(ui.output_prefix, "Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
+
+//    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
+//    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
+//    strcpy(ui.extension, "bmp");
+//    ui.start_index = 2;
+//    ui.end_index = 1798;
+//    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
+//    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #endif
 }
 
@@ -187,10 +187,10 @@ bool Initial_File_Selection_Menu::post_draw() {
             std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + ui.output_prefix + "-sample";
 
             // low res version
-            _state.low_res_volume.metadata = DatFile(volume_output_files_prefix + ".dat");
+            _state.low_res_volume.metadata = DatFile(volume_output_files_prefix + ".dat", _state.logger);
             _state.segmented_features.topological_features.loadData(volume_output_files_prefix);
             
-            load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, true);
+            load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, _state.logger, true /* normalize */);
 
             _state.low_res_volume.max_value = _state.low_res_volume.volume_data.maxCoeff();
             _state.low_res_volume.min_value = _state.low_res_volume.volume_data.minCoeff();

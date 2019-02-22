@@ -20,9 +20,8 @@ bool validate_endpoint_pairs(const std::vector<std::pair<int, int>>& endpoints,
 
     for (int i = 0; i < endpoints.size(); i++) {
         const int c1 = components[endpoints[i].first];
-
-        // abock(2018-09-10): c2 was the same as c1 before, I think in error
         const int c2 = components[endpoints[i].second];
+
         if (c1 != c2) {
             success = false;
             break;
@@ -122,6 +121,7 @@ void EndPoint_Selection_Menu::initialize() {
     if (state.dirty_flags.endpoints_dirty) {
         state.skeleton_estimation_parameters.endpoint_pairs.clear();
         state.dirty_flags.endpoints_dirty = false;
+        state.dirty_flags.bounding_cage_dirty = true;
     }
 
     current_endpoint_idx = 0;
@@ -158,14 +158,13 @@ bool EndPoint_Selection_Menu::pre_draw() {
             const int vid = current_endpoints[i];
             viewer->data().add_points(TV.row(vid), i == 0 ? ColorRGB::GREEN : ColorRGB::RED);
         }
+    } else {
+        for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
+            std::pair<int, int> ep = state.skeleton_estimation_parameters.endpoint_pairs[i];
+            viewer->data().add_points(TV.row(ep.first), ColorRGB::GREEN);
+            viewer->data().add_points(TV.row(ep.second), ColorRGB::RED);
+        }
     }
-
-    for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
-        std::pair<int, int> ep = state.skeleton_estimation_parameters.endpoint_pairs[i];
-        viewer->data().add_points(TV.row(ep.first), ColorRGB::GREEN);
-        viewer->data().add_points(TV.row(ep.second), ColorRGB::RED);
-    }
-
     viewer->selected_data_index = push_mesh_id;
 
     return ret;
@@ -317,7 +316,7 @@ bool EndPoint_Selection_Menu::post_draw() {
         ImGui::EndPopup();
     }
 
-    std::string button_text("New Endpoint Pair");
+    std::string button_text("Select Endpoints");
     if (selecting_endpoints) {
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
@@ -331,35 +330,6 @@ bool EndPoint_Selection_Menu::post_draw() {
         else {
             assert(false);
         }
-    }
-
-    int num_digits_ep = !state.skeleton_estimation_parameters.endpoint_pairs.empty() ?
-        static_cast<int>(log10(static_cast<double>(state.skeleton_estimation_parameters.endpoint_pairs.size())) + 1) :
-        1;
-
-    if (!state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
-        ImGui::Text("Endpoint Pairs:");
-        for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
-            int num_digits_i = (i + 1) > 0 ?
-                static_cast<int>(log10(static_cast<double>(i + 1)) + 1) :
-                1;
-
-            std::string label_text = "Endpoint ";
-            for (int zi = 0; zi < num_digits_ep - num_digits_i; zi++) {
-                label_text += std::string("0");
-            }
-            label_text += std::to_string(i);
-            label_text += std::string(": ");
-            std::string rm_button_text = std::string("Remove##") + std::to_string(i + 1);
-            ImGui::BulletText("%s", label_text.c_str());
-            ImGui::SameLine();
-            if (ImGui::Button(rm_button_text.c_str(), ImVec2(-1, 0))) {
-                assert(i < state.skeleton_estimation_parameters.endpoint_pairs.size());
-                state.skeleton_estimation_parameters.endpoint_pairs.erase(state.skeleton_estimation_parameters.endpoint_pairs.begin() + i);
-            }
-        }
-        ImGui::NewLine();
-        ImGui::Separator();
     }
 
     if (ImGui::Button(button_text.c_str(), ImVec2(-1, 0))) {
@@ -380,6 +350,74 @@ bool EndPoint_Selection_Menu::post_draw() {
     }
     ImGui::NewLine();
     ImGui::Separator();
+/*
+//    int num_digits_ep = !state.skeleton_estimation_parameters.endpoint_pairs.empty() ?
+//        static_cast<int>(log10(static_cast<double>(state.skeleton_estimation_parameters.endpoint_pairs.size())) + 1) :
+//        1;
+//    if (!state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
+//        ImGui::Text("Endpoint Pairs:");
+//        for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
+//            int num_digits_i = (i + 1) > 0 ?
+//                static_cast<int>(log10(static_cast<double>(i + 1)) + 1) :
+//                1;
+//            std::string label_text = "Endpoint ";
+//            for (int zi = 0; zi < num_digits_ep - num_digits_i; zi++) {
+//                label_text += std::string("0");
+//            }
+//            label_text += std::to_string(i);
+//            label_text += std::string(": ");
+//            std::string rm_button_text = std::string("Remove##") + std::to_string(i + 1);
+//            ImGui::BulletText("%s", label_text.c_str());
+//            ImGui::SameLine();
+//            if (ImGui::Button(rm_button_text.c_str(), ImVec2(-1, 0))) {
+//                state.dirty_flags.bounding_cage_dirty = true;
+//                assert(i < state.skeleton_estimation_parameters.endpoint_pairs.size());
+//                state.skeleton_estimation_parameters.endpoint_pairs.erase(state.skeleton_estimation_parameters.endpoint_pairs.begin() + i);
+//            }
+//        }
+//        ImGui::NewLine();
+//        ImGui::Separator();
+//    }
+*/
+
+
+
+    if (ImGui::CollapsingHeader("Advanced", nullptr, ImGuiTreeNodeFlags(0))) {
+        float cage_bbox_rad = (float)state.skeleton_estimation_parameters.cage_bbox_radius;
+        int num_subdivs = state.skeleton_estimation_parameters.num_subdivisions;
+        int smoothing_iters = state.skeleton_estimation_parameters.num_smoothing_iters;
+
+        ImGui::Spacing();
+        ImGui::Text("Skeleton Subdivisions:");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputInt("##skelsubdivs", &num_subdivs, 1, 2)) {
+           state.skeleton_estimation_parameters.num_subdivisions = std::max(num_subdivs, 2);
+           state.dirty_flags.bounding_cage_dirty = true;
+        }
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+        ImGui::Text("Skeleton Smoothing Iterations:");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputInt("##smoothingiters", &smoothing_iters, 1, 2)) {
+           state.skeleton_estimation_parameters.num_smoothing_iters = std::max(smoothing_iters, 0);
+           state.dirty_flags.bounding_cage_dirty = true;
+        }
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+        ImGui::Text("Cage Bounding-Box Radius:");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputFloat("##bboxrad", &cage_bbox_rad, 0.5, 1.0)) {
+            state.skeleton_estimation_parameters.cage_bbox_radius = std::max((double)cage_bbox_rad, 1.0);
+            state.dirty_flags.bounding_cage_dirty = true;
+        }
+        ImGui::PopItemWidth();
+    }
+
+    ImGui::NewLine();
+    ImGui::Separator();
+
     if (ImGui::Button("Back")) {
         state.set_application_state(Application_State::Segmentation);
     }
@@ -389,7 +427,13 @@ bool EndPoint_Selection_Menu::post_draw() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     if (ImGui::Button("Next")) {
-        extract_skeleton();
+        if (state.dirty_flags.bounding_cage_dirty) {
+            extract_skeleton();
+            state.dirty_flags.bounding_cage_dirty = false;
+        } else {
+            extracting_skeleton = false;
+            done_extracting_skeleton = true;
+        }
     }
     if (state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
         ImGui::PopItemFlag();
@@ -401,9 +445,12 @@ bool EndPoint_Selection_Menu::post_draw() {
     return ret;
 }
 
-bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
-    bool ret = FishUIViewerPlugin::mouse_down(button, modifier);
+bool EndPoint_Selection_Menu::key_down(int key, int modifier) {
+    bool ret = FishUIViewerPlugin::key_down(key, modifier);
     if (!selecting_endpoints) {
+        return ret;
+    }
+    if (key != 32) {
         return ret;
     }
 
@@ -425,8 +472,9 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
         current_endpoint_idx += 1;
 
         if (current_endpoint_idx >= 2) { // We've selected 2 endpoints
-            state.skeleton_estimation_parameters.endpoint_pairs.push_back(
-                std::make_pair(current_endpoints[0], current_endpoints[1]));
+            std::vector<std::pair<int, int>> old_endpoints = state.skeleton_estimation_parameters.endpoint_pairs;
+            state.skeleton_estimation_parameters.endpoint_pairs.clear();
+            state.skeleton_estimation_parameters.endpoint_pairs.push_back(std::make_pair(current_endpoints[0], current_endpoints[1]));
 
             if (current_endpoints[0] == current_endpoints[1]) {
                 bad_selection = true;
@@ -442,6 +490,12 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
             current_endpoints = { -1, -1 };
             current_endpoint_idx = 0;
             selecting_endpoints = false;
+
+            if (bad_selection) {
+                state.skeleton_estimation_parameters.endpoint_pairs = old_endpoints;
+            } else {
+                state.dirty_flags.bounding_cage_dirty = true;
+            }
         }
     }
 

@@ -128,23 +128,20 @@ void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi&
   tet_mesh_faces(TT, TF, true /*flip*/);
 }
 
-bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXf& out, bool normalize) {
+bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXf& out, std::shared_ptr<spdlog::logger> logger, bool normalize) {
     const size_t num_bytes = dims[0] * dims[1] * dims[2];
 
     char* data = new char[num_bytes];
     std::ifstream rawfile(rawfilename, std::ifstream::binary);
 
     if (!rawfile.good()) {
-        std::cerr << "ERROR: RawFile '" << rawfilename << "' does not exist." << std::endl;
+        logger->error("RawFile '{}' does not exist.", rawfilename);
         return false;
     }
 
     rawfile.read(data, num_bytes);
     if (!rawfile) {
-        std::cerr << "ERROR: Only read " << rawfile.gcount() <<
-            " bytes from Raw File '" << rawfilename <<
-            "' but expected to read " << num_bytes <<
-            " bytes." << std::endl;
+        logger->error("Only read {} bytes from RawFile '{}', but expected to read {} bytes.", rawfile.gcount(), rawfilename, num_bytes);
         return false;
     }
     rawfile.close();

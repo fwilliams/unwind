@@ -74,8 +74,8 @@ bool DatFile::set_filename(const std::string& filename) {
 #endif
 
 
-DatFile::DatFile(const std::string& filename) {
-  deserialize(filename);
+DatFile::DatFile(const std::string& filename, std::shared_ptr<spdlog::logger> logger) {
+  deserialize(filename, logger);
 }
 
 bool DatFile::serialize(const std::string& filename) {
@@ -96,7 +96,7 @@ bool DatFile::serialize(const std::string& filename) {
   return true;
 }
 
-bool DatFile::deserialize(const std::string& filename) {
+bool DatFile::deserialize(const std::string& filename, std::shared_ptr<spdlog::logger> logger) {
   using namespace std;
   string token;
   ifstream is(filename);
@@ -104,47 +104,47 @@ bool DatFile::deserialize(const std::string& filename) {
     return false;
   }
 
-  cout << "Deserializing " << filename << endl;
+  logger->debug("Deserializing {}", filename);
   while(is >> token) {
     if (token == "RawFile:") {
       is >> m_raw_filename;
-      cout << "RawFile: " << m_raw_filename << endl;
+      logger->debug("RawFile: {}", m_raw_filename);
     } else if (token == "Resolution:") {
       is >> w;
       is >> h;
       is >> d;
-      cout << "Resolution: " << w << " " << h << " " << d << endl;
+      logger->debug("Resolution: {} {} {}", w, h, d);
     } else if (token == "Format:") {
       is >> m_format;
-      cout << "Format: " << m_format << endl;
+      logger->debug("Format: {}", m_format);
     } else if(token == "SurfaceMesh:") {
       is >> m_mesh_filename;
-      cout << "SurfaceMesh: " << m_mesh_filename << endl;
+      logger->debug("SurfaceMesh: {}", m_mesh_filename);
     } else if (token == "BBmin:") {
       is >> m_bb_min[0];
       is >> m_bb_min[1];
       is >> m_bb_min[2];
-      cout << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
+      logger->debug("BBmin: {} {} {}", m_bb_min[0], m_bb_min[1], m_bb_min[2]);
     } else if (token == "ThinSurfaceMesh:") {
       is >> m_thin_surface_mesh;
-      cout << "ThinSurfaceMesh: " << m_thin_surface_mesh << endl;
+      logger->debug("ThinSurfaceMesh: {}", m_thin_surface_mesh);
     } else if (token == "BBmax:") {
       is >> m_bb_max[0];
       is >> m_bb_max[1];
       is >> m_bb_max[2];
-      cout << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
+      logger->debug("BBmax: {} {} {}", m_bb_max[0], m_bb_max[1], m_bb_max[2]);
     } else if (token == "TextureFile:") {
       is >> m_texture_filename;
-      cout << "TextureFile: " << m_texture_filename << endl;
+      logger->debug("TextureFile: {}", m_texture_filename);
     } else if (token == "ThinRawFile:") {
       is >> m_thin_raw_filename;
-      cout << "ThinRawFile: " << m_thin_raw_filename << endl;
+      logger->debug("ThinRawFile: {}", m_thin_raw_filename);
     } else {
-      cerr << "ERROR: Unexpected token " << token << endl;
+      logger->error("Unexpected token {}", token);
       return false;
     }
   }
-  cout << "Done!" << endl;
+  logger->debug("Done deserializing {}", filename);
 
   return true;
 }
