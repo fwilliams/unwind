@@ -313,17 +313,22 @@ void uniform_grad(const Eigen::MatrixXi& F, Eigen::SparseMatrix<double>& G) {
     G.setFromTriplets(triplets.begin(), triplets.end());
 }
 
-void remesh_connected_components(int comp, const Eigen::VectorXi& C, const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT, Eigen::MatrixXd& outTV, Eigen::MatrixXi& outTT) {
-    Eigen::VectorXi c_map(C.size());
+void remesh_connected_components(int comp, const Eigen::VectorXi& C,
+                                 const Eigen::MatrixXd& TV,
+                                 const Eigen::MatrixXi& TT,
+                                 Eigen::VectorXi& outCMap,
+                                 Eigen::MatrixXd& outTV,
+                                 Eigen::MatrixXi& outTT) {
+    outCMap.resize(C.size());
     outTV.resize(TV.rows(), TV.cols());
     int v_count = 0;
     for (int i = 0; i < C.size(); i++) {
         if (C[i] == comp) {
-            c_map[i] = v_count;
+            outCMap[i] = v_count;
             outTV.row(v_count) = TV.row(i);
             v_count += 1;
         } else {
-            c_map[i] = -1;
+            outCMap[i] = -1;
         }
     }
     outTV.conservativeResize(v_count, TV.cols());
@@ -331,10 +336,10 @@ void remesh_connected_components(int comp, const Eigen::VectorXi& C, const Eigen
     int f_count = 0;
     outTT.resize(TT.rows(), TT.cols());
     for (int i = 0; i < TT.rows(); i++) {
-        int c = C[TT(i, 0)];
+        const int c = C[TT(i, 0)];
         if (c == comp) {
             for (int j = 0; j < TT.cols(); j++) {
-                outTT(f_count, j) = c_map[TT(i, j)];
+                outTT(f_count, j) = outCMap[TT(i, j)];
             }
             f_count += 1;
         }

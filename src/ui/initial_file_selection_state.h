@@ -37,10 +37,10 @@ private:
         bool write_original = true;
     } ui;
 
-    bool old_is_animating;
-    bool slice_loading = false;
-    std::vector<uint8_t> byte_data;
+    bool load_textures_slice_by_slice = false;
     int loading_progress = -1;
+
+    std::vector<uint8_t> byte_data;
     std::atomic_bool done_loading;
     std::atomic_bool is_loading;
     std::thread loading_thread;

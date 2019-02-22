@@ -7,9 +7,6 @@
 #include <GLFW/glfw3.h>
 #include <utils/mkpath.h>
 
-#include <chrono>
-
-
 Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(state) {
 #ifdef WIN32
     strcpy(ui.folder_name, "C:/Users/harishd/Desktop/Projects/Fish/data/Plagiotremus-tapinosoma");
@@ -20,33 +17,30 @@ Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(
     strcpy(ui.output_folder, "C:/Users/harishd/Desktop/Projects/Fish/data/Plagiotremus-tapinosoma-output");
     strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #else
-    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
-    strcpy(ui.file_prefix, "Sternopygus_arenatus_72um_1k"); //Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
-    strcpy(ui.extension, "bmp");
-    ui.start_index = 45; //2;
-    ui.end_index = 2534.;
-    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus/output"); //Plaagiotremus_tapinosoma/output");
-    strcpy(ui.output_prefix, "Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
-
-//    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
-//    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
+//    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
+//    strcpy(ui.file_prefix, "Sternopygus_arenatus_72um_1k"); //Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
 //    strcpy(ui.extension, "bmp");
-//    ui.start_index = 2;
-//    ui.end_index = 1798;
-//    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
-//    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
+//    ui.start_index = 45; //2;
+//    ui.end_index = 2534.;
+//    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus/output"); //Plaagiotremus_tapinosoma/output");
+//    strcpy(ui.output_prefix, "Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
+
+    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
+    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
+    strcpy(ui.extension, "bmp");
+    ui.start_index = 2;
+    ui.end_index = 1798;
+    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
+    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
 #endif
 }
 
 void Initial_File_Selection_Menu::initialize() {
     _state.logger->debug("Initializing File Selection View");
-    old_is_animating = viewer->core.is_animating;
-    viewer->core.is_animating = true;
 }
 
 void Initial_File_Selection_Menu::deinitialize() {
     _state.logger->debug("De-Initializing File Selection View");
-    viewer->core.is_animating = old_is_animating;
 }
 
 bool Initial_File_Selection_Menu::post_draw() {
@@ -68,10 +62,6 @@ bool Initial_File_Selection_Menu::post_draw() {
         ImGui::BeginPopupModal("Loading CT Scan");
         ImGui::Text("Loading CT Scan. Please wait as this can take a few seconds.");
         ImGui::NewLine();
-        ImGui::Separator();
-        if (ImGui::Button("Cancel")) {
-            // TODO: Cancel button
-        }
         ImGui::EndPopup();
 
         if (done_loading) {
@@ -95,7 +85,7 @@ bool Initial_File_Selection_Menu::post_draw() {
                 //    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                if (slice_loading) {
+                if (load_textures_slice_by_slice) {
                     glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volume_dims[0], volume_dims[1], volume_dims[2], 0,
                                  GL_RED, GL_UNSIGNED_BYTE, nullptr);
                 } else {
@@ -115,7 +105,7 @@ bool Initial_File_Selection_Menu::post_draw() {
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-                if (slice_loading) {
+                if (load_textures_slice_by_slice) {
                     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32UI, volume_dims[0], volume_dims[1], volume_dims[2],
                                  0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
                 } else {
@@ -183,6 +173,8 @@ bool Initial_File_Selection_Menu::post_draw() {
     }
     ImGui::PopItemWidth();
 
+    ImGui::NewLine();
+    ImGui::Separator();
     if (ImGui::Button("Next")) {
         auto thread_fun = [&]() {
             mkpath(ui.output_folder, 0777 /* mode */);

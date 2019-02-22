@@ -37,6 +37,7 @@ void Bounding_Polygon_Menu::initialize() {
 
     // Initialize the 3d volume viewer
     widget_3d.initialize(viewer, this);
+    widget_3d.volume_renderer.set_transfer_function(tf_widget.transfer_function());
 
     exporter.init(128, 128, 1024);
 
@@ -264,22 +265,28 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
     bool pushed_disabled_style = false;
-    if (show_display_options) {
+    if (show_edit_transfer_function) {
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
         pushed_disabled_style = true;
     }
     if (ImGui::Button("Edit Transfer Function")) {
-        show_display_options = true;
+        show_edit_transfer_function = true;
     }
     if (pushed_disabled_style) {
         ImGui::PopItemFlag();
         ImGui::PopStyleVar();
     }
-
-    if (show_display_options) {
+    if (ImGui::Button("Center View")) {
+        if (draw_straight) {
+            widget_3d.center_straight_mesh();
+        } else {
+            widget_3d.center_bounding_cage_mesh();
+        }
+    }
+    if (show_edit_transfer_function) {
         ImGui::SetNextWindowSize(ImVec2(window_height_float*view_vsplit, 0), ImGuiSetCond_FirstUseEver);
-        ImGui::Begin("Edit Transfer Function", &show_display_options, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        ImGui::Begin("Edit Transfer Function", &show_edit_transfer_function, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
         ImVec2 popup_pos = ImGui::GetWindowPos();
         ImVec2 popup_size = ImGui::GetWindowSize();
         tf_widget.post_draw();
@@ -292,11 +299,11 @@ bool Bounding_Polygon_Menu::post_draw() {
 
         ImGui::Separator();
         if (ImGui::Button("Close")) {
-            show_display_options = false;
+            show_edit_transfer_function = false;
         }
         ImGui::End();
     } else {
-        show_display_options = false;
+        show_edit_transfer_function = false;
         mouse_in_popup = false;
     }
 

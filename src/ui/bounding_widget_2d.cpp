@@ -196,10 +196,20 @@ void Bounding_Polygon_Widget::update_selection() {
     BoundingCage::KeyFrameIterator kf = selection.current_active_keyframe;
     std::pair<int, float> cv = closest_vertex(kf_mouse, kf->bounding_box_vertices_rotated_2d());
 
-    selection.matched_vertex = std::get<1>(cv) < view.zoom * SelectionRadius;
-    float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
+    const float dist_to_center = glm::distance(kf_mouse, G2f(selection.current_active_keyframe->centroid_2d()));
+    const float dist_to_nearest_vertex = std::get<1>(cv);
 
-    selection.matched_center = dist_to_center < view.zoom * SelectionRadius;
+    const bool matched_vertex = dist_to_nearest_vertex < view.zoom * SelectionRadius;
+    const bool matched_center = dist_to_center < view.zoom * SelectionRadius;
+
+    if (matched_vertex && matched_center) {
+        selection.matched_vertex = (dist_to_nearest_vertex < dist_to_center);
+        selection.matched_center = !selection.matched_vertex;
+    } else {
+        selection.matched_vertex = matched_vertex;
+        selection.matched_center = matched_center;
+    }
+
     selection.closest_vertex_index = std::get<0>(cv);
 }
 

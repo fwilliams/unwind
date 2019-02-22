@@ -58,6 +58,6 @@ int nearest_vertex(const Eigen::MatrixXd& TV, const Eigen::RowVector3d& p);
 // Compute a new mesh with only the connected component comp
 void remesh_connected_components(int comp, const Eigen::VectorXi& C,
                                  const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
-                                 Eigen::MatrixXd& outTV, Eigen::MatrixXi& outTT);
+                                 Eigen::VectorXi& outCMap, Eigen::MatrixXd& outTV, Eigen::MatrixXi& outTT);
 
 #endif // UTILS_H

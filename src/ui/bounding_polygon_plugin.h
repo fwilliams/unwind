@@ -56,7 +56,7 @@ private:
     float current_cut_index = 0;
     float keyframe_nudge_amount = 0.1;
     bool draw_straight = false;
-    bool show_display_options = false;
+    bool show_edit_transfer_function = false;
     bool mouse_in_popup = false;
 };
 

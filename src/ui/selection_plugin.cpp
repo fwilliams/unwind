@@ -258,6 +258,25 @@ bool Selection_Menu::post_draw() {
 
     ImGui::NewLine();
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Advanced", nullptr, ImGuiTreeNodeFlags(0))) {
+        float dilation_amt = (float)_state.dilated_tet_mesh.dilation_radius;
+        float voxel_width = (float)_state.dilated_tet_mesh.meshing_voxel_radius;
+        ImGui::Text("Meshing Dilation Amount:");
+        if (ImGui::InputFloat("Dilation Amount", &dilation_amt, 0.5, 1.0)) {
+            _state.dilated_tet_mesh.dilation_radius = std::max((double)dilation_amt, 1.0);
+            _state.dirty_flags.mesh_dirty = true;
+        }
+        ImGui::Spacing();
+        ImGui::Text("Meshing Voxel Width:");
+        if (ImGui::InputFloat("Meshing Voxel Width", &voxel_width, 0.1, 0.2)) {
+            _state.dilated_tet_mesh.meshing_voxel_radius = std::max((double)voxel_width, 0.1);
+            _state.dirty_flags.mesh_dirty = true;
+        }
+    }
+    ImGui::NewLine();
+    ImGui::Separator();
+
     if (ImGui::Button("Back")) {
         _state.set_application_state(Application_State::Initial_File_Selection);
     }

@@ -183,10 +183,6 @@ bool Meshing_Menu::post_draw() {
         ImGui::BeginPopupModal("Processing Fish Segments");
         ImGui::Text("Processing Fish Segments. Please wait as this can take a few minutes.");
         ImGui::NewLine();
-        ImGui::Separator();
-        if (ImGui::Button("Cancel")) {
-            // TODO: Cancel button
-        }
         ImGui::EndPopup();
         ImGui::End();
     }
@@ -245,7 +241,7 @@ void Meshing_Menu::tetrahedralize_surface_mesh() {
     // NOTE: We add 5 here so as to add 4 grid points of padding, as well as
     // 1 grid point at the maximal boundary of the bounding box
     // ie: (xmax-xmin)/dx + 1 grid points to cover one axis of the bounding box
-    const float dx = 0.5f*_state.dilated_tet_mesh.dilation_radius; //0.8f; 
+    const float dx = _state.dilated_tet_mesh.meshing_voxel_radius; //0.8f;
     Vec3f origin = xmin - 2*Vec3f(dx, dx, dx);
     int ni = static_cast<int>(std::ceil((xmax[0] - xmin[0]) / dx) + 4);
     int nj = static_cast<int>(std::ceil((xmax[1] - xmin[1]) / dx) + 4);

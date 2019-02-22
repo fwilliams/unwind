@@ -70,7 +70,7 @@ struct State {
     LoadedVolume hi_res_volume;
 
     // Topological features
-    struct FeatureSegmentation {
+    struct SegmentedFeatures {
         std::vector<uint32_t> buffer_data;
         contourtree::TopologicalFeatures topological_features;
         std::vector<contourtree::Feature> features;
@@ -101,6 +101,7 @@ struct State {
         Eigen::VectorXi connected_components;
 
         double dilation_radius = 3.0;
+        double meshing_voxel_radius = 1.5;
 
         // Geodesic distances stored at each tet vertex
         Eigen::VectorXd geodesic_dists;
@@ -114,8 +115,18 @@ struct State {
         }
     } dilated_tet_mesh;
 
-    // Selected pairs of endpoints
-    std::vector<std::pair<int, int>> endpoint_pairs;
+    struct SkeletonEstimationParameters {
+        // Number of level sets in the skeleton
+        int num_subdivisions = 100;
+
+        // Number of smoothing iterations
+        int num_smoothing_iters = 50;
+
+        double cage_bbox_radius = 7.5;
+
+        // Selected pairs of endpoints
+        std::vector<std::pair<int, int>> endpoint_pairs;
+    } skeleton_estimation_parameters;
 
     BoundingCage cage;
 };

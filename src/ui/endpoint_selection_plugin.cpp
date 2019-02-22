@@ -120,7 +120,7 @@ void EndPoint_Selection_Menu::initialize() {
     viewer->core.viewport = Eigen::RowVector4f(view_hsplit*window_width, 0, (1.0-view_hsplit)*window_width, window_height);
 
     if (state.dirty_flags.endpoints_dirty) {
-        state.endpoint_pairs.clear();
+        state.skeleton_estimation_parameters.endpoint_pairs.clear();
         state.dirty_flags.endpoints_dirty = false;
     }
 
@@ -130,6 +130,7 @@ void EndPoint_Selection_Menu::initialize() {
 
     done_extracting_skeleton = false;
     extracting_skeleton = false;
+    debug.drew_debug_state = false;
 }
 
 void EndPoint_Selection_Menu::deinitialize() {
@@ -159,8 +160,8 @@ bool EndPoint_Selection_Menu::pre_draw() {
         }
     }
 
-    for (int i = 0; i < state.endpoint_pairs.size(); i++) {
-        std::pair<int, int> ep = state.endpoint_pairs[i];
+    for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
+        std::pair<int, int> ep = state.skeleton_estimation_parameters.endpoint_pairs[i];
         viewer->data().add_points(TV.row(ep.first), ColorRGB::GREEN);
         viewer->data().add_points(TV.row(ep.second), ColorRGB::RED);
     }
@@ -332,13 +333,13 @@ bool EndPoint_Selection_Menu::post_draw() {
         }
     }
 
-    int num_digits_ep = !state.endpoint_pairs.empty() ?
-        static_cast<int>(log10(static_cast<double>(state.endpoint_pairs.size())) + 1) :
+    int num_digits_ep = !state.skeleton_estimation_parameters.endpoint_pairs.empty() ?
+        static_cast<int>(log10(static_cast<double>(state.skeleton_estimation_parameters.endpoint_pairs.size())) + 1) :
         1;
 
-    if (!state.endpoint_pairs.empty()) {
+    if (!state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
         ImGui::Text("Endpoint Pairs:");
-        for (int i = 0; i < state.endpoint_pairs.size(); i++) {
+        for (int i = 0; i < state.skeleton_estimation_parameters.endpoint_pairs.size(); i++) {
             int num_digits_i = (i + 1) > 0 ?
                 static_cast<int>(log10(static_cast<double>(i + 1)) + 1) :
                 1;
@@ -353,8 +354,8 @@ bool EndPoint_Selection_Menu::post_draw() {
             ImGui::BulletText("%s", label_text.c_str());
             ImGui::SameLine();
             if (ImGui::Button(rm_button_text.c_str(), ImVec2(-1, 0))) {
-                assert(i < state.endpoint_pairs.size());
-                state.endpoint_pairs.erase(state.endpoint_pairs.begin() + i);
+                assert(i < state.skeleton_estimation_parameters.endpoint_pairs.size());
+                state.skeleton_estimation_parameters.endpoint_pairs.erase(state.skeleton_estimation_parameters.endpoint_pairs.begin() + i);
             }
         }
         ImGui::NewLine();
@@ -383,14 +384,14 @@ bool EndPoint_Selection_Menu::post_draw() {
         state.set_application_state(Application_State::Segmentation);
     }
     ImGui::SameLine();
-    if (state.endpoint_pairs.empty()) {
+    if (state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     if (ImGui::Button("Next")) {
         extract_skeleton();
     }
-    if (state.endpoint_pairs.empty()) {
+    if (state.skeleton_estimation_parameters.endpoint_pairs.empty()) {
         ImGui::PopItemFlag();
         ImGui::PopStyleVar();
     }
@@ -424,18 +425,18 @@ bool EndPoint_Selection_Menu::mouse_down(int button, int modifier) {
         current_endpoint_idx += 1;
 
         if (current_endpoint_idx >= 2) { // We've selected 2 endpoints
-            state.endpoint_pairs.push_back(
+            state.skeleton_estimation_parameters.endpoint_pairs.push_back(
                 std::make_pair(current_endpoints[0], current_endpoints[1]));
 
             if (current_endpoints[0] == current_endpoints[1]) {
                 bad_selection = true;
                 bad_selection_error_message = "Invalid Endpoints: Selected endpoints are the same.";
-                state.endpoint_pairs.pop_back();
+                state.skeleton_estimation_parameters.endpoint_pairs.pop_back();
             }
-            else if (!validate_endpoint_pairs(state.endpoint_pairs, state.dilated_tet_mesh.connected_components)) {
+            else if (!validate_endpoint_pairs(state.skeleton_estimation_parameters.endpoint_pairs, state.dilated_tet_mesh.connected_components)) {
                 bad_selection = true;
                 bad_selection_error_message = "Invalid Endpoints: You can only have one endpoint pair per connected component.";
-                state.endpoint_pairs.pop_back();
+                state.skeleton_estimation_parameters.endpoint_pairs.pop_back();
             }
 
             current_endpoints = { -1, -1 };
@@ -456,23 +457,39 @@ void EndPoint_Selection_Menu::extract_skeleton() {
         const Eigen::MatrixXd& TV = state.dilated_tet_mesh.TV;
         const Eigen::MatrixXi& TT = state.dilated_tet_mesh.TT;
         const Eigen::VectorXi& C = state.dilated_tet_mesh.connected_components;
-        const int comp = C[state.endpoint_pairs[0].first];
+        const int comp = C[state.skeleton_estimation_parameters.endpoint_pairs[0].first];
 
         Eigen::MatrixXd TV2;
         Eigen::MatrixXi TT2;
-        remesh_connected_components(comp, C, TV, TT, TV2, TT2);
+        Eigen::VectorXi C2;
+        Eigen::VectorXi CMap;
+        Eigen::VectorXd geodesic_dists2;
+        std::vector<std::pair<int, int>> selected_endpoints_2;
+        remesh_connected_components(comp, C, TV, TT, CMap, TV2, TT2);
+        C2 = Eigen::VectorXi::Zero(TV2.rows());
+        for (const std::pair<int, int>& p : state.skeleton_estimation_parameters.endpoint_pairs) {
+            std::pair<int, int> p2 = std::make_pair(CMap[p.first], CMap[p.second]);
+            selected_endpoints_2.push_back(p2);
+        }
         Eigen::MatrixXd skeleton_vertices;
 
         const bool normalized = true;
-        //heat_diffusion_distances(TV, TT, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
-        geodesic_distances(TV2, TT2, state.endpoint_pairs, state.dilated_tet_mesh.geodesic_dists, normalized);
-        compute_skeleton(TV, TT, state.dilated_tet_mesh.geodesic_dists,
-            state.endpoint_pairs, state.dilated_tet_mesh.connected_components,
-            100, skeleton_vertices);
+        geodesic_distances(TV2, TT2, selected_endpoints_2, geodesic_dists2, normalized);
+        compute_skeleton(TV2, TT2, geodesic_dists2,
+            selected_endpoints_2, C2,
+            state.skeleton_estimation_parameters.num_subdivisions, skeleton_vertices);
 
-        const double rad = 7.5;
+        state.dilated_tet_mesh.geodesic_dists.resize(TV.rows());
+        for (int i = 0; i < TV.rows(); i++) {
+            if (CMap[i] >= 0) {
+                state.dilated_tet_mesh.geodesic_dists[i] = geodesic_dists2[CMap[i]];
+            } else {
+                state.dilated_tet_mesh.geodesic_dists[i] = -1.0;
+            }
+        }
+        const double rad = state.skeleton_estimation_parameters.cage_bbox_radius;
         Eigen::Vector4d bbox(-rad, rad, -rad, rad);
-        state.cage.set_skeleton_vertices(skeleton_vertices, 50 /* smoothing iterations */, bbox);
+        state.cage.set_skeleton_vertices(skeleton_vertices, state.skeleton_estimation_parameters.num_smoothing_iters, bbox);
 
         extracting_skeleton = false;
         done_extracting_skeleton = true;
