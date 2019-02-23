@@ -133,6 +133,25 @@ struct State {
         std::vector<std::pair<int, int>> endpoint_pairs;
     } skeleton_estimation_parameters;
 
+    struct CTState {
+        std::string data_directory;
+        std::string name_prefix;
+        int start_index;
+        int end_index;
+        int downsample_factor;
+
+        std::string getFullResolutionPrefix() {
+            std::string str = name_prefix + std::string("-") + std::to_string(start_index) + std::string("-") + std::to_string(end_index);
+            return str;
+        }
+
+        std::string getLowResolutionPrefix() {
+            std::string str = name_prefix + std::string("-") + std::to_string(start_index) + std::string("-") + std::to_string(end_index) + std::string("-") + std::to_string(downsample_factor);
+            return str;
+        }
+    } ct_state;
+
+
     BoundingCage cage;
 };
 

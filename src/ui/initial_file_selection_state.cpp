@@ -179,13 +179,20 @@ bool Initial_File_Selection_Menu::post_draw() {
     ImGui::Separator();
     if (ImGui::Button("Next")) {
         auto thread_fun = [&]() {
+            // TODO hack for creating state
+            _state.ct_state.data_directory = ui.output_folder;
+            _state.ct_state.downsample_factor = ui.downsample_factor;
+            _state.ct_state.start_index = ui.start_index;
+            _state.ct_state.end_index = ui.end_index;
+            _state.ct_state.name_prefix = ui.file_prefix;
+
             mkpath(ui.output_folder, 0777 /* mode */);
 
-            std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + ui.output_prefix + "-sample";
+            std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + _state.ct_state.getLowResolutionPrefix();
 
             SamplingOutput op = ImageData::writeOutput(ui.folder_name, ui.file_prefix,
                 ui.start_index, ui.end_index, ui.extension, ui.output_folder,
-                ui.output_prefix, ui.downsample_factor, ui.write_original);
+                _state.ct_state.getFullResolutionPrefix(), _state.ct_state.getLowResolutionPrefix(), ui.downsample_factor, ui.write_original);
             preProcessing(op.fileName, op.x, op.y, op.z);
             _state.segmented_features.topological_features.loadData(volume_output_files_prefix);
             _state.segmented_features.recompute_feature_map();

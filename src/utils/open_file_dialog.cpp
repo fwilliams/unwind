@@ -10,6 +10,6 @@ std::string open_file_dialog() {
     QApplication app(argc, &argv);
     std::string result = QFileDialog::getOpenFileName(nullptr, QString("Open Image"), QString(""), QString("Image Files (*.png *.jpg *.bmp)")).toUtf8().constData();
     QEventLoop loop;
-    while (loop.processEvents())
+    while (loop.processEvents());
     return result;
 }
