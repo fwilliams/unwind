@@ -11,7 +11,7 @@
 struct DatFile {
 private:
 #ifdef _WIN32
-  std::pair<std::string, std::string> dir_and_base_name(const char* name, std::shared_ptr<spdlog::logger> logger);
+  std::pair<std::string, std::string> dir_and_base_name(const char* name);
 #endif
   bool set_filename(const std::string& filename, std::shared_ptr<spdlog::logger> logger);
 
