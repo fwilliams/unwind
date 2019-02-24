@@ -278,7 +278,7 @@ bool Initial_File_Selection_Menu::post_draw() {
                 return ret;
             }
         } else {
-            if (get_file_type(existing_project_path_buf) != REGULAR_FILE) {
+            if (get_file_type(existing_project_path_buf) != FT_REGULAR_FILE) {
                 show_error_popup = true;
                 error_message = "Existing project must be a valid project file";
                 ImGui::End();
@@ -312,12 +312,12 @@ bool Initial_File_Selection_Menu::post_draw() {
 
 bool Initial_File_Selection_Menu::process_new_project_form() {
 
-    if (get_file_type(first_image_path_buf) != REGULAR_FILE) {
+    if (get_file_type(first_image_path_buf) != FT_REGULAR_FILE) {
         show_error_popup = true;
         error_message = "Error: First image is not a valid file.";
         return false;
     }
-    if (get_file_type(last_image_path_buf) != REGULAR_FILE) {
+    if (get_file_type(last_image_path_buf) != FT_REGULAR_FILE) {
         show_error_popup = true;
         error_message = "Error: Last image is not a valid file.";
         return false;

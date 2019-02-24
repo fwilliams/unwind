@@ -12,11 +12,11 @@ using mode_t = int;
 int mkpath(const char *path, mode_t mode=0777);
 
 enum FileType {
-    DOES_NOT_EXIST,
-    DIRECTORY,
-    REGULAR_FILE,
-    OTHER,
-    ERROR
+    FT_DOES_NOT_EXIST,
+    FT_DIRECTORY,
+    FT_REGULAR_FILE,
+    FT_OTHER,
+    FT_ERROR
 };
 
 FileType get_file_type(const char* path);
