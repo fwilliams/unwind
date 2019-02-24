@@ -19,7 +19,7 @@ public:
 private:
     State& _state;
 
-#ifdef WIN32
+#ifdef _MSC_VER
     static constexpr int PATH_BUFFER_SIZE = 4*4096;
 #else
     static const int PATH_BUFFER_SIZE = 4*PATH_MAX;
