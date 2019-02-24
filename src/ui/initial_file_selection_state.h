@@ -22,18 +22,18 @@ private:
 #ifdef WIN32
     static constexpr int BufferSize = 4*4096;
 #else
-    static const int BufferSize = 4*PATH_MAX;
+    static const int BUFFER_SIZE = 4*PATH_MAX;
 #endif
 
-    char output_dir_path_buf[BufferSize];
-    char first_image_path_buf[BufferSize] = {};
-    char last_image_path_buf[BufferSize] = {};
+    char output_dir_path_buf[BUFFER_SIZE];
+    char first_image_path_buf[BUFFER_SIZE] = {};
+    char last_image_path_buf[BUFFER_SIZE] = {};
+    char existing_project_path_buf[BUFFER_SIZE] = {};
 
     bool show_error_popup = false;
     std::string error_message;
 
-    bool load_textures_slice_by_slice = false;
-    int loading_progress = -1;
+    bool show_new_scan_menu = true;
 
     std::vector<uint8_t> byte_data;
     std::atomic_bool done_loading;

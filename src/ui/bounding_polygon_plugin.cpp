@@ -1,8 +1,10 @@
 #include "bounding_polygon_plugin.h"
 
 #include "state.h"
-#include "utils/colors.h"
-#include "utils/utils.h"
+#include <utils/colors.h>
+#include <utils/utils.h>
+#include <utils/open_file_dialog.h>
+
 #include <igl/edges.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
@@ -314,16 +316,9 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     ImGui::SameLine();
     if (ImGui::Button("Serialize")) {
-        igl::serialize(state.cage, "cage", "bindata", true);
-        state.logger->trace("CAGE PRE : {}", state.cage.num_keyframes());
-        state.cage = BoundingCage();
-        state.cage.set_logger(state.logger);
-        state.logger->trace("CAGE DURING : {}", state.cage.num_keyframes());
-        igl::deserialize(state.cage, "cage", "bindata");
-        state.logger->trace("CAGE POST : {}", state.cage.num_keyframes());
-        for (BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-            state.logger->trace("KF {}", kf.index());
-        }
+        // TODO: Export!
+        std::string filename = open_save_file_dialog();
+        igl::serialize(state, "state", filename, true);
     }
 
     ImGui::End();

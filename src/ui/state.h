@@ -14,6 +14,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <igl/serialize.h>
+
+
 const spdlog::level::level_enum FISH_LOGGER_LEVEL = spdlog::level::trace;
 constexpr const char* FISH_LOGGER_NAME = "Fish Deformation";
 const spdlog::level::level_enum CONTOURTREE_LOGGER_LEVEL = spdlog::level::trace;
@@ -54,8 +57,8 @@ struct State {
         VectorXui index_data;
         Eigen::VectorXf volume_data;
 
-        GLuint volume_texture;
-        GLuint index_texture;
+        GLuint volume_texture = 0;
+        GLuint index_texture = 0;
 
         double min_value;
         double max_value;
@@ -67,6 +70,10 @@ struct State {
         const size_t num_voxels() const {
             return metadata.w*metadata.h*metadata.d;
         }
+
+        void preprocess_volume_texture(std::vector<uint8_t>& byte_data);
+        void load_gl_volume_texture(const std::vector<uint8_t> &byte_data);
+        void load_gl_index_texture();
     };
 
     // Initial volume data loaded in the first screen
@@ -78,24 +85,12 @@ struct State {
         std::vector<uint32_t> buffer_data;
         contourtree::TopologicalFeatures topological_features;
         std::vector<contourtree::Feature> features;
+
         std::vector<uint32_t> selected_features;
         int num_selected_features = 5;
 
-        void recompute_feature_map() {
-            selected_features.clear();
-            buffer_data.clear();
-            features = topological_features.getFeatures(num_selected_features, 0.f);
+        void recompute_feature_map();
 
-            uint32_t size = topological_features.ctdata.noArcs;
-            buffer_data.resize(size + 1 + 1, static_cast<uint32_t>(-1));
-            buffer_data[0] = static_cast<uint32_t>(features.size());
-            for (size_t i = 0; i < features.size(); ++i) {
-                for (uint32_t j : features[i].arcs) {
-                    // +1 since the first value of the vector contains the number of features
-                    buffer_data[j + 1] = static_cast<uint32_t>(i);
-                }
-            }
-        }
     } segmented_features;
 
     struct ImageInput {
@@ -160,52 +155,25 @@ struct State {
 
 
 
-    void preprocess_lowres_volume_texture(std::vector<uint8_t>& byte_data) {
-        // Pre-load and normalize data for the low res volume GL texture
-        const Eigen::RowVector3i volume_dims = low_res_volume.dims();
-        const int size = volume_dims[0]*volume_dims[1]*volume_dims[2];
-        byte_data.clear();
-        byte_data.resize(size);
-        const double min_value = low_res_volume.min_value;
-        const double value_range = low_res_volume.max_value - low_res_volume.min_value;
-        float* texture_data = low_res_volume.volume_data.data();
-        std::transform(
-            texture_data,
-            texture_data + size,
-            byte_data.begin(),
-            [min_value, value_range](double d) {
-                return static_cast<uint8_t>(((d - min_value)/value_range) * std::numeric_limits<uint8_t>::max());
-            }
-        );
-
-    }
-
-    void load_data_from_filesystem() {
-
-        // Load the low-res volume data
-        low_res_volume.metadata = DatFile(input_metadata.low_res_path_prefx() + ".dat", logger);
-        load_rawfile(input_metadata.low_res_path_prefx() + ".raw", low_res_volume.dims(),
-                     low_res_volume.volume_data, logger, true /* normalize */);
-        low_res_volume.max_value = low_res_volume.volume_data.maxCoeff();
-        low_res_volume.min_value = low_res_volume.volume_data.minCoeff();
-
-        // Compute the topological features
-        Eigen::Vector3i lrv = low_res_volume.dims();
-        preProcessing(input_metadata.low_res_path_prefx(), lrv[0], lrv[1], lrv[2]);
-        segmented_features.topological_features.loadData(input_metadata.low_res_path_prefx());
-        segmented_features.recompute_feature_map();
-
-        // Load the low-res index data
-        const size_t num_bytes = low_res_volume.num_voxels() * sizeof(uint32_t);
-        std::ifstream file;
-        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-        file.open(input_metadata.low_res_path_prefx() + ".part.raw", std::ifstream::binary);
-        typedef decltype(low_res_volume.index_data) IndexType;
-        low_res_volume.index_data.resize(num_bytes / sizeof(IndexType::Scalar));
-        file.read(reinterpret_cast<char*>(low_res_volume.index_data.data()), num_bytes);
-    }
+    void load_volume_data(LoadedVolume& volume, bool load_topology);
 
     BoundingCage cage;
+
+    void serialize(std::vector<char>& buffer) const;
+    void deserialize(const std::vector<char>& buffer);
 };
+
+namespace igl {
+namespace serialization {
+
+template <> inline void serialize(const State& obj, std::vector<char>& buffer) {
+    obj.serialize(buffer);
+}
+template <> inline void deserialize(State& obj, const std::vector<char>& buffer){
+    obj.deserialize(buffer);
+}
+
+}
+}
 
 #endif // __FISH_DEFORMATION_STATE__
