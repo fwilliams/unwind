@@ -90,7 +90,7 @@ bool Initial_File_Selection_Menu::post_draw() {
     }
 
     ImGui::SetNextTreeNodeOpen(show_new_scan_menu);
-    if (ImGui::CollapsingHeader("Load New Scan")) {
+    if (ImGui::CollapsingHeader("Create New Project")) {
         show_new_scan_menu = true;
         ImGui::Text("First Scan Image:");
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
