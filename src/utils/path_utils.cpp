@@ -37,14 +37,35 @@ int mkpath(const char* cpath, mode_t mode) {
   return 0;
 }
 
-std::pair<std::string, std::string> DatFile::dir_and_base_name(const char* name) {
+std::pair<std::string, std::string> dir_and_base_name(const char* name) {
     std::string filename = std::string(name);
     std::string::size_type separator = filename.rfind('\\');
     if (separator != std::string::npos) {
         return { filename.substr(0, separator), filename.substr(separator + 1) };
     }
     else {
-        return { filename, filename };
+        separator = filename.rfind('/');
+        if (separator != std::string::npos) {
+            return { filename.substr(0, separator), filename.substr(separator + 1) };
+        } else {
+            return { filename, filename };
+        }
+    }
+}
+
+FileType get_file_type(const char* path) {
+    struct stat stat_buf;
+    int retval = stat(path, &stat_buf);
+    if (retval != 0 && errno == ENOENT) {
+        return FT_DOES_NOT_EXIST;
+    } else if (retval != 0) {
+        return FT_ERROR;
+    } else if (S_ISDIR(stat_buf.st_mode)) {
+        return FT_DIRECTORY;
+    } else if (S_ISREG(stat_buf.st_mode)) {
+        return FT_REGULAR_FILE;
+    } else {
+        return FT_OTHER;
     }
 }
 #else
@@ -100,15 +121,15 @@ FileType get_file_type(const char* path) {
     struct stat stat_buf;
     int retval = stat(path, &stat_buf);
     if (retval != 0 && errno == ENOENT) {
-        return DOES_NOT_EXIST;
+        return FT_DOES_NOT_EXIST;
     } else if (retval != 0) {
-        return ERROR;
+        return FT_ERROR;
     } else if (S_ISDIR(stat_buf.st_mode)) {
-        return DIRECTORY;
+        return FT_DIRECTORY;
     } else if (S_ISREG(stat_buf.st_mode)) {
-        return REGULAR_FILE;
+        return FT_REGULAR_FILE;
     } else {
-        return OTHER;
+        return FT_OTHER;
     }
 }
 
