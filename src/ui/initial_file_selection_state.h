@@ -20,15 +20,15 @@ private:
     State& _state;
 
 #ifdef WIN32
-    static constexpr int BufferSize = 4*4096;
+    static constexpr int PATH_BUFFER_SIZE = 4*4096;
 #else
-    static const int BUFFER_SIZE = 4*PATH_MAX;
+    static const int PATH_BUFFER_SIZE = 4*PATH_MAX;
 #endif
 
-    char output_dir_path_buf[BUFFER_SIZE];
-    char first_image_path_buf[BUFFER_SIZE] = {};
-    char last_image_path_buf[BUFFER_SIZE] = {};
-    char existing_project_path_buf[BUFFER_SIZE] = {};
+    char output_dir_path_buf[PATH_BUFFER_SIZE];
+    char first_image_path_buf[PATH_BUFFER_SIZE] = {};
+    char last_image_path_buf[PATH_BUFFER_SIZE] = {};
+    char existing_project_path_buf[PATH_BUFFER_SIZE] = {};
 
     bool show_error_popup = false;
     std::string error_message;

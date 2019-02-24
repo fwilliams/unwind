@@ -94,7 +94,7 @@ bool Initial_File_Selection_Menu::post_draw() {
         show_new_scan_menu = true;
         ImGui::Text("First Scan Image:");
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
-        if (ImGui::InputText("##First Scan", first_image_path_buf, BUFFER_SIZE)) {
+        if (ImGui::InputText("##First Scan", first_image_path_buf, PATH_BUFFER_SIZE)) {
             _state.dirty_flags.file_loading_dirty = true;
             fix_path(first_image_path_buf);
         }
@@ -115,7 +115,7 @@ bool Initial_File_Selection_Menu::post_draw() {
         ImGui::Spacing();
         ImGui::Text("Last Scan Image");
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
-        if (ImGui::InputText("##Last Scan", last_image_path_buf, BUFFER_SIZE)) {
+        if (ImGui::InputText("##Last Scan", last_image_path_buf, PATH_BUFFER_SIZE)) {
             _state.dirty_flags.file_loading_dirty = true;
             fix_path(last_image_path_buf);
         }
@@ -135,7 +135,7 @@ bool Initial_File_Selection_Menu::post_draw() {
 
         ImGui::Text("Output Folder:");
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
-        if (ImGui::InputText("##Output Folder", output_dir_path_buf, BUFFER_SIZE)) {
+        if (ImGui::InputText("##Output Folder", output_dir_path_buf, PATH_BUFFER_SIZE)) {
             _state.dirty_flags.file_loading_dirty = true;
             fix_path(output_dir_path_buf);
         }
@@ -175,7 +175,7 @@ bool Initial_File_Selection_Menu::post_draw() {
         ImGui::Spacing();
         ImGui::Text("Existing Project File:");
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
-        if (ImGui::InputText("##Existing Project", existing_project_path_buf, BUFFER_SIZE)) {
+        if (ImGui::InputText("##Existing Project", existing_project_path_buf, PATH_BUFFER_SIZE)) {
             _state.dirty_flags.file_loading_dirty = true;
             fix_path(existing_project_path_buf);
         }
