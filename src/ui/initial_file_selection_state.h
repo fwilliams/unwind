@@ -20,22 +20,17 @@ private:
     State& _state;
 
 #ifdef WIN32
-    static constexpr int BufferSize = 4096;
+    static constexpr int BufferSize = 4*4096;
 #else
-    static const int BufferSize = PATH_MAX;
+    static const int BufferSize = 4*PATH_MAX;
 #endif
 
-    struct {
-        char folder_name[BufferSize] = {};
-        char file_prefix[BufferSize] = {};
-        char extension[BufferSize] = {};
-        int start_index = 0;
-        int end_index = 0;
-        char output_folder[BufferSize] = {};
-        char output_prefix[BufferSize] = {};
-        int downsample_factor = 4;
-        bool write_original = true;
-    } ui;
+    char output_dir_path_buf[BufferSize];
+    char first_image_path_buf[BufferSize] = {};
+    char last_image_path_buf[BufferSize] = {};
+
+    bool show_error_popup = false;
+    std::string error_message;
 
     bool load_textures_slice_by_slice = false;
     int loading_progress = -1;
@@ -44,6 +39,8 @@ private:
     std::atomic_bool done_loading;
     std::atomic_bool is_loading;
     std::thread loading_thread;
+
+    bool process_new_project_form();
 };
 
 #endif // __FISH_DEFORMATION_INITIAL_FILE_SELECTION_STATE__

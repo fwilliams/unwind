@@ -1,4 +1,4 @@
-#include "mkpath.h"
+#include "path_utils.h"
 
 #include <errno.h>
 #ifdef HAVE_UNISTD_H
@@ -36,9 +36,22 @@ int mkpath(const char* cpath, mode_t mode) {
 
   return 0;
 }
+
+std::pair<std::string, std::string> DatFile::dir_and_base_name(const char* name) {
+    std::string filename = std::string(name);
+    std::string::size_type separator = filename.rfind('\\');
+    if (separator != std::string::npos) {
+        return { filename.substr(0, separator), filename.substr(separator + 1) };
+    }
+    else {
+        return { filename, filename };
+    }
+}
 #else
 
 #include <string.h>
+#include <libgen.h>
+#include <limits.h>
 
 static int do_mkdir(const char *path, mode_t mode) {
   typedef struct stat Stat;
@@ -83,4 +96,40 @@ int mkpath(const char *path, mode_t mode) {
   return (status);
 }
 
+FileType get_file_type(const char* path) {
+    struct stat stat_buf;
+    int retval = stat(path, &stat_buf);
+    if (retval != 0 && errno == ENOENT) {
+        return DOES_NOT_EXIST;
+    } else if (retval != 0) {
+        return ERROR;
+    } else if (S_ISDIR(stat_buf.st_mode)) {
+        return DIRECTORY;
+    } else if (S_ISREG(stat_buf.st_mode)) {
+        return REGULAR_FILE;
+    } else {
+        return OTHER;
+    }
+}
+
+
+std::pair<std::string, std::string> dir_and_base_name(const char* name) {
+    char* full_path = realpath(name, NULL);
+    char* full_path_dup = strdup(full_path);
+
+    char* dir_name_1 = dirname(full_path);
+    char* base_name_1 = basename(full_path_dup);
+
+    char dir_name[PATH_MAX*4];
+    strcpy(dir_name, dir_name_1);
+
+    char base_name[PATH_MAX*4];
+    strcpy(base_name, base_name_1);
+
+    std::string ret1, ret2;
+    ret1.assign(dir_name);
+    ret2.assign(base_name);
+
+    return std::make_pair(ret1, ret2);
+}
 #endif

@@ -98,6 +98,31 @@ struct State {
         }
     } segmented_features;
 
+    struct ImageInput {
+        std::string input_dir;
+        std::string output_dir;
+        std::string file_extension;
+        std::string prefix;
+
+        int downsample_factor = 8;
+        int start_index;
+        int end_index;
+
+        std::string full_res_prefix() {
+            std::string str = prefix + std::string("-") + std::to_string(start_index) + std::string("-") + std::to_string(end_index);
+            return str;
+        }
+
+        std::string low_res_prefix() {
+            std::string str = prefix + std::string("-") + std::to_string(start_index) + std::string("-") + std::to_string(end_index) + std::string("-") + std::to_string(downsample_factor);
+            return str;
+        }
+
+        std::string low_res_path_prefx() {
+            return output_dir + "/" + low_res_prefix();
+        }
+    } input_metadata;
+
     // Output of the dilation and tetrahedralization
     struct DilatedTetMesh {
         Eigen::MatrixXd TV;
@@ -133,24 +158,52 @@ struct State {
         std::vector<std::pair<int, int>> endpoint_pairs;
     } skeleton_estimation_parameters;
 
-    struct CTState {
-        std::string data_directory;
-        std::string name_prefix;
-        int start_index;
-        int end_index;
-        int downsample_factor;
 
-        std::string getFullResolutionPrefix() {
-            std::string str = name_prefix + std::string("-") + std::to_string(start_index) + std::string("-") + std::to_string(end_index);
-            return str;
-        }
 
-        std::string getLowResolutionPrefix() {
-            std::string str = name_prefix + std::string("-") + std::to_string(start_index) + std::string("-") + std::to_string(end_index) + std::string("-") + std::to_string(downsample_factor);
-            return str;
-        }
-    } ct_state;
+    void preprocess_lowres_volume_texture(std::vector<uint8_t>& byte_data) {
+        // Pre-load and normalize data for the low res volume GL texture
+        const Eigen::RowVector3i volume_dims = low_res_volume.dims();
+        const int size = volume_dims[0]*volume_dims[1]*volume_dims[2];
+        byte_data.clear();
+        byte_data.resize(size);
+        const double min_value = low_res_volume.min_value;
+        const double value_range = low_res_volume.max_value - low_res_volume.min_value;
+        float* texture_data = low_res_volume.volume_data.data();
+        std::transform(
+            texture_data,
+            texture_data + size,
+            byte_data.begin(),
+            [min_value, value_range](double d) {
+                return static_cast<uint8_t>(((d - min_value)/value_range) * std::numeric_limits<uint8_t>::max());
+            }
+        );
 
+    }
+
+    void load_data_from_filesystem() {
+
+        // Load the low-res volume data
+        low_res_volume.metadata = DatFile(input_metadata.low_res_path_prefx() + ".dat", logger);
+        load_rawfile(input_metadata.low_res_path_prefx() + ".raw", low_res_volume.dims(),
+                     low_res_volume.volume_data, logger, true /* normalize */);
+        low_res_volume.max_value = low_res_volume.volume_data.maxCoeff();
+        low_res_volume.min_value = low_res_volume.volume_data.minCoeff();
+
+        // Compute the topological features
+        Eigen::Vector3i lrv = low_res_volume.dims();
+        preProcessing(input_metadata.low_res_path_prefx(), lrv[0], lrv[1], lrv[2]);
+        segmented_features.topological_features.loadData(input_metadata.low_res_path_prefx());
+        segmented_features.recompute_feature_map();
+
+        // Load the low-res index data
+        const size_t num_bytes = low_res_volume.num_voxels() * sizeof(uint32_t);
+        std::ifstream file;
+        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        file.open(input_metadata.low_res_path_prefx() + ".part.raw", std::ifstream::binary);
+        typedef decltype(low_res_volume.index_data) IndexType;
+        low_res_volume.index_data.resize(num_bytes / sizeof(IndexType::Scalar));
+        file.read(reinterpret_cast<char*>(low_res_volume.index_data.data()), num_bytes);
+    }
 
     BoundingCage cage;
 };

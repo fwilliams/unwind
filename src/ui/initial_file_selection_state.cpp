@@ -5,35 +5,11 @@
 
 #include <imgui/imgui.h>
 #include <GLFW/glfw3.h>
-#include <utils/mkpath.h>
+#include <utils/path_utils.h>
+#include <utils/open_file_dialog.h>
+#include <imgui/imgui_internal.h>
 
-Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(state) {
-#ifdef WIN32
-    strcpy(ui.folder_name, "C:/Users/harishd/Desktop/Projects/Fish/data/Plagiotremus-tapinosoma");
-    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
-    strcpy(ui.extension, "bmp");
-    ui.start_index = 2;
-    ui.end_index = 1798;
-    strcpy(ui.output_folder, "C:/Users/harishd/Desktop/Projects/Fish/data/Plagiotremus-tapinosoma-output");
-    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
-#else
-    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
-    strcpy(ui.file_prefix, "Sternopygus_arenatus_72um_1k"); //Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
-    strcpy(ui.extension, "bmp");
-    ui.start_index = 45; //2;
-    ui.end_index = 2534.;
-    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Sternopygus_arenatus/output"); //Plaagiotremus_tapinosoma/output");
-    strcpy(ui.output_prefix, "Sternopygus_arenatus"); //Plaagiotremus_tapinosoma");
-
-//    strcpy(ui.folder_name, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma");
-//    strcpy(ui.file_prefix, "Plaagiotremus_tapinosoma_9.9um_2k__rec_Tra");
-//    strcpy(ui.extension, "bmp");
-//    ui.start_index = 2;
-//    ui.end_index = 1798;
-//    strcpy(ui.output_folder, "/home/francis/projects/fish_deformation/data/Plaagiotremus_tapinosoma/output");
-//    strcpy(ui.output_prefix, "Plaagiotremus_tapinosoma");
-#endif
-}
+Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(state) {}
 
 void Initial_File_Selection_Menu::initialize() {
     _state.logger->debug("Initializing File Selection View");
@@ -56,6 +32,18 @@ bool Initial_File_Selection_Menu::post_draw() {
     ImGui::Begin("Load a fish!", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
+
+    if (show_error_popup) {
+        ImGui::OpenPopup("Invalid Selection");
+        ImGui::BeginPopupModal("Invalid Selection");
+        ImGui::Text("%s", error_message.c_str());
+        ImGui::NewLine();
+        ImGui::Separator();
+        if (ImGui::Button("OK")) {
+            show_error_popup = false;
+        }
+        ImGui::EndPopup();
+    }
 
     if (is_loading) {
         ImGui::OpenPopup("Loading CT Scan");
@@ -145,94 +133,82 @@ bool Initial_File_Selection_Menu::post_draw() {
             loading_progress += 1;
         }
     }
+
+    ImGui::Text("Load New Scan:");
+    ImGui::Separator();
+
+    ImGui::Text("First Scan Image:");
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
-    if (ImGui::InputText("Folder Name", ui.folder_name, BufferSize)) {
+    if (ImGui::InputText("##First Scan", first_image_path_buf, BufferSize)) {
         _state.dirty_flags.file_loading_dirty = true;
     }
-    if (ImGui::InputText("File Prefix", ui.file_prefix, BufferSize)) {
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+    if (ImGui::Button("Select##FirstScan")) {
+        std::string first_scan = open_image_file_dialog();
+        strcpy(first_image_path_buf, first_scan.c_str());
+        _state.dirty_flags.file_loading_dirty = true;
+        _state.logger->trace("First image {}", first_image_path_buf);
+    }
+
+
+    ImGui::Spacing();
+    ImGui::Text("Last Scan Image");
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
+    if (ImGui::InputText("##Last Scan", last_image_path_buf, BufferSize)) {
         _state.dirty_flags.file_loading_dirty = true;
     }
-    if (ImGui::InputText("File extensions", ui.extension, BufferSize)) {
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+    if (ImGui::Button("Select##LastScan")) {
+        std::string last_scan = open_image_file_dialog();
+        strcpy(last_image_path_buf, last_scan.c_str());
+        _state.dirty_flags.file_loading_dirty = true;
+        _state.logger->trace("Last image {}", last_image_path_buf);
+    }
+
+
+    ImGui::Text("Output Folder:");
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
+    if (ImGui::InputText("##Output Folder", output_dir_path_buf, BufferSize)) {
         _state.dirty_flags.file_loading_dirty = true;
     }
-    if (ImGui::InputInt("Start Index", &ui.start_index)) {
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+    if (ImGui::Button("Select##Outfolder")) {
+        std::string folder = open_folder_dialog();
+        folder = folder + "/";
+        strcpy(output_dir_path_buf, folder.c_str());
         _state.dirty_flags.file_loading_dirty = true;
+        _state.logger->trace("Selected output folder {}", output_dir_path_buf);
     }
-    if (ImGui::InputInt("End Index", &ui.end_index)) {
-        _state.dirty_flags.file_loading_dirty = true;
-    }
-    if (ImGui::InputText("Output Folder", ui.output_folder, BufferSize)) {
-        _state.dirty_flags.file_loading_dirty = true;
-    }
-    if (ImGui::InputText("Output Prefix", ui.output_prefix, BufferSize)) {
-        _state.dirty_flags.file_loading_dirty = true;
-    }
-    if (ImGui::InputInt("Downsample Factor", &ui.downsample_factor)) {
-        _state.dirty_flags.file_loading_dirty = true;
-    }
-    if (ImGui::Checkbox("Write Original", &ui.write_original)) {
+    ImGui::PopItemWidth();
+
+
+    ImGui::Spacing();
+    ImGui::Text("Downsampling Factor:");
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
+    if (ImGui::InputInt("##Downsample Factor", &_state.input_metadata.downsample_factor)) {
         _state.dirty_flags.file_loading_dirty = true;
     }
     ImGui::PopItemWidth();
 
     ImGui::NewLine();
     ImGui::Separator();
+
+    size_t first_len = std::string(first_image_path_buf).size();
+    size_t last_len = std::string(last_image_path_buf).size();
+    size_t output_len = std::string(output_dir_path_buf).size();\
+    bool next_disabled = false;
+    if (first_len == 0 || last_len == 0 || output_len == 0) {
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+        next_disabled = true;
+    }
     if (ImGui::Button("Next")) {
-        auto thread_fun = [&]() {
-            // TODO hack for creating state
-            _state.ct_state.data_directory = ui.output_folder;
-            _state.ct_state.downsample_factor = ui.downsample_factor;
-            _state.ct_state.start_index = ui.start_index;
-            _state.ct_state.end_index = ui.end_index;
-            _state.ct_state.name_prefix = ui.file_prefix;
-
-            mkpath(ui.output_folder, 0777 /* mode */);
-
-            std::string volume_output_files_prefix = std::string(ui.output_folder) + '/' + _state.ct_state.getLowResolutionPrefix();
-
-            SamplingOutput op = ImageData::writeOutput(ui.folder_name, ui.file_prefix,
-                ui.start_index, ui.end_index, ui.extension, ui.output_folder,
-                _state.ct_state.getFullResolutionPrefix(), _state.ct_state.getLowResolutionPrefix(), ui.downsample_factor, ui.write_original);
-            preProcessing(op.fileName, op.x, op.y, op.z);
-            _state.segmented_features.topological_features.loadData(volume_output_files_prefix);
-            _state.segmented_features.recompute_feature_map();
-
-            // Load the low-res volume data
-            _state.low_res_volume.metadata = DatFile(volume_output_files_prefix + ".dat", _state.logger);
-            load_rawfile(volume_output_files_prefix+ ".raw", _state.low_res_volume.dims(), _state.low_res_volume.volume_data, _state.logger, true /* normalize */);
-            _state.low_res_volume.max_value = _state.low_res_volume.volume_data.maxCoeff();
-            _state.low_res_volume.min_value = _state.low_res_volume.volume_data.minCoeff();
-
-            // Load the low-res index data
-            const size_t num_bytes = _state.low_res_volume.num_voxels() * sizeof(uint32_t);
-            std::ifstream file;
-            file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-            file.open(volume_output_files_prefix + ".part.raw", std::ifstream::binary);
-            typedef decltype(_state.low_res_volume.index_data) IndexType;
-            _state.low_res_volume.index_data.resize(num_bytes / sizeof(IndexType::Scalar));
-            file.read(reinterpret_cast<char*>(_state.low_res_volume.index_data.data()), num_bytes);
-
-            // Pre-load and normalize data for the volume GL texture
-            const Eigen::RowVector3i volume_dims = _state.low_res_volume.dims();
-            const int size = volume_dims[0]*volume_dims[1]*volume_dims[2];
-            byte_data.clear();
-            byte_data.resize(size);
-            const double min_value = _state.low_res_volume.min_value;
-            const double value_range = _state.low_res_volume.max_value - _state.low_res_volume.min_value;
-            float* texture_data = _state.low_res_volume.volume_data.data();
-            std::transform(
-                texture_data,
-                texture_data + size,
-                byte_data.begin(),
-                [min_value, value_range](double d) {
-                    return static_cast<uint8_t>(((d - min_value)/value_range) * std::numeric_limits<uint8_t>::max());
-                }
-            );
-
-            done_loading = true;
-            loading_progress = -1;
-            glfwPostEmptyEvent();
-        };
 
         if (!_state.dirty_flags.file_loading_dirty) {
             is_loading = false;
@@ -243,13 +219,124 @@ bool Initial_File_Selection_Menu::post_draw() {
             return ret;
         }
 
+        auto thread_fun = [&]() {
+            mkpath(_state.input_metadata.output_dir.c_str(), 0777 /* mode */);
+            ImageData::writeOutput(_state.input_metadata.input_dir, _state.input_metadata.prefix,
+                                   _state.input_metadata.start_index, _state.input_metadata.end_index,
+                                   _state.input_metadata.file_extension, _state.input_metadata.output_dir,
+                                   _state.input_metadata.full_res_prefix(),
+                                   _state.input_metadata.low_res_prefix(),
+                                   _state.input_metadata.downsample_factor,
+                                   true /* write_original */);
+            _state.load_data_from_filesystem();
+            _state.preprocess_lowres_volume_texture(byte_data);
+
+            done_loading = true;
+            loading_progress = -1;
+            glfwPostEmptyEvent();
+        };
+
+        if (!process_new_project_form()) {
+            ImGui::End();
+            ImGui::Render();
+            return ret;
+        }
+
         is_loading = true;
         done_loading = false;
         loading_thread = std::thread(thread_fun);
         loading_thread.detach();
     }
-
+    if (next_disabled) {
+        ImGui::PopItemFlag();
+        ImGui::PopStyleVar();
+    }
     ImGui::End();
     ImGui::Render();
     return ret;
+}
+
+bool Initial_File_Selection_Menu::process_new_project_form() {
+
+    if (get_file_type(first_image_path_buf) != REGULAR_FILE) {
+        show_error_popup = true;
+        error_message = "Error: First image is not a valid file.";
+        return false;
+    }
+    if (get_file_type(last_image_path_buf) != REGULAR_FILE) {
+        show_error_popup = true;
+        error_message = "Error: Last image is not a valid file.";
+        return false;
+    }
+
+    const std::pair<std::string, std::string> first_path = dir_and_base_name(first_image_path_buf);
+    const std::pair<std::string, std::string> last_path = dir_and_base_name(last_image_path_buf);
+    if (first_path.first != last_path.first) {
+        show_error_popup = true;
+        error_message = "Error: Invalid scan images. The first and last images must be in the same directory.";
+        return false;
+    }
+    const std::string directory = first_path.first;
+    _state.logger->trace("Directories are {} {}", first_path.first, last_path.first);
+
+    int prefix_end_idx = 0;
+    const std::string first_file = first_path.second;
+    const std::string last_file = last_path.second;
+    for (prefix_end_idx = 0; prefix_end_idx < std::min(first_file.size(), last_file.size()); prefix_end_idx++) {
+        if (first_file[prefix_end_idx] != last_file[prefix_end_idx]) {
+            break;
+        }
+    }
+    if (prefix_end_idx == 0) {
+        show_error_popup = true;
+        error_message = "Error: Invalid scan images.";
+        return false;
+    }
+    const std::string prefix = first_file.substr(0, prefix_end_idx);
+    _state.logger->trace("Prefix is {}", prefix);
+
+
+    const std::string first_extension = first_file.substr(first_file.find_last_of(".") + 1);
+    const std::string last_extension = last_file.substr(last_file.find_last_of(".") + 1);
+    if (first_extension != last_extension) {
+        show_error_popup = true;
+        error_message = "Error: First and last scan images do not have the same file extension";
+        return false;
+    }
+    const std::string file_extension = first_extension;
+    _state.logger->trace("File extension is {}", file_extension);
+
+    int start_index = prefix.size();
+    int first_end_index = first_file.find_last_of(".");
+    int last_end_index = last_file.find_last_of(".");
+
+    std::string first_index_str = first_file.substr(start_index, first_end_index-start_index);
+    std::string last_index_str = last_file.substr(start_index, last_end_index-start_index);
+
+    int first_index = -1, last_index = -1;
+    try {
+        first_index = std::stoi(first_index_str);
+        last_index = std::stoi(last_index_str);
+    } catch(std::invalid_argument) {
+        show_error_popup = true;
+        error_message = "Error: Invalid scan image pair must be of the form <prefix><number>.<extension>.";
+        return false;
+    }
+
+    if (last_index < first_index) {
+        int swap_index = last_index;
+        last_index = first_index;
+        first_index = swap_index;
+        _state.logger->info("First and last index order out of order. Swapping them.");
+    }
+    _state.logger->trace("Range {} {}", first_index, last_index);
+
+    _state.input_metadata.input_dir = directory;
+    _state.input_metadata.output_dir = std::string(output_dir_path_buf);
+    _state.logger->trace("Output directory is {}", _state.input_metadata.output_dir);
+    _state.input_metadata.file_extension = file_extension;
+    _state.input_metadata.prefix = prefix;
+    _state.input_metadata.start_index = first_index;
+    _state.input_metadata.end_index = last_index;
+    return true;
 }
