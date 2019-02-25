@@ -129,7 +129,7 @@ void load_tet_file(const std::string& tet, Eigen::MatrixXd& TV, Eigen::MatrixXi&
 }
 
 bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, Eigen::VectorXf& out, std::shared_ptr<spdlog::logger> logger, bool normalize) {
-    const size_t num_bytes = dims[0] * dims[1] * dims[2];
+    const size_t num_bytes = (size_t)(dims[0]) * (size_t)(dims[1]) * (size_t)(dims[2]);
 
     char* data = new char[num_bytes];
     std::ifstream rawfile(rawfilename, std::ifstream::binary);
@@ -155,6 +155,37 @@ bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims
         }
     }
 
+    return true;
+}
+
+bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims, std::vector<uint8_t> &out, std::shared_ptr<spdlog::logger> logger) {
+    const size_t num_bytes = (size_t)(dims[0]) * (size_t)(dims[1]) * (size_t)(dims[2]);
+
+    logger->trace("allocating {} bytes", num_bytes);
+    char* data = new char[num_bytes];
+    logger->trace("Allocated {} bytes", num_bytes);
+
+    std::ifstream rawfile(rawfilename, std::ifstream::binary);
+    if (!rawfile.good()) {
+        logger->error("RawFile '{}' does not exist.", rawfilename);
+        return false;
+    }
+
+    logger->trace("About to read {} bytes", num_bytes);
+    rawfile.read(data, num_bytes);
+    if (!rawfile) {
+        logger->error("Only read {} bytes from RawFile '{}', but expected to read {} bytes.", rawfile.gcount(), rawfilename, num_bytes);
+        return false;
+    }
+    rawfile.close();
+    logger->trace("read {} bytes", num_bytes);
+
+    logger->trace("Resizing output");
+    out.resize(num_bytes);
+    for (int i = 0; i < num_bytes; i++) {
+        out[i] = data[i];
+    }
+    logger->trace("Copied output");
     return true;
 }
 

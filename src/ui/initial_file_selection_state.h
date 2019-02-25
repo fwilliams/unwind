@@ -35,7 +35,8 @@ private:
 
     bool show_new_scan_menu = true;
 
-    std::vector<uint8_t> byte_data;
+    std::vector<uint8_t> low_res_byte_data;
+    std::vector<uint8_t> high_res_byte_data;
     std::atomic_bool done_loading;
     std::atomic_bool is_loading;
     std::thread loading_thread;

@@ -64,19 +64,26 @@ bool Initial_File_Selection_Menu::post_draw() {
         ImGui::EndPopup();
 
         if (done_loading) {
-            const Eigen::RowVector3i volume_dims = _state.low_res_volume.dims();
-
             // Volume texture
             if (_state.low_res_volume.volume_texture == 0) {
                 _state.logger->debug("Creating low resolution volume texture...");
                 glGenTextures(1, &_state.low_res_volume.volume_texture);
             }
-
             _state.logger->debug("Creating low resolution volume texture...");
-            _state.low_res_volume.load_gl_volume_texture(byte_data);
+            _state.low_res_volume.load_gl_volume_texture(low_res_byte_data);
 
             _state.logger->debug("Creating low resolution index texture...");
             _state.low_res_volume.load_gl_index_texture();
+
+            if (_state.hi_res_volume.volume_texture == 0) {
+                _state.logger->debug("Creating high resolution volume texture...");
+                glGenTextures(1, &_state.hi_res_volume.volume_texture);
+            }
+            _state.logger->debug("Creating high resolution volume texture...");
+            _state.hi_res_volume.load_gl_volume_texture(high_res_byte_data);
+
+            low_res_byte_data.clear();
+            high_res_byte_data.clear();
 
             is_loading = false;
             done_loading = false;
@@ -260,8 +267,11 @@ bool Initial_File_Selection_Menu::post_draw() {
                 _state.input_metadata.file_extension = "";
             }
 
-            _state.load_volume_data(_state.low_res_volume, true /* load topological features */);
-             _state.low_res_volume.preprocess_volume_texture(byte_data);
+            _state.load_volume_data(_state.low_res_volume, _state.input_metadata.low_res_prefix(), true /* load topological features */);
+            _state.low_res_volume.preprocess_volume_texture(low_res_byte_data);
+
+            _state.hi_res_volume.metadata = DatFile(_state.input_metadata.full_res_path_prefix() + ".dat", _state.logger);
+            load_rawfile(_state.input_metadata.full_res_path_prefix() + ".raw", _state.hi_res_volume.dims(), high_res_byte_data, _state.logger);
 
              if (!show_new_scan_menu) {
                  _state.segmented_features.selected_features = selected_features_backup;

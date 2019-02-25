@@ -37,11 +37,12 @@ void State::LoadedVolume::preprocess_volume_texture(std::vector<uint8_t>& byte_d
 }
 
 
-void State::load_volume_data(State::LoadedVolume& volume, bool load_topology) {
+void State::load_volume_data(State::LoadedVolume& volume, std::string prefix, bool load_topology) {
+    std::string prefix_with_path = input_metadata.output_dir + "/" + prefix;
 
-    // Load the low-res volume data
-    volume.metadata = DatFile(input_metadata.low_res_path_prefx() + ".dat", logger);
-    load_rawfile(input_metadata.low_res_path_prefx() + ".raw", volume.dims(),
+    // Load the volume data
+    volume.metadata = DatFile(prefix_with_path + ".dat", logger);
+    load_rawfile(prefix_with_path + ".raw", volume.dims(),
                  volume.volume_data, logger, true /* normalize */);
     volume.max_value = volume.volume_data.maxCoeff();
     volume.min_value = volume.volume_data.minCoeff();
@@ -49,15 +50,15 @@ void State::load_volume_data(State::LoadedVolume& volume, bool load_topology) {
     if (load_topology) {
         // Compute the topological features
         Eigen::Vector3i lrv = volume.dims();
-        preProcessing(input_metadata.low_res_path_prefx(), lrv[0], lrv[1], lrv[2]);
-        segmented_features.topological_features.loadData(input_metadata.low_res_path_prefx());
+        preProcessing(prefix_with_path, lrv[0], lrv[1], lrv[2]);
+        segmented_features.topological_features.loadData(prefix_with_path);
         segmented_features.recompute_feature_map();
 
         // Load the low-res index data
         const size_t num_bytes = volume.num_voxels() * sizeof(uint32_t);
         std::ifstream file;
         file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-        file.open(input_metadata.low_res_path_prefx() + ".part.raw", std::ifstream::binary);
+        file.open(prefix_with_path + ".part.raw", std::ifstream::binary);
         typedef decltype(volume.index_data) IndexType;
         volume.index_data.resize(num_bytes / sizeof(IndexType::Scalar));
         file.read(reinterpret_cast<char*>(volume.index_data.data()), num_bytes);

@@ -117,6 +117,11 @@ struct State {
         std::string low_res_path_prefx() {
             return output_dir + "/" + low_res_prefix();
         }
+
+        std::string full_res_path_prefix() {
+            return output_dir + "/" + full_res_prefix();
+        }
+
     } input_metadata;
 
     // Output of the dilation and tetrahedralization
@@ -156,7 +161,7 @@ struct State {
 
 
 
-    void load_volume_data(LoadedVolume& volume, bool load_topology);
+    void load_volume_data(LoadedVolume& volume, std::string prefix, bool load_topology);
 
     BoundingCage cage;
 
