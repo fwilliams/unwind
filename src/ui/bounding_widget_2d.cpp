@@ -592,7 +592,8 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
         glUniform3fv(plane.ur_location, 1, glm::value_ptr(ur));
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_3D, state.low_res_volume.volume_texture);
+        GLuint tex = parent->use_hires_texture ? state.hi_res_volume.volume_texture : state.low_res_volume.volume_texture;
+        glBindTexture(GL_TEXTURE_3D, tex);
         glUniform1i(plane.texture_location, 0);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);

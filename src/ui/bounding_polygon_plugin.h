@@ -31,8 +31,8 @@ public:
     bool cage_dirty = true;
 
     VolumeExporter exporter;
-    VolumeExporter final_exporter;
 
+    bool use_hires_texture = true;
 private:
 
     void center_bounding_cage_mesh();

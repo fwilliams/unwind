@@ -40,7 +40,6 @@ void Bounding_Polygon_Menu::initialize() {
     widget_3d.volume_renderer.set_transfer_function(tf_widget.transfer_function());
 
     exporter.init(128, 128, 1024);
-    final_exporter.init(0, 0, 0);
 
     state.logger->trace("Done initializing bounding polygon plugin!");
 
@@ -125,7 +124,8 @@ bool Bounding_Polygon_Menu::post_draw() {
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         exporter.set_export_dims(width, height, depth);
-        exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
+        GLuint tex = use_hires_texture ? state.hi_res_volume.volume_texture : state.low_res_volume.volume_texture;
+        exporter.update(state.cage, tex, G3i(state.low_res_volume.dims()));
 
         glBindTexture(GL_TEXTURE_3D, state.low_res_volume.volume_texture);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, old_min_filter);
@@ -257,20 +257,25 @@ bool Bounding_Polygon_Menu::post_draw() {
 
     ImGui::Separator();
     ImGui::Text("Display Options");
-    if (ImGui::Checkbox("Show straight view", &draw_straight)) {
+    if (ImGui::Checkbox("Show Straight View", &draw_straight)) {
         if (draw_straight) {
             widget_3d.center_straight_mesh();
         } else {
             widget_3d.center_bounding_cage_mesh();
         }
     }
-
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Show Hi-Res Texture", &use_hires_texture)) {
+        cage_dirty = true;
+    }
+    ImGui::SameLine();
     bool pushed_disabled_style = false;
     if (show_edit_transfer_function) {
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
         pushed_disabled_style = true;
     }
+
     if (ImGui::Button("Edit Transfer Function")) {
         show_edit_transfer_function = true;
     }
@@ -278,6 +283,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         ImGui::PopItemFlag();
         ImGui::PopStyleVar();
     }
+    ImGui::SameLine();
     if (ImGui::Button("Center View")) {
         if (draw_straight) {
             widget_3d.center_straight_mesh();
@@ -475,41 +481,22 @@ bool Bounding_Polygon_Menu::post_draw() {
 
 
             {
-                double depth = 0, width, height;
-                Eigen::RowVector3d last_centroid = state.cage.keyframes.begin()->centroid_3d();
-                for (const BoundingCage::KeyFrame& kf : state.cage.keyframes) {
-                    depth += (kf.centroid_3d() - last_centroid).norm();
-                    last_centroid = kf.centroid_3d();
-                }
-                depth = round(depth) * widget_3d.export_rescale_factor;
-
-                Eigen::RowVector4d cage_bbox = state.cage.keyframe_bounding_box();
-                width = std::max(round(fabs(cage_bbox[1] - cage_bbox[0])), 1.0) * widget_3d.export_rescale_factor;
-                height = std::max(round(fabs(cage_bbox[3] - cage_bbox[2])), 1.0) * widget_3d.export_rescale_factor;
-
-                glBindTexture(GL_TEXTURE_3D, state.low_res_volume.volume_texture);
+                glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
                 GLint old_min_filter, old_mag_filter;
                 glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_min_filter);
                 glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_mag_filter);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glBindTexture(GL_TEXTURE_3D, 0);
-                state.logger->trace("EXPORT: {} {} {}", 128, 128, 1024);
-//                final_exporter.set_export_dims(128, 128, 1024);
-//                final_exporter.update(state.cage, state.low_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
+                exporter.set_export_dims(output_dims[0], output_dims[1], output_dims[2]);
+                exporter.update(state.cage, state.hi_res_volume.volume_texture, G3f(state.low_res_volume.dims()));
                 exporter.write_texture_data_to_file(save_rawfile_path);
-                state.logger->trace("DONE EXPORT: {} {} {}", width, height, depth);
-                glBindTexture(GL_TEXTURE_3D, state.low_res_volume.volume_texture);
+                cage_dirty = true;
+                glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, old_min_filter);
                 glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, old_mag_filter);
                 glBindTexture(GL_TEXTURE_3D, 0);
             }
-//            state.logger->trace("Resizing export texture to {}x{}x{}", output_dims[0], output_dims[1], output_dims[2]);
-//            final_exporter.set_export_dims(output_dims[0], output_dims[1], output_dims[2]);
-//            state.logger->trace("Rendering export texture");
-//            final_exporter.update(state.cage, state.hi_res_volume.volume_texture, G3i(state.low_res_volume.dims()));
-//            state.logger->trace("Writing rawfile");
-//            final_exporter.write_texture_data_to_file(save_rawfile_path);
 
             show_save_popup = false;
             output_dims[0] = -1;

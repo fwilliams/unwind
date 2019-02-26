@@ -70,23 +70,19 @@ void VolumeExporter::write_texture_data_to_file(std::string filename) {
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Export");
     const size_t num_voxels = size_t(w)*size_t(h)*size_t(d);
     std::vector<std::uint8_t> out_data;
-    out_data.resize(num_voxels);
+    out_data.resize(num_voxels*4);
 
-    GLint a_w, a_h, a_d;
     glBindTexture(GL_TEXTURE_3D, render_texture);
-    glGetTexLevelParameteriv(GL_TEXTURE_3D, 0, GL_TEXTURE_WIDTH, &a_w);
-    glGetTexLevelParameteriv(GL_TEXTURE_3D, 0, GL_TEXTURE_HEIGHT, &a_h);
-    glGetTexLevelParameteriv(GL_TEXTURE_3D, 0, GL_TEXTURE_DEPTH, &a_d);
-
-    std::cout << "w, h, d = " << w << ", " << h << ", " << d << std::endl;
-    std::cout << "a_w, a_h, a_d = " << a_w << ", " << a_h << ", " << a_d << std::endl;
-
-    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, (void*)out_data.data());
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA, GL_UNSIGNED_BYTE, (void*)out_data.data());
     glBindTexture(GL_TEXTURE_3D, 0);
+    glFinish();
 
+    std::vector<uint8_t> real_data;
+    real_data.resize(num_voxels);
+    for (int i = 0; i < num_voxels; i++) { real_data[i] = out_data[4*i]; }
     std::ofstream fout;
     fout.open(filename, std::ios::binary);
-    fout.write(reinterpret_cast<char*>(out_data.data()), num_voxels*sizeof(uint8_t));
+    fout.write(reinterpret_cast<char*>(real_data.data()), num_voxels*sizeof(uint8_t));
     fout.close();
     glPopDebugGroup();
 }
