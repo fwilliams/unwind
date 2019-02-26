@@ -124,6 +124,7 @@ void State::serialize(std::vector<char> &buffer) const {
     igl::serialize(input_metadata.downsample_factor, std::string("image_input.downsample_factor"), buffer);
     igl::serialize(input_metadata.start_index, std::string("image_input.start_index"), buffer);
     igl::serialize(input_metadata.end_index, std::string("image_input.end_index"), buffer);
+    igl::serialize(input_metadata.project_name, std::string("image_input.project_name"), buffer);
 
 
     igl::serialize(dilated_tet_mesh.TV, std::string("dilated_tet_mesh.TV"), buffer);
@@ -160,6 +161,7 @@ void State::deserialize(const std::vector<char> &buffer) {
     igl::deserialize(input_metadata.downsample_factor, std::string("image_input.downsample_factor"), buffer);
     igl::deserialize(input_metadata.start_index, std::string("image_input.start_index"), buffer);
     igl::deserialize(input_metadata.end_index, std::string("image_input.end_index"), buffer);
+    igl::deserialize(input_metadata.project_name, std::string("image_input.project_name"), buffer);
 
 
     igl::deserialize(dilated_tet_mesh.TV, std::string("dilated_tet_mesh.TV"), buffer);

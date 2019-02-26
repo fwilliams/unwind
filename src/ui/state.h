@@ -99,6 +99,7 @@ struct State {
         std::string output_dir;
         std::string file_extension;
         std::string prefix;
+        std::string project_name;
 
         int downsample_factor = 8;
         int start_index;

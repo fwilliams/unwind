@@ -44,6 +44,10 @@ void Bounding_Polygon_Menu::initialize() {
     state.logger->trace("Done initializing bounding polygon plugin!");
 
     cage_dirty = true;
+
+    if (std::string(save_name_buf).size() == 0) {
+        strcpy(save_name_buf, state.input_metadata.project_name.c_str());
+    }
 }
 
 void Bounding_Polygon_Menu::deinitialize() {
@@ -268,14 +272,13 @@ bool Bounding_Polygon_Menu::post_draw() {
     if (ImGui::Checkbox("Show Hi-Res Texture", &use_hires_texture)) {
         cage_dirty = true;
     }
-    ImGui::SameLine();
+
     bool pushed_disabled_style = false;
     if (show_edit_transfer_function) {
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
         pushed_disabled_style = true;
     }
-
     if (ImGui::Button("Edit Transfer Function")) {
         show_edit_transfer_function = true;
     }
@@ -469,6 +472,8 @@ bool Bounding_Polygon_Menu::post_draw() {
             const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
             const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
             const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
+
+            state.input_metadata.project_name = save_file_name;
 
             igl::serialize(state, "state", save_project_path, true);
             DatFile out_datfile;
