@@ -23,4 +23,6 @@ FileType get_file_type(const char* path);
 
 std::pair<std::string, std::string> dir_and_base_name(const char* name);
 
+void trim_path_in_place(char* path);
+
 #endif // MKPATH_H

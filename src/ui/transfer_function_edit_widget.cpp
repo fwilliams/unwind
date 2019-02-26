@@ -11,7 +11,7 @@ TransferFunctionEditWidget::TransferFunctionEditWidget() {
     _transfer_function.push_back(n2);
 }
 
-bool TransferFunctionEditWidget::post_draw() {
+bool TransferFunctionEditWidget::post_draw(bool active) {
     constexpr float click_scale = 2.5f;
 
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 1.5f);
@@ -83,7 +83,7 @@ bool TransferFunctionEditWidget::post_draw() {
         ImGui::GetIO().MousePos.x <= (canvas_scale_pos.x + canvas_capture_size.x) &&
         ImGui::GetIO().MousePos.y >= (canvas_scale_pos.y) &&
         ImGui::GetIO().MousePos.y <= (canvas_scale_pos.y + canvas_capture_size.y);
-    if (mouse_in_tf_editor) {
+    if (mouse_in_tf_editor && active) {
         if (ImGui::IsMouseDown(0)) {
             ImGui::GetIO().WantCaptureMouse = true;
             for (size_t i = 0; i < _transfer_function.size(); ++i) {

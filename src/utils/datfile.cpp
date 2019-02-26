@@ -78,19 +78,46 @@ DatFile::DatFile(const std::string& filename, std::shared_ptr<spdlog::logger> lo
     deserialize(filename, logger);
 }
 
-bool DatFile::serialize(const std::string& filename) {
+bool DatFile::serialize(const std::string& filename, std::shared_ptr<spdlog::logger> logger) {
     using namespace std;
 
     ofstream of(filename);
-    of << "RawFile: " << m_raw_filename << endl;
-    of << "ThinRawFile: " << m_thin_raw_filename << endl;
-    of << "Resolution: " << w << " " << h << " " << d << endl;
-    of << "Format: " << m_format << endl;
-    of << "SurfaceMesh: " << m_mesh_filename << endl;
-    of << "ThinSurfaceMesh: " << m_thin_surface_mesh << endl;
-    of << "TextureFile: " << m_texture_filename << endl;
-    of << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
-    of << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
+    if (m_raw_filename.size() > 0) {
+        of << "RawFile: " << m_raw_filename << endl;
+        logger->debug("Wrote RawFile: {}", m_raw_filename);
+    }
+    if (m_thin_raw_filename.size() > 0) {
+        of << "ThinRawFile: " << m_thin_raw_filename << endl;
+        logger->debug("Wrote ThinRawFile: {}", m_thin_raw_filename);
+    }
+    if (w > 0 && h > 0 && d > 0) {
+        of << "Resolution: " << w << " " << h << " " << d << endl;
+        logger->debug("Wrote Resolution: {} {} {}", w, h, d);
+    }
+    if (m_format.size() > 0) {
+        of << "Format: " << m_format << endl;
+        logger->debug("Wrote Format: {}", m_format);
+    }
+    if (m_mesh_filename.size() > 0) {
+        of << "SurfaceMesh: " << m_mesh_filename << endl;
+        logger->debug("Wrote SurfaceMesh: {}", m_mesh_filename);
+    }
+    if (m_thin_surface_mesh.size() > 0) {
+        of << "ThinSurfaceMesh: " << m_thin_surface_mesh << endl;
+        logger->debug("Wrote ThinSurfaceMesh: {}", m_thin_surface_mesh);
+    }
+    if (m_texture_filename.size() > 0) {
+        of << "TextureFile: " << m_texture_filename << endl;
+        logger->debug("Wrote TextureFile: {}", m_texture_filename);
+    }
+    if (m_bb_min[0] > 0 && m_bb_min[1] > 0 && m_bb_min[2] > 0) {
+        of << "BBmin: " << m_bb_min[0] << " " << m_bb_min[1] << " " << m_bb_min[2] << endl;
+        logger->debug("Wrote BBmin: {} {} {}", m_bb_min[0], m_bb_min[1], m_bb_min[2]);
+    }
+    if (m_bb_max[0] > 0 && m_bb_max[1] > 0 && m_bb_max[2] > 0) {
+        logger->debug("Wrote BBmax: {} {} {}", m_bb_max[0], m_bb_max[1], m_bb_max[2]);
+        of << "BBmax: " << m_bb_max[0] << " " << m_bb_max[1] << " " << m_bb_max[2] << endl;
+    }
     of.close();
 
     return true;

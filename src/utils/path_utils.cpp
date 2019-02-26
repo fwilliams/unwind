@@ -9,6 +9,8 @@
 #include <vector>
 #include <cstdlib>
 
+#include "string_utils.h"
+
 #ifdef WIN32
 #include <Windows.h>
 
@@ -154,3 +156,9 @@ std::pair<std::string, std::string> dir_and_base_name(const char* name) {
     return std::make_pair(ret1, ret2);
 }
 #endif
+
+void trim_path_in_place(char* path) {
+    std::string strpath(path);
+    std::string trimmed_path = trim_copy(strpath);
+    strcpy(path, trimmed_path.c_str());
+}

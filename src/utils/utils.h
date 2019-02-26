@@ -8,6 +8,12 @@
 #include <memory>
 
 
+#ifdef _MSC_VER
+    static constexpr int PATH_BUFFER_SIZE = 4*4096;
+#else
+    static const int PATH_BUFFER_SIZE = 4*PATH_MAX;
+#endif
+
 // Scale a vector so its values lie between zero and one
 void scale_zero_one(const Eigen::VectorXd& V, Eigen::VectorXd& V_scaled);
 

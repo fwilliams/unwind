@@ -139,7 +139,7 @@ bool Initial_File_Selection_Menu::post_draw() {
             }
         }
 
-
+        ImGui::Spacing();
         ImGui::Text("Output Folder:");
         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
         if (ImGui::InputText("##Output Folder", output_dir_path_buf, PATH_BUFFER_SIZE)) {

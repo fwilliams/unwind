@@ -31,6 +31,7 @@ public:
     bool cage_dirty = true;
 
     VolumeExporter exporter;
+    VolumeExporter final_exporter;
 
 private:
 
@@ -58,6 +59,14 @@ private:
     bool draw_straight = false;
     bool show_edit_transfer_function = false;
     bool mouse_in_popup = false;
+
+    bool show_save_popup = false;
+    char save_name_buf[PATH_BUFFER_SIZE] = {};
+    bool save_name_invalid = false;
+    bool save_name_overwrite = false;
+    std::string save_name_error_message;
+    int output_dims[3] = {-1, -1, -1};
+    bool output_preserve_aspect_ratio = true;
 };
 
 #endif // __FISH_DEFORMATION_BOUNDING_POLYGON_STATE__

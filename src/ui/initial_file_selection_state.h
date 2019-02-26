@@ -6,6 +6,8 @@
 #include <atomic>
 #include <thread>
 
+#include <utils/utils.h>
+
 struct State;
 
 class Initial_File_Selection_Menu : public FishUIViewerPlugin {
@@ -18,12 +20,6 @@ public:
 
 private:
     State& _state;
-
-#ifdef _MSC_VER
-    static constexpr int PATH_BUFFER_SIZE = 4*4096;
-#else
-    static const int PATH_BUFFER_SIZE = 4*PATH_MAX;
-#endif
 
     char output_dir_path_buf[PATH_BUFFER_SIZE];
     char first_image_path_buf[PATH_BUFFER_SIZE] = {};

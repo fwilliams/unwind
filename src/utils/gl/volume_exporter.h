@@ -7,8 +7,6 @@
 #include "glm_conversion.h"
 
 
-glm::vec4 keyframe_bounds(BoundingCage& bc);
-
 class VolumeExporter {
     GLuint framebuffer;
     GLuint render_texture;
@@ -35,12 +33,6 @@ public:
 
     const GLuint export_texture() const {
         return render_texture;
-    }
-
-    void texture_data(std::vector<float>& ret) const {
-        ret.resize(w*h*d);
-        glBindTexture(GL_TEXTURE_3D, render_texture);
-        glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, (void*)ret.data());
     }
 
     void write_texture_data_to_file(std::string filename);

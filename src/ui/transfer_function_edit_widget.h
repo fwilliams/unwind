@@ -36,7 +36,7 @@ public:
     void set_padding_width(float width) { _padding_width = width; }
     void set_color_edit_as_popup(bool enabled) { _color_edit_as_popup = enabled; }
     void clear_dirty_bit() { _transfer_function_dirty = false; }
-    bool post_draw();
+    bool post_draw(bool active);
 };
 
 #endif // TRANSFER_FUNCTION_EDIT_WIDGET_H

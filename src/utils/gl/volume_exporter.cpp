@@ -66,33 +66,29 @@ void main() {
 }
 )";
 
-
-glm::vec4 keyframe_bounds(BoundingCage& bc) {
-    double min_u = std::numeric_limits<double>::max(),
-           min_v = std::numeric_limits<double>::max(),
-           max_u = std::numeric_limits<double>::min(),
-           max_v = std::numeric_limits<double>::min();
-    for (const BoundingCage::KeyFrame& kf : bc.keyframes) {
-        Eigen::MatrixXd v2d = kf.vertices_2d().rowwise() - kf.centroid_2d();
-        Eigen::RowVector2d minV2d = v2d.colwise().minCoeff();
-        Eigen::RowVector2d maxV2d = v2d.colwise().maxCoeff();
-
-        min_u = std::min(minV2d[0], min_u);
-        max_u = std::max(maxV2d[0], max_u);
-        min_v = std::min(minV2d[1], min_v);
-        max_v = std::max(maxV2d[1], max_v);
-    }
-
-    return glm::vec4(min_u, max_u, min_v, max_v);
-}
-
 void VolumeExporter::write_texture_data_to_file(std::string filename) {
-    std::vector<float> out_data;
-    texture_data(out_data);
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Export");
+    const size_t num_voxels = size_t(w)*size_t(h)*size_t(d);
+    std::vector<std::uint8_t> out_data;
+    out_data.resize(num_voxels);
+
+    GLint a_w, a_h, a_d;
+    glBindTexture(GL_TEXTURE_3D, render_texture);
+    glGetTexLevelParameteriv(GL_TEXTURE_3D, 0, GL_TEXTURE_WIDTH, &a_w);
+    glGetTexLevelParameteriv(GL_TEXTURE_3D, 0, GL_TEXTURE_HEIGHT, &a_h);
+    glGetTexLevelParameteriv(GL_TEXTURE_3D, 0, GL_TEXTURE_DEPTH, &a_d);
+
+    std::cout << "w, h, d = " << w << ", " << h << ", " << d << std::endl;
+    std::cout << "a_w, a_h, a_d = " << a_w << ", " << a_h << ", " << a_d << std::endl;
+
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, (void*)out_data.data());
+    glBindTexture(GL_TEXTURE_3D, 0);
+
     std::ofstream fout;
     fout.open(filename, std::ios::binary);
-    fout.write(reinterpret_cast<char*>(out_data.data()), sizeof(float)*out_data.size());
+    fout.write(reinterpret_cast<char*>(out_data.data()), num_voxels*sizeof(uint8_t));
     fout.close();
+    glPopDebugGroup();
 }
 
 void VolumeExporter::set_export_dims(GLsizei w, GLsizei h, GLsizei d) {
@@ -138,6 +134,8 @@ void VolumeExporter::init(GLsizei w, GLsizei h, GLsizei d) {
     set_export_dims(w, h, d);
 
     glGenFramebuffers(1, &framebuffer);
+
+    glBindTexture(GL_TEXTURE_3D, 0);
     glPopDebugGroup();
 
 }
@@ -147,9 +145,6 @@ void VolumeExporter::update(BoundingCage& cage, GLuint volume_texture, glm::ivec
 
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
-
-    glm::vec4 bounds = G4f(cage.keyframe_bounding_box());
-    float min_u = bounds[0], max_u = bounds[1], min_v = bounds[2], max_v = bounds[3];
 
     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Export Slice");
     glUseProgram(slice.program);
@@ -213,6 +208,7 @@ void VolumeExporter::update(BoundingCage& cage, GLuint volume_texture, glm::ivec
 
     glBindVertexArray(0);
     glUseProgram(0);
+    glBindTexture(GL_TEXTURE_3D, 0);
     glPopDebugGroup();
 
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);

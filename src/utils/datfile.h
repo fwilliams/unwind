@@ -17,7 +17,8 @@ private:
 
 public:
   int w, h, d;
-  Eigen::RowVector3d m_bb_min, m_bb_max;
+  Eigen::RowVector3d m_bb_min = Eigen::RowVector3d(0.0, 0.0, 0.0);
+  Eigen::RowVector3d m_bb_max = Eigen::RowVector3d(0.0, 0.0, 0.0);
   std::string m_raw_filename;
   std::string m_mesh_filename;
   std::string m_format;
@@ -32,8 +33,7 @@ public:
 
   DatFile() = default;
 
-  bool serialize(const std::string& filename);
-
+  bool serialize(const std::string& filename, std::shared_ptr<spdlog::logger> logger);
   bool deserialize(const std::string& filename, std::shared_ptr<spdlog::logger> logger);
 };
 
