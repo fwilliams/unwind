@@ -250,6 +250,7 @@ bool Initial_File_Selection_Menu::post_draw() {
                                        _state.input_metadata.low_res_prefix(),
                                        _state.input_metadata.downsample_factor,
                                        true /* write_original */);
+                _state.input_metadata.project_name = "";
             } else {
                 if (!igl::deserialize(_state, "state", std::string(existing_project_path_buf))) {
                     show_error_popup = true;
