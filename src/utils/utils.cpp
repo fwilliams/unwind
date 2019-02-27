@@ -182,7 +182,7 @@ bool load_rawfile(const std::string& rawfilename, const Eigen::RowVector3i& dims
 
     logger->trace("Resizing output");
     out.resize(num_bytes);
-    for (int i = 0; i < num_bytes; i++) {
+    for (size_t i = 0; i < num_bytes; i++) {
         out[i] = data[i];
     }
     logger->trace("Copied output");

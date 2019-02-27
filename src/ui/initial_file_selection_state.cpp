@@ -152,7 +152,6 @@ bool Initial_File_Selection_Menu::post_draw() {
         if (ImGui::Button("Select##Outfolder")) {
             std::string folder = open_folder_dialog();
             if (folder.size() > 0) {
-                folder = folder + "/";
                 strcpy(output_dir_path_buf, folder.c_str());
                 _state.dirty_flags.file_loading_dirty = true;
                 fix_path(output_dir_path_buf);
