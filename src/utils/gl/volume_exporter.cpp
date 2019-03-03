@@ -79,7 +79,7 @@ void VolumeExporter::write_texture_data_to_file(std::string filename) {
 
     std::vector<uint8_t> real_data;
     real_data.resize(num_voxels);
-    for (int i = 0; i < num_voxels; i++) { real_data[i] = out_data[4*i]; }
+    for (size_t i = 0; i < num_voxels; i++) { real_data[i] = out_data[4*i]; }
     std::ofstream fout;
     fout.open(filename, std::ios::binary);
     fout.write(reinterpret_cast<char*>(real_data.data()), num_voxels*sizeof(uint8_t));
