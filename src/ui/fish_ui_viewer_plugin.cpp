@@ -15,7 +15,8 @@ void FishUIViewerPlugin::init(igl::opengl::glfw::Viewer* _viewer) {
         }
         ImGui_ImplGlfwGL3_Init(viewer->window, false);
         ImGui::GetIO().IniFilename = nullptr;
-        ImGui::StyleColorsDark();
+//        ImGui::StyleColorsDark();
+        ImGui::StyleColorsLight();
         ImGuiStyle& style = ImGui::GetStyle();
         style.FrameRounding = 0.0f;
         reload_font();
