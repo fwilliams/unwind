@@ -35,6 +35,8 @@ public:
     bool use_hires_texture = true;
 private:
 
+    void post_draw_save(int window_width);
+
     void center_bounding_cage_mesh();
     void center_straight_mesh();
 

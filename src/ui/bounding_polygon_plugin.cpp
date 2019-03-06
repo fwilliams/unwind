@@ -9,6 +9,7 @@
 #include <igl/edges.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+
 Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
     : state(state)
     , widget_2d(Bounding_Polygon_Widget(state))
@@ -105,6 +106,205 @@ bool Bounding_Polygon_Menu::key_up(int button, int modifier) {
     bool ret = FishUIViewerPlugin::key_up(button, modifier);
     ret = ret || widget_2d.key_up(button, modifier, is_2d_widget_in_focus());
     return ret;
+}
+
+void Bounding_Polygon_Menu::post_draw_save(int window_width) {
+    ImGui::SetNextWindowSize(ImVec2(window_width*0.4, 0), ImGuiSetCond_FirstUseEver);
+    ImGui::OpenPopup("Save Result");
+    ImGui::BeginPopupModal("Save Result");
+
+    ImGui::Text("Project Name:");
+    ImGui::PushItemWidth(-1);
+    if (ImGui::InputText("##SaveDest", save_name_buf, PATH_BUFFER_SIZE)) {
+        trim_path_in_place(save_name_buf);
+        const bool found_slash = std::string(save_name_buf).find_first_of("/") != std::string::npos;
+        const bool found_backslash = std::string(save_name_buf).find_first_of("\\") != std::string::npos;
+        if (found_slash || found_backslash) {
+            save_name_invalid = true;
+            save_name_overwrite = false;
+            save_name_error_message = "Output name cannot contain '/' or '\\'";
+        } else {
+            save_name_invalid = false;
+            save_name_error_message = "";
+        }
+
+        if (!save_name_invalid) {
+            const std::string save_file_name = std::string(save_name_buf);
+            const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
+            const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
+            const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
+            if (get_file_type(save_project_path.c_str()) != FT_DOES_NOT_EXIST) {
+                save_name_error_message = "Warning: A file named " + save_file_name + ".fish.pro exists. Saving will overwrite it.";
+                save_name_overwrite = true;
+            } else if (get_file_type(save_datfile_path.c_str()) != FT_DOES_NOT_EXIST) {
+                save_name_error_message = "Warning: A file named " + save_file_name + ".dat exists. Saving will overwrite it.";
+                save_name_overwrite = true;
+            } else if (get_file_type(save_rawfile_path.c_str()) != FT_DOES_NOT_EXIST) {
+                save_name_error_message = "Warning: A file named " + save_file_name + ".raw exists. Saving will overwrite it.";
+                save_name_overwrite = true;
+            } else {
+                save_name_error_message = "";
+                save_name_overwrite = false;
+            }
+        }
+    }
+    ImGui::PopItemWidth();
+
+    bool disabled = false;
+    if (save_name_invalid) {
+        ImGui::TextColored(ImColor(200, 20, 20, 255), "%s", save_name_error_message.c_str());
+        disabled = true;
+    }
+    if (save_name_overwrite) {
+        ImGui::TextColored(ImColor(200, 200, 20, 255), "%s", save_name_error_message.c_str());
+    }
+
+    auto reset_dims = [&]() {
+        double d = -1.0;
+        std::vector<double> kf_depths;
+        state.cage.keyframe_depths(kf_depths);
+        d = kf_depths.back();
+
+        Eigen::Vector4d kfbb = state.cage.keyframe_bounding_box();
+        double w = kfbb[1] - kfbb[0];
+        double h = kfbb[3] - kfbb[2];
+
+        output_dims[0] = int(w*state.input_metadata.downsample_factor);
+        output_dims[1] = int(h*state.input_metadata.downsample_factor);
+        output_dims[2] = int(d*state.input_metadata.downsample_factor);
+    };
+
+    // First time we open the popup
+    if (output_dims[0] < 0) {
+        reset_dims();
+    }
+    ImGui::Spacing();
+    ImGui::Text("Output Dimensions:");
+    ImGui::PushItemWidth(-1);
+    int old_dims[3] = {output_dims[0], output_dims[1], output_dims[2]};
+    if (ImGui::InputInt3("##Outdims", output_dims)) {
+        int change_idx = 0;
+        for (change_idx = 0; change_idx < 3; change_idx++) {
+            if (old_dims[change_idx] != output_dims[change_idx]) {
+                break;
+            }
+        }
+
+        if (output_preserve_aspect_ratio) {
+            std::vector<double> kf_depths;
+            state.cage.keyframe_depths(kf_depths);
+            double d = kf_depths.back();
+
+            Eigen::RowVector4d kfbb = state.cage.keyframe_bounding_box();
+            double w = std::max(round(fabs(kfbb[1] - kfbb[0])), 1.0);
+            double h = std::max(round(fabs(kfbb[3] - kfbb[2])), 1.0);
+
+            double new_d, new_w, new_h;
+            if (change_idx == 0) {
+                new_w = double(output_dims[0]);
+                new_h = (h/w)*new_w;
+                new_d = (d/w)*new_w;
+            } else if (change_idx == 1) {
+                new_h = double(output_dims[1]);
+                new_w = (w/h)*new_h;
+                new_d = (d/h)*new_h;
+            } else if (change_idx == 2) {
+                new_d = double(output_dims[2]);
+                new_w = (w/d)*new_d;
+                new_h = (h/d)*new_d;
+            }
+
+            int new_dims[3] = {int(new_w), int(new_h), int(new_d)};
+            for (int i = 0; i < 3; i++) { output_dims[i] = new_dims[i]; }
+        }
+
+        bool was_negative = false;
+        for (int i = 0; i < 3; i++) {
+            if (output_dims[i] <= 0) {
+                was_negative = true;
+                break;
+            }
+        }
+
+        if (was_negative) {
+            output_dims[0] = old_dims[0];
+            output_dims[1] = old_dims[1];
+            output_dims[2] = old_dims[2];
+        }
+    }
+    ImGui::PopItemWidth();
+    ImGui::Checkbox("Preserve Aspect Ratio", &output_preserve_aspect_ratio);
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Dims")) {
+        reset_dims();
+    }
+    if (std::string(save_name_buf).size() == 0) {
+        disabled = true;
+    }
+
+    if (!save_name_invalid && !save_name_overwrite) {
+        ImGui::NewLine();
+    }
+
+    ImGui::Separator();
+
+    if (disabled) {
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+    }
+    if (ImGui::Button("Save")) {
+        const std::string save_file_name = std::string(save_name_buf);
+        const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
+        const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
+        const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
+
+        state.input_metadata.project_name = save_file_name;
+
+        igl::serialize(state, "state", save_project_path, true);
+        DatFile out_datfile;
+        out_datfile.w = output_dims[0];
+        out_datfile.h = output_dims[1];
+        out_datfile.d = output_dims[2];
+        out_datfile.m_raw_filename = save_file_name + ".raw";
+        out_datfile.m_format = "UINT8";
+        out_datfile.serialize(save_datfile_path, state.logger);
+
+
+        {
+            glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
+            GLint old_min_filter, old_mag_filter;
+            glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_min_filter);
+            glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_mag_filter);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glBindTexture(GL_TEXTURE_3D, 0);
+            exporter.set_export_dims(output_dims[0], output_dims[1], output_dims[2]);
+            exporter.update(state.cage, state.hi_res_volume.volume_texture, G3f(state.low_res_volume.dims()));
+            exporter.write_texture_data_to_file(save_rawfile_path);
+            cage_dirty = true;
+            glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, old_min_filter);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, old_mag_filter);
+            glBindTexture(GL_TEXTURE_3D, 0);
+        }
+
+        show_save_popup = false;
+        output_dims[0] = -1;
+        output_dims[1] = -1;
+        output_dims[2] = -2;
+    }
+    if (disabled) {
+        ImGui::PopItemFlag();
+        ImGui::PopStyleVar();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+        show_save_popup = false;
+        output_dims[0] = -1;
+        output_dims[1] = -1;
+        output_dims[2] = -2;
+    }
+    ImGui::EndPopup();
 }
 
 bool Bounding_Polygon_Menu::post_draw() {
@@ -322,210 +522,13 @@ bool Bounding_Polygon_Menu::post_draw() {
     if (ImGui::Button("Back")) {
         state.set_application_state(Application_State::EndPointSelection);
     }
-
-    if (show_save_popup) {
-        ImGui::SetNextWindowSize(ImVec2(window_width*0.4, 0), ImGuiSetCond_FirstUseEver);
-        ImGui::OpenPopup("Save Result");
-        ImGui::BeginPopupModal("Save Result");
-
-        ImGui::Text("Project Name:");
-        ImGui::PushItemWidth(-1);
-        if (ImGui::InputText("##SaveDest", save_name_buf, PATH_BUFFER_SIZE)) {
-            trim_path_in_place(save_name_buf);
-            const bool found_slash = std::string(save_name_buf).find_first_of("/") != std::string::npos;
-            const bool found_backslash = std::string(save_name_buf).find_first_of("\\") != std::string::npos;
-            if (found_slash || found_backslash) {
-                save_name_invalid = true;
-                save_name_overwrite = false;
-                save_name_error_message = "Output name cannot contain '/' or '\\'";
-            } else {
-                save_name_invalid = false;
-                save_name_error_message = "";
-            }
-
-            if (!save_name_invalid) {
-                const std::string save_file_name = std::string(save_name_buf);
-                const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
-                const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
-                const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
-                if (get_file_type(save_project_path.c_str()) != FT_DOES_NOT_EXIST) {
-                    save_name_error_message = "Warning: A file named " + save_file_name + ".fish.pro exists. Saving will overwrite it.";
-                    save_name_overwrite = true;
-                } else if (get_file_type(save_datfile_path.c_str()) != FT_DOES_NOT_EXIST) {
-                    save_name_error_message = "Warning: A file named " + save_file_name + ".dat exists. Saving will overwrite it.";
-                    save_name_overwrite = true;
-                } else if (get_file_type(save_rawfile_path.c_str()) != FT_DOES_NOT_EXIST) {
-                    save_name_error_message = "Warning: A file named " + save_file_name + ".raw exists. Saving will overwrite it.";
-                    save_name_overwrite = true;
-                } else {
-                    save_name_error_message = "";
-                    save_name_overwrite = false;
-                }
-            }
-        }
-        ImGui::PopItemWidth();
-
-        bool disabled = false;
-        if (save_name_invalid) {
-            ImGui::TextColored(ImColor(200, 20, 20, 255), "%s", save_name_error_message.c_str());
-            disabled = true;
-        }
-        if (save_name_overwrite) {
-            ImGui::TextColored(ImColor(200, 200, 20, 255), "%s", save_name_error_message.c_str());
-        }
-
-        auto reset_dims = [&]() {
-            double d = -1.0;
-            std::vector<double> kf_depths;
-            state.cage.keyframe_depths(kf_depths);
-            d = kf_depths.back();
-
-            Eigen::Vector4d kfbb = state.cage.keyframe_bounding_box();
-            double w = kfbb[1] - kfbb[0];
-            double h = kfbb[3] - kfbb[2];
-
-            output_dims[0] = int(w*state.input_metadata.downsample_factor);
-            output_dims[1] = int(h*state.input_metadata.downsample_factor);
-            output_dims[2] = int(d*state.input_metadata.downsample_factor);
-        };
-
-        // First time we open the popup
-        if (output_dims[0] < 0) {
-            reset_dims();
-        }
-        ImGui::Spacing();
-        ImGui::Text("Output Dimensions:");
-        ImGui::PushItemWidth(-1);
-        int old_dims[3] = {output_dims[0], output_dims[1], output_dims[2]};
-        if (ImGui::InputInt3("##Outdims", output_dims)) {
-            int change_idx = 0;
-            for (change_idx = 0; change_idx < 3; change_idx++) {
-                if (old_dims[change_idx] != output_dims[change_idx]) {
-                    break;
-                }
-            }
-
-            if (output_preserve_aspect_ratio) {
-                std::vector<double> kf_depths;
-                state.cage.keyframe_depths(kf_depths);
-                double d = kf_depths.back();
-
-                Eigen::RowVector4d kfbb = state.cage.keyframe_bounding_box();
-                double w = std::max(round(fabs(kfbb[1] - kfbb[0])), 1.0);
-                double h = std::max(round(fabs(kfbb[3] - kfbb[2])), 1.0);
-
-                double new_d, new_w, new_h;
-                if (change_idx == 0) {
-                    new_w = double(output_dims[0]);
-                    new_h = (h/w)*new_w;
-                    new_d = (d/w)*new_w;
-                } else if (change_idx == 1) {
-                    new_h = double(output_dims[1]);
-                    new_w = (w/h)*new_h;
-                    new_d = (d/h)*new_h;
-                } else if (change_idx == 2) {
-                    new_d = double(output_dims[2]);
-                    new_w = (w/d)*new_d;
-                    new_h = (h/d)*new_d;
-                }
-
-                int new_dims[3] = {int(new_w), int(new_h), int(new_d)};
-                for (int i = 0; i < 3; i++) { output_dims[i] = new_dims[i]; }
-            }
-
-            bool was_negative = false;
-            for (int i = 0; i < 3; i++) {
-                if (output_dims[i] <= 0) {
-                    was_negative = true;
-                    break;
-                }
-            }
-
-            if (was_negative) {
-                output_dims[0] = old_dims[0];
-                output_dims[1] = old_dims[1];
-                output_dims[2] = old_dims[2];
-            }
-        }
-        ImGui::PopItemWidth();
-        ImGui::Checkbox("Preserve Aspect Ratio", &output_preserve_aspect_ratio);
-        ImGui::SameLine();
-        if (ImGui::Button("Reset Dims")) {
-            reset_dims();
-        }
-        if (std::string(save_name_buf).size() == 0) {
-            disabled = true;
-        }
-
-        if (!save_name_invalid && !save_name_overwrite) {
-            ImGui::NewLine();
-        }
-
-        ImGui::Separator();
-
-        if (disabled) {
-            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-        }
-        if (ImGui::Button("Save")) {
-            const std::string save_file_name = std::string(save_name_buf);
-            const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
-            const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
-            const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
-
-            state.input_metadata.project_name = save_file_name;
-
-            igl::serialize(state, "state", save_project_path, true);
-            DatFile out_datfile;
-            out_datfile.w = output_dims[0];
-            out_datfile.h = output_dims[1];
-            out_datfile.d = output_dims[2];
-            out_datfile.m_raw_filename = save_file_name + ".raw";
-            out_datfile.m_format = "UINT8";
-            out_datfile.serialize(save_datfile_path, state.logger);
-
-
-            {
-                glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
-                GLint old_min_filter, old_mag_filter;
-                glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_min_filter);
-                glGetTexParameteriv(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, &old_mag_filter);
-                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                glBindTexture(GL_TEXTURE_3D, 0);
-                exporter.set_export_dims(output_dims[0], output_dims[1], output_dims[2]);
-                exporter.update(state.cage, state.hi_res_volume.volume_texture, G3f(state.low_res_volume.dims()));
-                exporter.write_texture_data_to_file(save_rawfile_path);
-                cage_dirty = true;
-                glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
-                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, old_min_filter);
-                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, old_mag_filter);
-                glBindTexture(GL_TEXTURE_3D, 0);
-            }
-
-            show_save_popup = false;
-            output_dims[0] = -1;
-            output_dims[1] = -1;
-            output_dims[2] = -2;
-        }
-        if (disabled) {
-            ImGui::PopItemFlag();
-            ImGui::PopStyleVar();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            show_save_popup = false;
-            output_dims[0] = -1;
-            output_dims[1] = -1;
-            output_dims[2] = -2;
-        }
-        ImGui::EndPopup();
-    }
     ImGui::SameLine();
     if (ImGui::Button("Save")) {
         show_save_popup = true;
     }
-
+    if (show_save_popup) {
+        post_draw_save(window_width);
+    }
     ImGui::End();
 
     // Draw a line separating the two half views
