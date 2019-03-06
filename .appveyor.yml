@@ -11,15 +11,7 @@ install:
 build_script:
   - echo Running cmake...
   - cd c:\projects\fish_deformation
-  - cd external
   - mkdir build
   - cd build
   - cmake -G "Visual Studio 15 2017 Win64" -T "host=x64" ..
-  - msbuild %MSBuildOptions% libigl_external.sln
-  - cd ../../tutorial
-  - mkdir build
-  - cd build
-  - cmake -G "Visual Studio 15 2017 Win64" ../
-  - set MSBuildLogger="C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
-  - set MSBuildOptions=/v:m /p:Configuration=Debug /logger:%MSBuildLogger%
   - msbuild %MSBuildOptions% fish_deformation
