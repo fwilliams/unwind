@@ -62,9 +62,9 @@ FileType get_file_type(const char* path) {
         return FT_DOES_NOT_EXIST;
     } else if (retval != 0) {
         return FT_ERROR;
-    } else if (S_ISDIR(stat_buf.st_mode)) {
+    } else if (stat_buf.st_mode & S_IFDIR) {
         return FT_DIRECTORY;
-    } else if (S_ISREG(stat_buf.st_mode)) {
+    } else if (stat_buf.st_mode & S_IFREG) {
         return FT_REGULAR_FILE;
     } else {
         return FT_OTHER;
