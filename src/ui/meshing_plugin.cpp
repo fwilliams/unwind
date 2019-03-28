@@ -120,13 +120,25 @@ void Meshing_Menu::initialize() {
         is_meshing = true;
         glfwPostEmptyEvent();
 
-        std::vector<uint32_t> feature_list = _state.segmented_features.selected_features;
-        // The feature list used in export_selected_volume uses a zero-based indexing, we use
-        // 0 for the non-feature, so we have to convert into the zero-based indexing here
-        std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(),
-            [](uint32_t v) { return v - 1; });
-        export_selected_volume(feature_list);
-
+        if (!debug.enabled) {
+            std::vector<uint32_t> feature_list = _state.segmented_features.selected_features;
+            // The feature list used in export_selected_volume uses a zero-based indexing, we use
+            // 0 for the non-feature, so we have to convert into the zero-based indexing here
+            std::transform(feature_list.begin(), feature_list.end(), feature_list.begin(),
+                [](uint32_t v) { return v - 1; });
+            export_selected_volume(feature_list);
+        } else {
+            skeleton_masking_volume = debug.masking_volume_hack;
+            for (int i = 0; i < skeleton_masking_volume.size(); ++i) {
+                unsigned int idx = _state.low_res_volume.index_data[i];
+                if (skeleton_masking_volume[i] != 0.0) {
+                    skeleton_masking_volume[i] = 1.0;
+                }
+                else {
+                    skeleton_masking_volume[i] = -1.0;
+                }
+            }
+        }
         dilate_volume();
         if (extracted_surface.V_fat.rows() == 0) {
             _state.logger->error("Extracted empty mesh after dilation! Something went wrong!");

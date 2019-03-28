@@ -2,6 +2,8 @@
 
 #include "state.h"
 #include "preprocessing.hpp"
+#include "meshing_plugin.h"
+
 
 #include <imgui/imgui.h>
 #include <GLFW/glfw3.h>
@@ -9,6 +11,8 @@
 #include <utils/open_file_dialog.h>
 #include <utils/string_utils.h>
 #include <imgui/imgui_internal.h>
+
+extern Meshing_Menu meshing_menu;
 
 Initial_File_Selection_Menu::Initial_File_Selection_Menu(State& state) : _state(state) {}
 
@@ -202,6 +206,77 @@ bool Initial_File_Selection_Menu::post_draw() {
         show_new_scan_menu = true;
     }
 
+    if (debug.enabled) {
+        ImGui::Text("RawFile:");
+        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.8f);
+        if (ImGui::InputText("##Rawfile Path", debug.rawfile_path, PATH_BUFFER_SIZE)) {
+            _state.dirty_flags.file_loading_dirty = true;
+            fix_path(debug.rawfile_path);
+        }
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+        if (ImGui::Button("Select##RawFilePath")) {
+            std::string rawfile_path = open_datfile_dialog();
+            if (rawfile_path.size() > 0) {
+                strcpy(debug.rawfile_path, rawfile_path.c_str());
+                _state.dirty_flags.file_loading_dirty = true;
+                fix_path(debug.rawfile_path);
+            }
+        }
+
+        if (ImGui::Button("Le Hackz")) {
+
+            const std::pair<std::string, std::string> pathinfo = dir_and_base_name(debug.rawfile_path);
+            _state.logger->trace("Hacking rawfile {}", debug.rawfile_path);
+            _state.low_res_volume.metadata = DatFile(debug.rawfile_path, _state.logger);
+            std::string rawfile_path = pathinfo.first + std::string("/") + _state.low_res_volume.metadata.m_raw_filename;
+            load_rawfile(rawfile_path, _state.low_res_volume.dims(),
+                         _state.low_res_volume.volume_data, _state.logger, true /* normalize */);
+            _state.low_res_volume.preprocess_volume_texture(low_res_byte_data);
+            _state.hi_res_volume = _state.low_res_volume;
+
+            load_rawfile(rawfile_path, _state.hi_res_volume.dims(), high_res_byte_data, _state.logger);
+            load_rawfile(rawfile_path, _state.hi_res_volume.dims(), low_res_byte_data, _state.logger);
+
+            _state.logger->trace("Hacking metadata");
+            _state.input_metadata.input_dir = pathinfo.first;
+            _state.input_metadata.output_dir = pathinfo.first;
+            _state.logger->trace("Output directory is {}", _state.input_metadata.output_dir);
+            _state.input_metadata.file_extension = "derp";
+            _state.input_metadata.prefix = "prefix";
+            _state.input_metadata.start_index = 0;
+            _state.input_metadata.end_index = 0;
+
+            if (_state.low_res_volume.volume_texture == 0) {
+                _state.logger->debug("Creating low resolution volume texture...");
+                glGenTextures(1, &_state.low_res_volume.volume_texture);
+            }
+            _state.logger->debug("Hacking low resolution volume texture...");
+            _state.low_res_volume.load_gl_volume_texture(low_res_byte_data);
+
+            _state.logger->debug("Hacking low resolution index texture...");
+            _state.low_res_volume.load_gl_index_texture();
+
+            if (_state.hi_res_volume.volume_texture == 0) {
+                _state.logger->debug("Creating high resolution volume texture...");
+                glGenTextures(1, &_state.hi_res_volume.volume_texture);
+            }
+            _state.logger->debug("Hacking high resolution volume texture...");
+            _state.hi_res_volume.load_gl_volume_texture(high_res_byte_data);
+
+            low_res_byte_data.clear();
+            high_res_byte_data.clear();
+
+            meshing_menu.debug.masking_volume_hack = _state.hi_res_volume.volume_data;
+            meshing_menu.debug.enabled = true;
+            _state.dirty_flags.file_loading_dirty = false;
+            _state.set_application_state(Application_State::Meshing);
+            ImGui::End();
+            ImGui::Render();
+            return ret;
+        }
+    }
     ImGui::NewLine();
     ImGui::Separator();
 

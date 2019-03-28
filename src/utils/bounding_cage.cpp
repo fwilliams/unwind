@@ -128,13 +128,37 @@ bool BoundingCage::KeyFrame::move_centroid_2d(const Eigen::RowVector2d& new_cent
     return true;
 }
 
-bool BoundingCage::KeyFrame::rotate_torsion_frame(double d_angle) {
+bool BoundingCage::KeyFrame::rotate_about_normal(double d_angle) {
     if (!in_bounding_cage()) {
         logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
         return false;
     }
 
     _angle += d_angle;
+    return true;
+}
+
+bool BoundingCage::KeyFrame::rotate_about_right(double d_angle) {
+    if (!in_bounding_cage()) {
+        logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
+        return false;
+    }
+
+    Eigen::AngleAxisd R(d_angle, _orientation.row(0));
+    Eigen::Matrix3d O = _orientation;
+    _orientation = O*R;
+    return true;
+}
+
+bool BoundingCage::KeyFrame::rotate_about_up(double d_angle) {
+    if (!in_bounding_cage()) {
+        logger->warn("Cannot move KeyFrame centroid if KeyFrame is not in bounding cage");
+        return false;
+    }
+
+    Eigen::AngleAxisd R(d_angle, _orientation.row(1));
+    Eigen::Matrix3d O = _orientation;
+    _orientation = O*R;
     return true;
 }
 

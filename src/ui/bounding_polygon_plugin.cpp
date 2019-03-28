@@ -269,7 +269,6 @@ void Bounding_Polygon_Menu::post_draw_save(int window_width) {
         out_datfile.m_format = "UINT8";
         out_datfile.serialize(save_datfile_path, state.logger);
 
-
         {
             glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
             GLint old_min_filter, old_mag_filter;
@@ -363,7 +362,7 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
 
-    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::SetNextWindowBgAlpha(0.5f);
     float window_height_float = static_cast<float>(window_height);
     float window_width_float = static_cast<float>(window_width);
     ImGui::SetNextWindowPos(ImVec2(0.f, (1.0-view_vsplit)*window_height_float), ImGuiSetCond_Always);
@@ -515,6 +514,34 @@ bool Bounding_Polygon_Menu::post_draw() {
     } else {
         show_edit_transfer_function = false;
         mouse_in_popup = false;
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("NR-")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_right(-3.14159*1.0/180.0);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("NR+")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_right(3.14159*1.0/180.0);
+    }
+    if (ImGui::Button("NU-")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_up(-3.14159*1.0/180.0);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("NU+")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_up(3.14159*1.0/180.0);
     }
 
     ImGui::NewLine();

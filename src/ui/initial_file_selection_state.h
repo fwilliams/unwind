@@ -38,6 +38,11 @@ private:
     std::thread loading_thread;
 
     bool process_new_project_form();
+
+    struct {
+        char rawfile_path[PATH_BUFFER_SIZE];
+        bool enabled = true;
+    } debug;
 };
 
 #endif // __FISH_DEFORMATION_INITIAL_FILE_SELECTION_STATE__

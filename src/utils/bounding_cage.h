@@ -457,7 +457,11 @@ public:
 
         /// Rotate the coordinate frame counter-clockwise about the normal axis
         ///
-        bool rotate_torsion_frame(double d_angle);
+        bool rotate_about_normal(double d_angle);
+
+        bool rotate_about_right(double d_angle);
+
+        bool rotate_about_up(double d_angle);
 
         /// Set the rotation of the coordinate frame
         ///

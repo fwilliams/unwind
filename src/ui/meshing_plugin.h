@@ -16,6 +16,10 @@ public:
 
     void initialize();
 
+    struct {
+        Eigen::VectorXf masking_volume_hack;
+        bool enabled = false;
+    } debug;
 private:
     State& _state;
 

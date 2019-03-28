@@ -118,7 +118,8 @@ int main(int argc, char** argv) {
     previous_state = Application_State::NoState;
     igl::opengl::glfw::Viewer viewer;
     // viewer.core.background_color = Eigen::Vector4f(0.1f, 0.1f, 0.1f, 1.f);
-    viewer.core.background_color = Eigen::Vector4f(0.8f, 0.8f, 0.8f, 1.f); //Eigen::Vector4f(1.f, 1.f, 1.f, 1.f);
+    viewer.core.background_color = Eigen::Vector4f(1.f, 1.f, 1.f, 1.f);
+    // viewer.core.background_color = Eigen::Vector4f(0.8f, 0.8f, 0.8f, 1.f);
     viewer.core.is_animating = true;
     viewer.callback_init = init;
     viewer.callback_pre_draw = pre_draw;
