@@ -6,7 +6,7 @@ This repository contains the source code for [Unwind](http://google.com), a tool
 ## Installing Unwind
 
 ### On Windows:
-[Download the installer](http://)
+[Download the prgram here](http://)
 
 ### On Linux:
 (TODO: Install the snap package)
