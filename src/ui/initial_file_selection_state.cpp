@@ -200,8 +200,6 @@ bool Initial_File_Selection_Menu::post_draw() {
                 fix_path(existing_project_path_buf);
             }
         }
-
-
     } else {
         show_new_scan_menu = true;
     }

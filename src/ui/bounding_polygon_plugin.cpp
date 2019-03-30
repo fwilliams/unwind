@@ -517,6 +517,7 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
     ImGui::Separator();
+    ImGui::Text("Rotate Normal");
     if (ImGui::Button("NR-")) {
         if (!kf->in_bounding_cage()) {
             state.cage.insert_keyframe(kf);

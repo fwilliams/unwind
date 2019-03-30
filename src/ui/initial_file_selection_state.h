@@ -41,7 +41,7 @@ private:
 
     struct {
         char rawfile_path[PATH_BUFFER_SIZE];
-        bool enabled = true;
+        bool enabled = false;
     } debug;
 };
 
