@@ -2,21 +2,45 @@ cmake_minimum_required(VERSION 3.8)
 project(fish_deformation)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/external/voroffset/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/voroffset/cmake)
 
 
 
 
-###################
-## Build options ##
-###################
+#################################
+## Download external libraries ##
+#################################
 
-option(BUILD_TESTS                   "Build test binaries" OFF)
-option(RELEASE_WITH_SYMBOLS          "Build in release mode but with debug symbols" OFF)
+if (NOT DEFINED ${DL_EXTERNAL_PROJ_DIRECTORY})
+  set(DL_EXTERNAL_PROJ_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external)
+endif()
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+include(DownloadExternalProject)
 
-#if (RELEASE_WITH_SYMBOLS)
-#  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCHOLMOD")
-#endif()
+download_external_project(glm
+  GIT_REPOSITORY https://github.com/fwilliams/glm.git
+  GIT_TAG        master
+)
+download_external_project(spdlog
+  GIT_REPOSITORY https://github.com/fwilliams/spdlog.git
+  GIT_TAG        v1.x
+)
+download_external_project(quartet
+  GIT_REPOSITORY https://github.com/fwilliams/quartet.git
+  GIT_TAG        master
+)
+download_external_project(Segmentangling
+  GIT_REPOSITORY https://github.com/ViDA-NYU/Segmentangling.git
+  GIT_TAG        fish_deformation
+)
+download_external_project(libigl
+  GIT_REPOSITORY https://github.com/fwilliams/libigl.git
+  GIT_TAG        fish_deformation
+)
+download_external_project(cgal
+  GIT_REPOSITORY https://github.com/fwilliams/cgal.git
+  GIT_TAG        master
+)
 
 
 
@@ -91,6 +115,7 @@ target_link_libraries(contourtree Qt5::Core Qt5::Widgets -fopenmp spdlog)
 target_include_directories(contourtree PUBLIC ${CT_INCLUDE_DIRS})
 target_compile_definitions(contourtree PUBLIC CONTOUR_TREE_USE_SPDLOG)
 
+
 # Utils static library
 set(UTILS_INCLUDE_DIRS src src/utils)
 file(GLOB UTILS_SRCS src/utils/*.cpp src/utils/gl/*.cpp)
@@ -107,11 +132,11 @@ target_include_directories(utils SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/external/g
 
 # Eigen library
 add_library(eigen INTERFACE)
-target_include_directories(eigen SYSTEM INTERFACE external/voroffset/3rdparty/eigen)
+target_include_directories(eigen SYSTEM INTERFACE src/utils/voroffset/3rdparty/eigen)
 
 
 # Vor3d static library
-set(VOR3D_DIR external/voroffset/src/vor3d)
+set(VOR3D_DIR src/utils/voroffset/src/vor3d)
 file(GLOB VOR3D_SRCS ${VOR3D_DIR}/*.cpp ${VOR3D_DIR}/*.h)
 list(FILTER VOR3D_SRCS EXCLUDE REGEX ".*Dexelize.[h|cpp]")
 add_library(vor3d STATIC ${VOR3D_SRCS})
@@ -124,12 +149,8 @@ target_link_libraries(vor3d PUBLIC eigen)
 
 
 
-##################################
-## Build main and test programs ##
-##################################
+############################
+## Build main application ##
+############################
 
 add_subdirectory("src")
-
-IF (BUILD_TESTS)
-  add_subdirectory("tests")
-ENDIF()

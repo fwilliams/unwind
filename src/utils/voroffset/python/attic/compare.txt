@@ -1,0 +1,48 @@
+=================Summary of buddha.ply=================
+___________________Basic information___________________
+dim: 3
+#v: 543524	#f: 1087474	#V: 0
+vertex per face : 3
+vertex per voxel: 0
+_____________________Boundding box_____________________
+bbox_min:  [-0.188615  -0.445945  -0.224346 ]
+bbox_max:  [ 0.222054   0.554055   0.186807 ]
+bbox_size: [ 0.410669      1       0.411153 ]
+bbox_diag:  1.15659
+radii: 0.0144573  0.0289147  0.0578294   0.115659
+================Summary of filigree.ply================
+___________________Basic information___________________
+dim: 3
+#v: 509732	#f: 1019720	#V: 0
+vertex per face : 3
+vertex per voxel: 0
+_____________________Boundding box_____________________
+bbox_min:  [  7e-06     4.3e-05    1.3e-05  ]
+bbox_max:  [ 0.999574   0.999977   0.149177 ]
+bbox_size: [ 0.999567   0.999934   0.149164 ]
+bbox_diag:  1.42171
+radii: 0.0177713  0.0355427  0.0710854   0.142171
+==============Summary of octa-flower.ply===============
+___________________Basic information___________________
+dim: 3
+#v: 7919	#f: 15834	#V: 0
+vertex per face : 3
+vertex per voxel: 0
+_____________________Boundding box_____________________
+bbox_min:  [    0          0          0     ]
+bbox_max:  [    1       0.993658   0.711238 ]
+bbox_size: [    1       0.993658   0.711238 ]
+bbox_diag:  1.57899
+radii: 0.0197374  0.0394748  0.0789496   0.157899
+===============Summary of vase-lion.ply================
+___________________Basic information___________________
+dim: 3
+#v: 199927	#f: 399850	#V: 0
+vertex per face : 3
+vertex per voxel: 0
+_____________________Boundding box_____________________
+bbox_min:  [ 0.000124   0.000227   8.4e-05  ]
+bbox_max:  [ 0.605761   0.999929   0.738096 ]
+bbox_size: [ 0.605637   0.999702   0.738012 ]
+bbox_diag:  1.38234
+radii: 0.0172792  0.0345585   0.069117   0.138234
