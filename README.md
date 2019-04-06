@@ -20,7 +20,7 @@ To build Unwind you need to have the following dependencies installed:
 
 These should all be available for installation through the package manager on any distribution. Once you have installed, the dependencies simply clone this repository:
 ```
-git clone ttps://github.com/fwilliams/unwind
+git clone https://github.com/fwilliams/unwind
 cd unwind
 ```
 
