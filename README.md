@@ -12,22 +12,22 @@ Packages for Linux will be made available soon. For now, you can compile Unwind 
 ## Compiling Unwind from source
 Unwind requires minimal dependencies and can be easily compiled from source.
 
+
 ### On Linux
 
-#### Dependencies
+#### 1. Install Dependencies
 To build Unwind you need to have the following dependencies installed:
 * A modern C++ compiler (C++ 14 or later) such as GCC or Clang
 * CMake version 3.8 or later
 * Qt5 
 * Xorg development libraries (Needed by GLFW)
-
-##### Installing Dependencies on Ubuntu
+##### On Ubuntu
 You can install the necessary packages on ubuntu as follows:
 ```
 sudo apt-get install build-essential cmake xorg-dev qt5-default
 ```
 
-#### Building on Linux
+#### 2. Compile
 Once you have installed the dependencies, simply clone this repository:
 ```
 git clone https://github.com/fwilliams/unwind
@@ -42,7 +42,8 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-The binary for Unwind will be in `build/src/unwind`
+#### 3. Run
+The binary for Unwind will be in `build/src/unwind` relative to the root of the repository.
 
-## On Windows with Visual Studio
+### On Windows with Visual Studio
 TODO: Windows instructions
