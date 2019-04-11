@@ -45,6 +45,8 @@ make -j4
 #### 3. Run
 The binary for Unwind will be in `build/src/unwind` relative to the root of the repository.
 
+-------------------------------------------------------
+
 ### Windows with Visual Studio
 
 #### 1. Clone the repository
