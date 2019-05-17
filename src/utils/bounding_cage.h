@@ -455,6 +455,10 @@ public:
         ///
         bool move_centroid_2d(const Eigen::RowVector2d& new_center);
 
+        bool bump(double amount) {
+            this->_origin += amount * this->normal();
+        }
+
         /// Rotate the coordinate frame counter-clockwise about the normal axis
         ///
         bool rotate_about_normal(double d_angle);
@@ -624,7 +628,7 @@ public:
         SV.resize(0, 0);
         SV_smooth.resize(0, 0);
     }
-
+    
     /// Add a new KeyFrame at the given index in the bounding Cage.
     /// The new KeyFrame will have a shape which linearly interpolates the
     /// base KeyFrames of the Cell containing its index.

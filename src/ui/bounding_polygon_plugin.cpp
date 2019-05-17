@@ -517,32 +517,76 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
     ImGui::Separator();
-    ImGui::Text("Rotate Normal");
-    if (ImGui::Button("NR-")) {
-        if (!kf->in_bounding_cage()) {
-            state.cage.insert_keyframe(kf);
+//    ImGui::Text("Rotate Normal");
+//    if (ImGui::Button("NR-")) {
+//        if (!kf->in_bounding_cage()) {
+//            state.cage.insert_keyframe(kf);
+//        }
+//        kf->rotate_about_right(-3.14159*1.0/180.0);
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("NR+")) {
+//        if (!kf->in_bounding_cage()) {
+//            state.cage.insert_keyframe(kf);
+//        }
+//        kf->rotate_about_right(3.14159*1.0/180.0);
+//    }
+//    if (ImGui::Button("NU-")) {
+//        if (!kf->in_bounding_cage()) {
+//            state.cage.insert_keyframe(kf);
+//        }
+//        kf->rotate_about_up(-3.14159*1.0/180.0);
+//    }
+//    ImGui::SameLine();
+//    if (ImGui::Button("NU+")) {
+//        if (!kf->in_bounding_cage()) {
+//            state.cage.insert_keyframe(kf);
+//        }
+//        kf->rotate_about_up(3.14159*1.0/180.0);
+//    }
+
+    {
+        ImGui::Text("Move Front and Back");
+        if (ImGui::Button("+ Front")) {
+            state.cage.keyframes.begin()->bump(-1.0);
+            front_bump_amount -= 1.0;
         }
-        kf->rotate_about_right(-3.14159*1.0/180.0);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("NR+")) {
-        if (!kf->in_bounding_cage()) {
-            state.cage.insert_keyframe(kf);
+        ImGui::SameLine();
+        bool disabled = false;
+        if (front_bump_amount + 1.0 > 0.0) {
+            disabled = true;
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
         }
-        kf->rotate_about_right(3.14159*1.0/180.0);
-    }
-    if (ImGui::Button("NU-")) {
-        if (!kf->in_bounding_cage()) {
-            state.cage.insert_keyframe(kf);
+        if (ImGui::Button("- Front")) {
+            state.cage.keyframes.begin()->bump(1.0);
+            front_bump_amount += 1.0;
         }
-        kf->rotate_about_up(-3.14159*1.0/180.0);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("NU+")) {
-        if (!kf->in_bounding_cage()) {
-            state.cage.insert_keyframe(kf);
+        if (disabled) {
+            ImGui::PopItemFlag();
+            ImGui::PopStyleVar();
         }
-        kf->rotate_about_up(3.14159*1.0/180.0);
+
+
+        disabled = false;
+        if (back_bump_amount - 1.0 < 0.0) {
+            disabled = true;
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+        }
+        if (ImGui::Button("+ Back")) {
+            state.cage.keyframes.rbegin()->bump(-1.0);
+            back_bump_amount -= 1.0;
+        }
+        if (disabled) {
+            ImGui::PopItemFlag();
+            ImGui::PopStyleVar();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("- Back")) {
+            state.cage.keyframes.rbegin()->bump(1.0);
+            back_bump_amount += 1.0;
+        }
     }
 
     ImGui::NewLine();
