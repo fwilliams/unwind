@@ -550,6 +550,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         if (ImGui::Button("+ Front")) {
             state.cage.keyframes.begin()->bump(-1.0);
             front_bump_amount -= 1.0;
+            cage_dirty = true;
         }
         ImGui::SameLine();
         bool disabled = false;
@@ -561,6 +562,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         if (ImGui::Button("- Front")) {
             state.cage.keyframes.begin()->bump(1.0);
             front_bump_amount += 1.0;
+            cage_dirty = true;
         }
         if (disabled) {
             ImGui::PopItemFlag();
@@ -577,6 +579,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         if (ImGui::Button("+ Back")) {
             state.cage.keyframes.rbegin()->bump(-1.0);
             back_bump_amount -= 1.0;
+            cage_dirty = true;
         }
         if (disabled) {
             ImGui::PopItemFlag();
@@ -586,6 +589,7 @@ bool Bounding_Polygon_Menu::post_draw() {
         if (ImGui::Button("- Back")) {
             state.cage.keyframes.rbegin()->bump(1.0);
             back_bump_amount += 1.0;
+            cage_dirty = true;
         }
     }
 
