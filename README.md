@@ -5,9 +5,12 @@ This repository contains the source code for [Unwind](https://arxiv.org/abs/1904
 ![](https://github.com/fwilliams/unwind/blob/master/img/teaser.png)
 
 ## Installing Unwind
-Executables for Unwind are available for [Windows](https://drive.google.com/open?id=1sMOADLW4UndNcVG1y5wLlFNg16LJLoGY). 
+Executables for Unwind are available for [Windows](https://drive.google.com/open?id=1J9BzsZyI-AfS8e60z1lJpMUY8lKS6-rC). 
 
 Packages for Linux will be made available soon. For now, you can compile Unwind from source (see below)
+
+## Usage Instructions
+Detailed instructions for using Unwind are available [here](https://drive.google.com/open?id=1nX1DfBNiOcilo1tyLqh0B6fV_Aa-K2ML)
 
 ## Compiling Unwind from source
 Unwind requires minimal dependencies and can be easily compiled from source.
