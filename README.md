@@ -2,7 +2,7 @@
 
 ![](https://raw.githubusercontent.com/fwilliams/unwind/master/img/teaser3.png "Unwind: Interactive Fish Straightening")
 
-This repository contains the source code for [Unwind](https://arxiv.org/abs/1904.04890), a tool for unwarping bent volumetric scans of fishes.
+Unwind is a tool for unwarping bent volumetric scans of fishes. This repository contains the source code for the [Unwind Paper](https://arxiv.org/abs/1904.04890),
 
 ![](https://github.com/fwilliams/unwind/blob/master/img/teaser.png)
 
