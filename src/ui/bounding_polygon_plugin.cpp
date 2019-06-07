@@ -132,12 +132,16 @@ void Bounding_Polygon_Menu::post_draw_save(int window_width) {
             const std::string save_file_name = std::string(save_name_buf);
             const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
             const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
+            const std::string save_nrrdfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".nrrd";
             const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
             if (get_file_type(save_project_path.c_str()) != FT_DOES_NOT_EXIST) {
                 save_name_error_message = "Warning: A file named " + save_file_name + ".fish.pro exists. Saving will overwrite it.";
                 save_name_overwrite = true;
             } else if (get_file_type(save_datfile_path.c_str()) != FT_DOES_NOT_EXIST) {
                 save_name_error_message = "Warning: A file named " + save_file_name + ".dat exists. Saving will overwrite it.";
+                save_name_overwrite = true;
+            } else if (get_file_type(save_nrrdfile_path.c_str()) != FT_DOES_NOT_EXIST) {
+                save_name_error_message = "Warning: A file named " + save_file_name + ".nrrd exists. Saving will overwrite it.";
                 save_name_overwrite = true;
             } else if (get_file_type(save_rawfile_path.c_str()) != FT_DOES_NOT_EXIST) {
                 save_name_error_message = "Warning: A file named " + save_file_name + ".raw exists. Saving will overwrite it.";
@@ -256,6 +260,7 @@ void Bounding_Polygon_Menu::post_draw_save(int window_width) {
         const std::string save_file_name = std::string(save_name_buf);
         const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
         const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
+        const std::string save_nrrdfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".nrrd";
         const std::string save_rawfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".raw";
 
         state.input_metadata.project_name = save_file_name;
@@ -279,7 +284,7 @@ void Bounding_Polygon_Menu::post_draw_save(int window_width) {
             glBindTexture(GL_TEXTURE_3D, 0);
             exporter.set_export_dims(output_dims[0], output_dims[1], output_dims[2]);
             exporter.update(state.cage, state.hi_res_volume.volume_texture, G3f(state.low_res_volume.dims()));
-            exporter.write_texture_data_to_file(save_rawfile_path);
+            exporter.write_texture_data_to_file(save_rawfile_path, save_nrrdfile_path);
             cage_dirty = true;
             glBindTexture(GL_TEXTURE_3D, state.hi_res_volume.volume_texture);
             glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, old_min_filter);

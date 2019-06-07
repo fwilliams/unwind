@@ -35,7 +35,7 @@ public:
         return render_texture;
     }
 
-    void write_texture_data_to_file(std::string filename);
+    void write_texture_data_to_file(std::string raw_filename, std::string nrrd_filename);
 
     void set_export_dims(GLsizei w, GLsizei h, GLsizei d);
 
