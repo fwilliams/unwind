@@ -7,6 +7,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 #include <igl/opengl/create_shader_program.h>
+#include <utils/nrrd/NRRD/nrrd.hxx>
 
 constexpr const char* SLICE_VERTEX_SHADER = R"(
 #version 150
@@ -80,10 +81,7 @@ void VolumeExporter::write_texture_data_to_file(std::string filename) {
     std::vector<uint8_t> real_data;
     real_data.resize(num_voxels);
     for (size_t i = 0; i < num_voxels; i++) { real_data[i] = out_data[4*i]; }
-    std::ofstream fout;
-    fout.open(filename, std::ios::binary);
-    fout.write(reinterpret_cast<char*>(real_data.data()), num_voxels*sizeof(uint8_t));
-    fout.close();
+    NRRD::save3D <uint8_t> (filename, real_data.data(), this->w, this->h, this->d);
     glPopDebugGroup();
 }
 
