@@ -5,13 +5,25 @@ clone_folder: C:\projects\fish_deformation
 branches:
   only:
     - master
+    - michael
 install:
   - git submodule update --init --recursive
   - cinstall: python
+build:
+  parallel: true
 build_script:
-  - echo Running cmake...
+  - echo Running cmake ..
+  - cd c:\tools\vcpkg
+  - .\vcpkg.exe --triplet x64-windows install mpir mpfr
   - cd c:\projects\fish_deformation
+  - set PATH=C:\Python%PYTHON%-x64;C:\Python%PYTHON%-x64\Scripts;%PATH%
   - mkdir build
   - cd build
-  - cmake -G "Visual Studio 15 2017 Win64" -T "host=x64" ..
-  - msbuild %MSBuildOptions% fish_deformation
+  - cmake -G "Visual Studio 15 2017 Win64"
+      -DCMAKE_PREFIX_PATH="C:/Qt/5.10.1/msvc2017_64/lib/cmake"  
+      -DMPFR_INCLUDE_DIR:PATH="C:/tools/vcpkg/installed/x64-windows/include" 
+      -DMPFR_LIBRARIES:FILEPATH="C:/tools/vcpkg/installed/x64-windows/lib/mpfr.lib" 
+      -DGMP_INCLUDE_DIR:PATH="C:/tools/vcpkg/installed/x64-windows/include" 
+      -DGMP_LIBRARIES:FILEPATH="C:/tools/vcpkg/installed/x64-windows/lib/mpir.lib" 
+      -DBOOST_ROOT="C:/Libraries/boost_1_65_1" ../
+  - msbuild %MSBuildOptions% fish_deformation.sln
