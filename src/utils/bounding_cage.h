@@ -457,6 +457,7 @@ public:
 
         bool bump(double amount) {
             this->_origin += amount * this->normal();
+            return true;
         }
 
         /// Rotate the coordinate frame counter-clockwise about the normal axis
