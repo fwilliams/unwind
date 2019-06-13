@@ -31,7 +31,12 @@ after_build:
   - cd C:\Qt\latest\msvc2017_64\bin
   - windeployqt c:\projects\fish_deformation\build\src\Debug\unwind.exe
   - cd C:\projects\fish_deformation
+  - 7z a plugins.zip C:\projects\fish_deformation\build\src\Debug\unwind.exe  
   - 7z a plugins.zip C:\projects\fish_deformation\build\src\Debug\*.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Core.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Gui.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Svg.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Widgets.dll
   - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\iconengines\qsvgicon.dll		
   - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qgif.dll
   - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qicns.dll
