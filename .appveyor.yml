@@ -26,32 +26,29 @@ build_script:
       -DGMP_INCLUDE_DIR:PATH="C:/tools/vcpkg/installed/x64-windows/include" 
       -DGMP_LIBRARIES:FILEPATH="C:/tools/vcpkg/installed/x64-windows/lib/mpir.lib" 
       -DBOOST_ROOT="C:/Libraries/boost_1_65_1" ../
+  - set MSBuildOptions=/v:m /p:Configuration=Release /p:Platform=x64
   - msbuild %MSBuildOptions% fish_deformation.sln
 after_build:
   - cd C:\Qt\latest\msvc2017_64\bin
-  - windeployqt c:\projects\fish_deformation\build\src\Debug\unwind.exe
+  - windeployqt c:\projects\fish_deformation\build\src\Release\unwind.exe
   - cd C:\projects\fish_deformation
-  - 7z a plugins.zip C:\projects\fish_deformation\build\src\Debug\unwind.exe  
-  - 7z a plugins.zip C:\projects\fish_deformation\build\src\Debug\*.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Core.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Gui.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Svg.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\Qt5Widgets.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\iconengines\qsvgicon.dll		
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qgif.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qicns.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qico.dll	
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qjpeg.dll	
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qsvg.dll	
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qtga.dll	
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qtiff.dll	
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qwbmp.dll	
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qwebp.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\platforms\qwindows.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\styles\qwindowsvistastyle.dll 
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\d3dcompiler_47.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\libEGL.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\libGLESV2.dll
-  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\opengl32sw.dll
+  - 7z a unwind.zip C:\projects\fish_deformation\build\src\Release\unwind.exe  
+  - 7z a unwind.zip C:\projects\fish_deformation\build\src\Release\*.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\iconengines\qsvgicon.dll		
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qgif.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qicns.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qico.dll	
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qjpeg.dll	
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qsvg.dll	
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qtga.dll	
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qtiff.dll	
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qwbmp.dll	
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qwebp.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\platforms\qwindows.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\plugins\styles\qwindowsvistastyle.dll 
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\bin\d3dcompiler_47.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\bin\libEGL.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\bin\libGLESV2.dll
+  - 7z a unwind.zip C:\Qt\latest\msvc2017_64\bin\opengl32sw.dll
 artifacts:
-  - path: plugins.zip 
+  - path: unwind.zip 
