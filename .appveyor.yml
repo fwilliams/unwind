@@ -30,22 +30,22 @@ build_script:
 after_build:
   - cd C:\Qt\latest\msvc2017_64\bin
   - windeployqt c:\projects\fish_deformation\build\src\Debug\unwind.exe
-  - appveyor PushArtifact c:\projects\fish_deformation\build\src\Debug\*.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\iconengines\qsvgicon.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qgif.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qicns.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qico.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qjpeg.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qsvg.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qtga.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qtiff.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qwbmp.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\imageformats\qwebp.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\platforms\qwindows.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\plugins\styles\qwindowsvistastyle.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\bin\d3dcompiler_47.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\bin\libEGL.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\bin\libGLESV2.dll
-  - appveyor PushArtifact C:\Qt\latest\msvc2017_64\bin\opengl32sw.dll
+  - 7z a plugins.zip C:\projects\fish_deformation\build\src\Debug\*.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\iconengines\qsvgicon.dll		
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qgif.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qicns.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qico.dll	
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qjpeg.dll	
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qsvg.dll	
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qtga.dll	
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qtiff.dll	
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qwbmp.dll	
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\imageformats\qwebp.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\platforms\qwindows.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\plugins\styles\qwindowsvistastyle.dll 
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\d3dcompiler_47.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\libEGL.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\libGLESV2.dll
+  - 7z a plugins.zip C:\Qt\latest\msvc2017_64\bin\opengl32sw.dll
 artifacts:
   - path: plugins.zip 
