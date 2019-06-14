@@ -36,6 +36,6 @@ after_build:
   - cd C:\Qt\latest\msvc2017_64\bin
   - windeployqt C:\projects\fish_deformation\unwind\unwind.exe
   - cd C:\projects\fish_deformation
-  - 7z a unwind.zip .\unwind\*
+  - 7z a unwind.zip unwind\
 artifacts:
   - path: unwind.zip
