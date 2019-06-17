@@ -1,0 +1,70 @@
+dist: trusty
+sudo: true
+language: cpp
+cache: ccache
+branches:
+  only:
+    - master
+    - michael
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - cmake
+    - g++-6
+    - gcc-6
+    - g++-7
+    - gcc-7
+    - libblas-dev
+    - libboost-filesystem-dev
+    - libboost-system-dev
+    - libboost-thread-dev
+    - libglu1-mesa-dev
+    - liblapack-dev
+    - libmpfr-dev
+    - libpython3-dev
+    - python3-setuptools
+    - qt5-default
+    - xorg-dev
+  homebrew:
+    packages:
+    - ccache
+matrix:
+  include:
+  - os: linux
+    compiler: gcc-6
+    env:
+    - MATRIX_EVAL="export CC=gcc-6 CXX=g++-6 CONFIG=Release PYTHON=python3"
+  - os: linux
+    compiler: gcc-7
+    env:
+    - MATRIX_EVAL="export CC=gcc-7 CXX=g++-7 CONFIG=Release PYTHON=python3"
+  - os: linux
+    compiler: gcc-7
+    env:
+    - MATRIX_EVAL="export CC=gcc-7 CXX=g++-7 CONFIG=Release PYTHON=python3 CMAKE_EXTRA='-DLIBIGL_USE_STATIC_LIBRARY=OFF'"
+  - os: linux
+    compiler: gcc-7
+    env:
+    - MATRIX_EVAL="export CC=gcc-7 CXX=g++-7 CONFIG=Release PYTHON=python3 CMAKE_EXTRA='-DLIBIGL_EIGEN_VERSION=3.3.7'"
+
+install:
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH="/usr/local/opt/ccache/libexec:$PATH"; fi
+- eval "${MATRIX_EVAL}"
+- ccache --max-size=5.0G
+- ccache -V && ccache --show-stats && ccache --zero-stats
+
+script:
+- mkdir build
+- pushd build
+- cmake ${CMAKE_EXTRA}
+    -DCMAKE_BUILD_TYPE=$CONFIG
+    -DLIBIGL_CHECK_UNDEFINED=ON
+    -DLIBIGL_WITH_CGAL=ON
+    ../
+- make -j8
+- ctest --verbose
+- popd
+- rm -rf build
+- ccache --show-stats
