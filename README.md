@@ -1,4 +1,5 @@
 # Unwind: Interactive Fish Straightening
+[![Build Status](https://travis-ci.org/fwilliams/unwind.svg?branch=master)](https://travis-ci.org/fwilliams/unwind)
 [![Build status](https://ci.appveyor.com/api/projects/status/a8rngcuug9whxwh3?svg=true)](https://ci.appveyor.com/project/fwilliams/unwind)
 
 ![](https://raw.githubusercontent.com/fwilliams/unwind/master/img/teaser3.png "Unwind: Interactive Fish Straightening")
