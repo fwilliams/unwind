@@ -5,7 +5,6 @@ cache: ccache
 branches:
   only:
     - master
-    - michael
 addons:
   apt:
     sources:
@@ -40,7 +39,7 @@ matrix:
     compiler: gcc-7
     env:
     - MATRIX_EVAL="export CC=gcc-7 CXX=g++-7 CONFIG=Release PYTHON=python3"
-  - os: linux
+  - os: linux # same config like above but with -DLIBIGL_USE_STATIC_LIBRARY=OFF to test static and header-only builds
     compiler: gcc-7
     env:
     - MATRIX_EVAL="export CC=gcc-7 CXX=g++-7 CONFIG=Release PYTHON=python3 CMAKE_EXTRA='-DLIBIGL_USE_STATIC_LIBRARY=OFF'"

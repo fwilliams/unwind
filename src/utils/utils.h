@@ -6,6 +6,7 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <glad/glad.h>
 
 
 #ifdef _MSC_VER
@@ -68,5 +69,17 @@ int nearest_vertex(const Eigen::MatrixXd& TV, const Eigen::RowVector3d& p);
 void remesh_connected_components(int comp, const Eigen::VectorXi& C,
                                  const Eigen::MatrixXd& TV, const Eigen::MatrixXi& TT,
                                  Eigen::VectorXi& outCMap, Eigen::MatrixXd& outTV, Eigen::MatrixXi& outTT);
+
+
+typedef void (*DEBUGPROC)(GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar *message,
+    const void *userParam);
+void push_opengl_debug_group(const std::string& name);
+void pop_opengl_debug_group();
+void init_opengl_debugging(DEBUGPROC debug_callback);
 
 #endif // UTILS_H
