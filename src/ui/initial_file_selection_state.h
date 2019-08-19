@@ -7,6 +7,7 @@
 #include <thread>
 
 #include <utils/utils.h>
+#include <utils/timer.h>
 
 struct State;
 
@@ -20,6 +21,7 @@ public:
 
 private:
     State& _state;
+    Timer _timer;
 
     char output_dir_path_buf[PATH_BUFFER_SIZE];
     char first_image_path_buf[PATH_BUFFER_SIZE] = {};

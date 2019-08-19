@@ -2,10 +2,11 @@
 #define __FISH_DEFORMATION_ENDPOINT_SELECTION_STATE__
 
 #include "fish_ui_viewer_plugin.h"
-
 #include <array>
 #include <atomic>
 #include <thread>
+
+#include <utils/timer.h>
 
 struct State;
 
@@ -28,6 +29,9 @@ private:
 
 
     State& state;
+    Timer timer;
+    int num_mouse_clicks = 0;
+    int num_key_presses = 0;
 
     Eigen::Vector4f old_viewport;
 

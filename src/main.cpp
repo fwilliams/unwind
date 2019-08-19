@@ -1,6 +1,9 @@
 #include <string>
+#include <ctime>
+#include <chrono>
 
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 #include "ui/initial_file_selection_state.h"
 #include "ui/selection_plugin.h"
@@ -40,6 +43,12 @@ void log_opengl_debug(GLenum source, GLenum type, GLuint id, GLenum severity,
 
 
 bool init(igl::opengl::glfw::Viewer& viewer) {
+    auto timenow = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    _state.timing_logger_filename = "timings." + std::to_string(timenow) + ".log.txt";
+    _state.timing_logger = spdlog::basic_logger_mt(TIMING_LOGGER_NAME, _state.timing_logger_filename);
+    _state.timing_logger->set_level(TIMING_LOGGER_LEVEL);
+    _state.timing_logger->flush_on(TIMING_LOGGER_LEVEL);
+
     initial_file_selection.init(&viewer);
     selection_menu.init(&viewer);
     meshing_menu.init(&viewer);

@@ -114,6 +114,9 @@ Meshing_Menu::Meshing_Menu(State& state) : _state(state) {}
 
 
 void Meshing_Menu::initialize() {
+    _timer.reset();
+    _state.timing_logger->info("BEGIN MESHING");
+
     done_meshing = false;
 
     auto thread_fun = [&]() {
@@ -200,6 +203,8 @@ bool Meshing_Menu::post_draw() {
     }
 
     if (done_meshing) {
+        double elapsed = _timer.elapsed();
+        _state.timing_logger->info("END MESHING {} {} {}", elapsed, 0, 0);
         _state.set_application_state(Application_State::EndPointSelection);
         done_meshing = false;
         _state.dirty_flags.mesh_dirty = false;

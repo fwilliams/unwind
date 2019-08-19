@@ -3,7 +3,9 @@
 
 #include "fish_ui_viewer_plugin.h"
 #include "bounding_widget_2d.h"
+
 #include <utils/gl/volume_exporter.h>
+#include <utils/timer.h>
 
 #include "bounding_widget_3d.h"
 #include "transfer_function_edit_widget.h"
@@ -52,6 +54,9 @@ private:
     TransferFunctionEditWidget tf_widget;
 
     State& state;
+    Timer timer;
+    int num_mouse_clicks = 0;
+    int num_key_presses = 0;
 
     Eigen::Vector4f old_viewport;
     Eigen::Vector4f viewer_viewport;

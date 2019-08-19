@@ -6,6 +6,8 @@
 #include <atomic>
 #include <thread>
 
+#include <utils/timer.h>
+
 struct State;
 
 class Meshing_Menu : public FishUIViewerPlugin {
@@ -22,6 +24,7 @@ public:
     } debug;
 private:
     State& _state;
+    Timer _timer;
 
     // Intermediate state of the extracted surface
     struct ExtractedSurface {

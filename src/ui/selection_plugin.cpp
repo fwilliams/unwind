@@ -17,11 +17,19 @@
 Selection_Menu::Selection_Menu(State& state) : _state(state) {}
 
 void Selection_Menu::deinitialize() {
+    double elapsed = _timer.elapsed();
+    _state.timing_logger->info("END SEGMENTATION {} {} {}", elapsed, _num_key_presses, _num_mouse_clicks);
     selection_renderer.destroy();
     viewer->core.viewport = old_viewport;
 }
 
 void Selection_Menu::initialize() {
+    _timer.reset();
+    _num_key_presses = 0;
+    _num_mouse_clicks = 0;
+    _state.timing_logger->info("BEGIN SEGMENTATION");
+    _state.timing_logger->info("BEGIN_INTERACT SEGMENTATION");
+
     selection_renderer.initialize(glm::ivec2(viewer->core.viewport[2], viewer->core.viewport[3]));
 
     const glm::ivec3 volume_dims = G3i(_state.low_res_volume.dims());
@@ -196,6 +204,7 @@ void Selection_Menu::draw_selection_volume() {
 }
 
 bool Selection_Menu::key_down(int key, int modifiers) {
+    _num_key_presses += 1;
     if (key == 32) { // SPACE
         should_select = true;
         return true;
@@ -286,6 +295,7 @@ bool Selection_Menu::post_draw() {
     ImGui::Separator();
 
     if (ImGui::Button("Back")) {
+        _state.timing_logger->info("END_INTERACT SEGMENTATION {}", _timer.elapsed());
         _state.set_application_state(Application_State::Initial_File_Selection);
     }
     ImGui::SameLine();
@@ -294,6 +304,7 @@ bool Selection_Menu::post_draw() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     if (ImGui::Button("Next")) {
+        _state.timing_logger->info("END_INTERACT SEGMENTATION {}", _timer.elapsed());
         _state.set_application_state(Application_State::Meshing);
     }
     if (list.empty()) {
