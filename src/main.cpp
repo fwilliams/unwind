@@ -56,7 +56,9 @@ bool init(igl::opengl::glfw::Viewer& viewer) {
     ct_logger->set_level(CONTOURTREE_LOGGER_LEVEL);
     contourtree::Logger::setLogger(ct_logger);
 
-    init_opengl_debugging(log_opengl_debug);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(log_opengl_debug, NULL);
+
     return false;
 }
 

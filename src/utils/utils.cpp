@@ -11,7 +11,7 @@
 #include <igl/grad.h>
 #include <igl/adjacency_list.h>
 #include <igl/components.h>
-#include <glad/glad.h>
+
 
 void split_mesh_components(const Eigen::MatrixXi& TT, const Eigen::VectorXi& components, std::vector<Eigen::MatrixXi>& out) {
   const int num_components = components.maxCoeff() + 1;
@@ -400,24 +400,4 @@ void geodesic_distances(const Eigen::MatrixXd& TV,
   if (normalized) {
     scale_zero_one(isovals, isovals);
   }
-}
-
-
-void push_opengl_debug_group(const std::string& name) {
-#ifndef __APPLE__
-    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name.c_str());
-#endif
-}
-
-void pop_opengl_debug_group() {
-#ifndef __APPLE__
-    glPopDebugGroup();
-#endif
-}
-
-void init_opengl_debugging(DEBUGPROC log_opengl_debug) {
-#ifndef __APPLE__
-    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(log_opengl_debug, NULL);
-#endif
 }

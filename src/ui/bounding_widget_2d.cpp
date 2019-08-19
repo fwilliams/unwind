@@ -563,7 +563,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
     //
     // Render the slice of the volume for this keyframe into an OpenGL texture
     //
-    push_opengl_debug_group("Render Slice");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render slice");
     {
         glUseProgram(plane.program);
         glBindVertexArray(empty_vao);
@@ -600,13 +600,13 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
         glBindVertexArray(0);
         glUseProgram(0);
     }
-    pop_opengl_debug_group();
+    glPopDebugGroup();
 
 
     //
     // Render the bounding-box, center, and axes into the same texture
     //
-    push_opengl_debug_group("Render Polygon");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render polygon");
     {
         const glm::vec2 centroid_2d = G2f(kf->centroid_2d());
         const glm::vec2 r_axis = G2f(kf->right_rotated_2d()), u_axis = G2f(kf->up_rotated_2d());
@@ -647,7 +647,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
             }
         }
     }
-    pop_opengl_debug_group();
+    glPopDebugGroup();
 
     // Restore the framebuffer and viewport
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -658,7 +658,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
     //
     // Blit the texture we just rendered to the screen
     //
-    push_opengl_debug_group("Texture Blit");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Texture Blit");
     {
         int width;
         int height;
@@ -709,7 +709,7 @@ bool Bounding_Polygon_Widget::post_draw(BoundingCage::KeyFrameIterator kf, bool 
         glBindVertexArray(0);
         glUseProgram(0);
     }
-    pop_opengl_debug_group();
+    glPopDebugGroup();
     glEnable(GL_DEPTH_TEST);
 
     return false;

@@ -9,7 +9,6 @@
 #include <iostream>
 #include <array>
 
-#include "utils/utils.h"
 
 namespace {
 
@@ -502,7 +501,7 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
 
 
     // Generate multipass buffers if enabled
-    push_opengl_debug_group("Init VolumeRenderer Multipass");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Init VolumeRenderer Multipass");
     for (int i = 0; i < 2; i++) {
         glGenTextures(1, &_gl_state.multipass.texture[i]);
         glBindTexture(GL_TEXTURE_2D, _gl_state.multipass.texture[i]);
@@ -518,11 +517,11 @@ void VolumeRenderer::init(const glm::ivec2 &viewport_size, const char *fragment_
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    pop_opengl_debug_group();
+    glPopDebugGroup();
 }
 
 void VolumeRenderer::ray_endpoint_pass(const glm::mat4& model_matrix, const glm::mat4& view_matrix, const glm::mat4& proj_matrix) {
-    push_opengl_debug_group("Render Bounding Box");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Bounding Box");
     {
         const glm::vec4 color_transparent(0.0);
 
@@ -579,11 +578,11 @@ void VolumeRenderer::ray_endpoint_pass(const glm::mat4& model_matrix, const glm:
             glDisable(GL_CULL_FACE);
         }
     }
-    pop_opengl_debug_group();
+    glPopDebugGroup();
 }
 
 void VolumeRenderer::volume_pass(const glm::vec3& light_position, const glm::ivec3& volume_dims, GLuint volume_tex, GLuint multipass_tex) {
-    push_opengl_debug_group("Render Volume TEST");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Render Volume TEST");
 
     //
     //  Setup
@@ -641,7 +640,7 @@ void VolumeRenderer::volume_pass(const glm::vec3& light_position, const glm::ive
 
     glBindVertexArray(0);
 
-    pop_opengl_debug_group();
+    glPopDebugGroup();
 }
 
 void VolumeRenderer::begin(const glm::ivec3& volume_dims, GLuint tex) {
@@ -683,7 +682,7 @@ void VolumeRenderer::render_pass(
     const int current_buf = _current_multipass_buf;
     const int last_buf = (_current_multipass_buf+1) % 2;
 
-    push_opengl_debug_group("Multipass render");
+    glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Multipass render");
 
     GLint old_viewport[4];
     glGetIntegerv(GL_VIEWPORT, old_viewport);
@@ -710,7 +709,7 @@ void VolumeRenderer::render_pass(
     volume_pass(light_position, _current_volume_dims, volume_tex, _gl_state.multipass.texture[last_buf]);
 
     glViewport(old_viewport[0], old_viewport[1], old_viewport[2], old_viewport[3]);
-    pop_opengl_debug_group();
+    glPopDebugGroup();
 }
 
 

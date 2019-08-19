@@ -54,11 +54,8 @@ class SelectionRenderer {
             GLuint program_object = 0;
             GLuint transfer_function_texture;
 
-            GLuint contour_features_texture;
-            GLuint selection_features_texture;
-
-            GLuint num_contour_features;
-            GLuint num_selection_features;
+            GLuint selection_list_ssbo;
+            GLuint contour_information_ssbo;
 
             struct {
                 GLint entry_texture = 0;
@@ -75,11 +72,6 @@ class SelectionRenderer {
                 GLint light_color_diffuse = 0;
                 GLint light_color_specular = 0;
                 GLint light_exponent_specular = 0;
-
-                GLint contour_features_texture;
-                GLint selection_features_texture;
-                GLint num_contour_features;
-                GLint num_selection_features;
 
                 GLuint index_volume = 0;
                 GLuint color_by_identifier = 0;
@@ -104,9 +96,6 @@ class SelectionRenderer {
                 GLint volume_dimensions_rcp = 0;
                 GLint sampling_rate = 0;
                 GLuint index_volume = 0;
-
-                GLint contour_features_texture;
-                GLint num_contour_features;
             } uniform_location;
         } picking_pass;
     } _gl_state;
