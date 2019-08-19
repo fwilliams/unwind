@@ -93,6 +93,12 @@ EndPoint_Selection_Menu::EndPoint_Selection_Menu(State& state) : state(state) {
 
 
 void EndPoint_Selection_Menu::initialize() {
+    timer.reset();
+    state.timing_logger->info("BEGIN ENDPOINT_SELECT");
+    state.timing_logger->info("BEGIN_INTERACT ENDPOINT_SELECT");
+    num_key_presses = 0;
+    num_mouse_clicks = 0;
+
     for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
         viewer->erase_mesh(i);
     }
@@ -136,6 +142,8 @@ void EndPoint_Selection_Menu::initialize() {
 }
 
 void EndPoint_Selection_Menu::deinitialize() {
+    double elapsed = timer.elapsed();
+    state.timing_logger->info("END ENDPOINT_SELECT {} {} {}", elapsed, num_key_presses, num_mouse_clicks);
     for (size_t i = viewer->data_list.size() - 1; i > 0; i--) {
         viewer->erase_mesh(i);
     }
@@ -390,6 +398,7 @@ bool EndPoint_Selection_Menu::post_draw() {
     ImGui::Separator();
 
     if (ImGui::Button("Back")) {
+        state.timing_logger->info("END_INTERACT ENDPOINT_SELECT {}", timer.elapsed());
         state.set_application_state(Application_State::Segmentation);
     }
     ImGui::SameLine();
@@ -398,6 +407,7 @@ bool EndPoint_Selection_Menu::post_draw() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     if (ImGui::Button("Next")) {
+        state.timing_logger->info("END_INTERACT ENDPOINT_SELECT {}", timer.elapsed());
         if (state.dirty_flags.bounding_cage_dirty) {
             extract_skeleton();
             state.dirty_flags.bounding_cage_dirty = false;
@@ -417,6 +427,7 @@ bool EndPoint_Selection_Menu::post_draw() {
 }
 
 bool EndPoint_Selection_Menu::key_down(int key, int modifier) {
+    num_key_presses += 1;
     bool ret = FishUIViewerPlugin::key_down(key, modifier);
     if (!selecting_endpoints) {
         return ret;

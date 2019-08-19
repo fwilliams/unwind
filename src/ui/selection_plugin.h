@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 #include <utils/gl/selection_renderer.h>
+#include <utils/timer.h>
 
 struct State;
 
@@ -26,6 +27,9 @@ private:
     void draw_selection_volume();
 
     State& _state;
+    Timer _timer;
+    int _num_mouse_clicks = 0;
+    int _num_key_presses = 0;
 
     Parameters rendering_params;
     SelectionRenderer selection_renderer;

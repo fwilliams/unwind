@@ -22,6 +22,8 @@ const spdlog::level::level_enum FISH_LOGGER_LEVEL = spdlog::level::trace;
 constexpr const char* FISH_LOGGER_NAME = "Fish Deformation";
 const spdlog::level::level_enum CONTOURTREE_LOGGER_LEVEL = spdlog::level::trace;
 constexpr const char* CONTOURTREE_LOGGER_NAME = "Contour Tree";
+const spdlog::level::level_enum TIMING_LOGGER_LEVEL = spdlog::level::trace;
+constexpr const char* TIMING_LOGGER_NAME = "Timing Stats";
 
 enum class Application_State {
     Initial_File_Selection = 0,
@@ -52,6 +54,9 @@ struct State {
     }
 
     std::shared_ptr<spdlog::logger> logger;
+
+    std::shared_ptr<spdlog::logger> timing_logger;
+    std::string timing_logger_filename;
 
     struct LoadedVolume {
         DatFile metadata;

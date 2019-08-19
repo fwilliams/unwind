@@ -28,9 +28,14 @@ void fix_path(char* path) {
 
 void Initial_File_Selection_Menu::initialize() {
     _state.logger->debug("Initializing File Selection View");
+    _timer.reset();
+    _state.timing_logger->info("BEGIN FILE_SELECTION");
+    _state.timing_logger->info("BEGIN_INTERACT FILE_SELECTION");
 }
 
 void Initial_File_Selection_Menu::deinitialize() {
+    double elapsed = _timer.elapsed();
+    _state.timing_logger->info("END FILE_SELECTION {} {} {}", elapsed, 0, 0);
     _state.logger->debug("De-Initializing File Selection View");
 }
 
@@ -371,6 +376,7 @@ bool Initial_File_Selection_Menu::post_draw() {
         }
 
         is_loading = true;
+        _state.timing_logger->info("END_INTERACT FILE_SELECTION {}", _timer.elapsed());
         done_loading = false;
         loading_thread = std::thread(thread_fun);
         loading_thread.detach();

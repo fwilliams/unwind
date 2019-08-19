@@ -18,6 +18,12 @@ Bounding_Polygon_Menu::Bounding_Polygon_Menu(State& state)
 
 
 void Bounding_Polygon_Menu::initialize() {
+    timer.reset();
+    num_mouse_clicks = 0;
+    num_key_presses = 0;
+    state.timing_logger->info("BEGIN TRANSFORM");
+    state.timing_logger->info("BEGIN_INTERACT TRANSFORM");
+
     // Store a backup copy of the viewer viewport and then set the viewport to the size specified by the
     // layout constraints of the widget
     old_viewport = viewer->core.viewport;
@@ -52,6 +58,9 @@ void Bounding_Polygon_Menu::initialize() {
 }
 
 void Bounding_Polygon_Menu::deinitialize() {
+    double elapsed = timer.elapsed();
+    state.timing_logger->info("END_INTERACT TRANSFORM {}", elapsed);
+    state.timing_logger->info("END TRANSFORM {} {} {}", elapsed, num_key_presses, num_mouse_clicks);
     viewer->core.viewport = old_viewport;
     widget_2d.deinitialize();
     widget_3d.deinitialize();
@@ -77,6 +86,7 @@ bool Bounding_Polygon_Menu::mouse_move(int mouse_x, int mouse_y) {
 }
 
 bool Bounding_Polygon_Menu::mouse_down(int button, int modifier) {
+    num_mouse_clicks += 1;
     bool ret = FishUIViewerPlugin::mouse_down(button, modifier);
 
     ret = ret || widget_2d.mouse_down(button, modifier, is_2d_widget_in_focus());
@@ -97,6 +107,7 @@ bool Bounding_Polygon_Menu::mouse_scroll(float delta_y) {
 }
 
 bool Bounding_Polygon_Menu::key_down(int button, int modifier) {
+    num_key_presses += 1;
     bool ret = FishUIViewerPlugin::key_down(button, modifier);
     ret = ret || widget_2d.key_down(button, modifier, is_2d_widget_in_focus());
     return ret;
@@ -253,6 +264,11 @@ void Bounding_Polygon_Menu::post_draw_save(int window_width) {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
     }
     if (ImGui::Button("Save")) {
+        double elapsed = timer.elapsed();
+        state.timing_logger->info("END_INTERACT TRANSFORM {}", elapsed);
+        state.timing_logger->info("END TRANSFORM {} {} {}", elapsed, num_key_presses, num_mouse_clicks);
+        state.timing_logger->info("END_APPLICATION_RUN");
+
         const std::string save_file_name = std::string(save_name_buf);
         const std::string save_project_path = state.input_metadata.output_dir + "/" + save_file_name + ".fish.pro";
         const std::string save_datfile_path = state.input_metadata.output_dir + "/" + save_file_name + ".dat";
@@ -291,6 +307,8 @@ void Bounding_Polygon_Menu::post_draw_save(int window_width) {
         output_dims[0] = -1;
         output_dims[1] = -1;
         output_dims[2] = -2;
+        std::string dst_filename = state.input_metadata.output_dir + std::string("/timings.log.txt");
+        std::rename(state.timing_logger_filename.c_str(), dst_filename.c_str());
     }
     if (disabled) {
         ImGui::PopItemFlag();
@@ -517,33 +535,33 @@ bool Bounding_Polygon_Menu::post_draw() {
     }
 
     ImGui::Separator();
-//    ImGui::Text("Rotate Normal");
-//    if (ImGui::Button("NR-")) {
-//        if (!kf->in_bounding_cage()) {
-//            state.cage.insert_keyframe(kf);
-//        }
-//        kf->rotate_about_right(-3.14159*1.0/180.0);
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("NR+")) {
-//        if (!kf->in_bounding_cage()) {
-//            state.cage.insert_keyframe(kf);
-//        }
-//        kf->rotate_about_right(3.14159*1.0/180.0);
-//    }
-//    if (ImGui::Button("NU-")) {
-//        if (!kf->in_bounding_cage()) {
-//            state.cage.insert_keyframe(kf);
-//        }
-//        kf->rotate_about_up(-3.14159*1.0/180.0);
-//    }
-//    ImGui::SameLine();
-//    if (ImGui::Button("NU+")) {
-//        if (!kf->in_bounding_cage()) {
-//            state.cage.insert_keyframe(kf);
-//        }
-//        kf->rotate_about_up(3.14159*1.0/180.0);
-//    }
+    ImGui::Text("Rotate Normal");
+    if (ImGui::Button("NR-")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_right(-3.14159*1.0/180.0);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("NR+")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_right(3.14159*1.0/180.0);
+    }
+    if (ImGui::Button("NU-")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_up(-3.14159*1.0/180.0);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("NU+")) {
+        if (!kf->in_bounding_cage()) {
+            state.cage.insert_keyframe(kf);
+        }
+        kf->rotate_about_up(3.14159*1.0/180.0);
+    }
 
     {
         ImGui::Text("Move Front and Back");
